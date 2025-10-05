@@ -1,0 +1,292 @@
+# ========================================
+# POPULAR FORMATS
+# ========================================
+
+[[format]]
+extension = "mp4"
+name = "MP4 (MPEG-4 Part 14)"
+category = "popular"
+video_codecs = ["h264", "hevc", "mpeg4", "av1"]
+audio_codecs = ["aac", "mp3", "ac3"]
+container = "mp4"
+stability = "stable"
+description = "Universal video container, excellent compatibility"
+typical_use = "Streaming, web, mobile devices"
+max_resolution = []
+special_params = ["-movflags", "+faststart"]
+
+[[format]]
+extension = "mkv"
+name = "MKV (Matroska)"
+category = "popular"
+video_codecs = ["h264", "hevc", "vp9", "av1", "mpeg4"]
+audio_codecs = ["aac", "opus", "vorbis", "ac3", "dts", "flac"]
+container = "matroska"
+stability = "stable"
+description = "Open-source universal container, supports everything"
+typical_use = "Archiving, multi-track, subtitles"
+max_resolution = []
+special_params = []
+
+[[format]]
+extension = "webm"
+name = "WebM"
+category = "popular"
+video_codecs = ["vp8", "vp9", "av1"]
+audio_codecs = ["opus", "vorbis"]
+container = "webm"
+stability = "stable"
+description = "Web-optimized open format"
+typical_use = "HTML5 video, YouTube"
+max_resolution = []
+special_params = ["-deadline", "good"]
+
+[[format]]
+extension = "avi"
+name = "AVI (Audio Video Interleave)"
+category = "popular"
+video_codecs = ["mpeg4", "h264", "mjpeg"]
+audio_codecs = ["mp3", "ac3", "pcm_s16le"]
+container = "avi"
+stability = "stable"
+description = "Classic Windows video format"
+typical_use = "Legacy compatibility, Windows"
+max_resolution = [2048, 2048]
+special_params = []
+
+[[format]]
+extension = "mov"
+name = "MOV (QuickTime)"
+category = "popular"
+video_codecs = ["h264", "hevc", "prores", "mjpeg"]
+audio_codecs = ["aac", "alac", "pcm_s16le"]
+container = "mov"
+stability = "stable"
+description = "Apple's professional video format"
+typical_use = "macOS, professional video editing"
+max_resolution = []
+special_params = ["-movflags", "+faststart"]
+
+# ========================================
+# STANDARD FORMATS
+# ========================================
+
+[[format]]
+extension = "m4v"
+name = "M4V (iTunes Video)"
+category = "standard"
+video_codecs = ["h264"]
+audio_codecs = ["aac"]
+container = "mp4"
+stability = "stable"
+description = "iTunes video format"
+typical_use = "iTunes Store, Apple TV"
+max_resolution = []
+special_params = []
+
+[[format]]
+extension = "flv"
+name = "FLV (Flash Video)"
+category = "standard"
+video_codecs = ["flv", "h264"]
+audio_codecs = ["mp3", "aac"]
+container = "flv"
+stability = "requiressetup"
+description = "Legacy web video format"
+typical_use = "Old web videos, Flash players"
+max_resolution = []
+special_params = []
+
+[[format]]
+extension = "wmv"
+name = "WMV (Windows Media Video)"
+category = "standard"
+video_codecs = ["wmv1", "wmv2"]
+audio_codecs = ["wmav2"]
+container = "asf"
+stability = "requiressetup"
+description = "Microsoft video format"
+typical_use = "Windows applications"
+max_resolution = []
+special_params = ["-strict", "-2"]
+
+[[format]]
+extension = "mpg"
+name = "MPG/MPEG (MPEG-1/2)"
+category = "standard"
+video_codecs = ["mpeg1video", "mpeg2video"]
+audio_codecs = ["mp2", "mp3"]
+container = "mpeg"
+stability = "stable"
+description = "Classic MPEG video"
+typical_use = "DVD, broadcast, VCD"
+max_resolution = [1920, 1080]
+special_params = []
+
+[[format]]
+extension = "mpeg"
+name = "MPEG (MPEG-1/2)"
+category = "standard"
+video_codecs = ["mpeg1video", "mpeg2video"]
+audio_codecs = ["mp2", "mp3"]
+container = "mpeg"
+stability = "stable"
+description = "Classic MPEG video"
+typical_use = "DVD, broadcast"
+max_resolution = [1920, 1080]
+special_params = []
+
+[[format]]
+extension = "ts"
+name = "TS (MPEG Transport Stream)"
+category = "standard"
+video_codecs = ["h264", "hevc", "mpeg2video"]
+audio_codecs = ["aac", "ac3", "mp2"]
+container = "mpegts"
+stability = "stable"
+description = "Transport stream for broadcasting"
+typical_use = "DVB, IPTV, streaming"
+max_resolution = []
+special_params = []
+
+# ========================================
+# SPECIALIZED FORMATS
+# ========================================
+
+[[format]]
+extension = "ogv"
+name = "OGV (Ogg Video)"
+category = "specialized"
+video_codecs = ["theora"]
+audio_codecs = ["vorbis", "opus"]
+container = "ogg"
+stability = "stable"
+description = "Open-source Theora video"
+typical_use = "Open-source projects, HTML5"
+max_resolution = []
+special_params = []
+
+[[format]]
+extension = "3gp"
+name = "3GP (3GPP)"
+category = "specialized"
+video_codecs = ["h263", "h264", "mpeg4"]
+audio_codecs = ["amr_nb", "aac"]
+container = "3gp"
+stability = "requiressetup"
+description = "Mobile phone video format"
+typical_use = "Old mobile devices"
+max_resolution = [352, 288]
+special_params = ["-strict", "experimental"]
+
+[[format]]
+extension = "mxf"
+name = "MXF (Material Exchange Format)"
+category = "specialized"
+video_codecs = ["mpeg2video", "dnxhd", "prores"]
+audio_codecs = ["pcm_s16le"]
+container = "mxf"
+stability = "requiressetup"
+description = "Professional broadcast format"
+typical_use = "Television, professional production"
+max_resolution = []
+special_params = []
+
+[[format]]
+extension = "f4v"
+name = "F4V (Flash MP4)"
+category = "specialized"
+video_codecs = ["h264"]
+audio_codecs = ["aac"]
+container = "mp4"
+stability = "stable"
+description = "Adobe Flash video in MP4"
+typical_use = "Flash Player"
+max_resolution = []
+special_params = []
+
+# ========================================
+# LEGACY FORMATS
+# ========================================
+
+[[format]]
+extension = "vob"
+name = "VOB (DVD Video Object)"
+category = "legacy"
+video_codecs = ["mpeg2video"]
+audio_codecs = ["ac3", "mp2", "pcm_s16le"]
+container = "vob"
+stability = "stable"
+description = "DVD video format"
+typical_use = "DVD discs"
+max_resolution = [720, 576]
+special_params = ["-target", "dvd"]
+
+[[format]]
+extension = "rm"
+name = "RM (RealMedia)"
+category = "legacy"
+video_codecs = ["rv10", "rv20"]
+audio_codecs = ["cook"]
+container = "rm"
+stability = "experimental"
+description = "Legacy RealPlayer format"
+typical_use = "90s internet video archives"
+max_resolution = []
+special_params = ["-strict", "-2"]
+
+[[format]]
+extension = "divx"
+name = "DivX"
+category = "legacy"
+video_codecs = ["mpeg4"]
+audio_codecs = ["mp3", "ac3"]
+container = "avi"
+stability = "stable"
+description = "DivX MPEG-4 in AVI"
+typical_use = "Legacy video collections"
+max_resolution = []
+special_params = ["-vtag", "DIVX"]
+
+# ========================================
+# EXOTIC FORMATS
+# ========================================
+
+[[format]]
+extension = "nut"
+name = "NUT"
+category = "exotic"
+video_codecs = ["h264", "mpeg4"]
+audio_codecs = ["vorbis", "mp3"]
+container = "nut"
+stability = "experimental"
+description = "FFmpeg's experimental container"
+typical_use = "Experimental projects"
+max_resolution = []
+special_params = []
+
+[[format]]
+extension = "y4m"
+name = "Y4M (YUV4MPEG2)"
+category = "exotic"
+video_codecs = ["rawvideo"]
+audio_codecs = []
+container = "yuv4mpegpipe"
+stability = "stable"
+description = "Uncompressed YUV frames"
+typical_use = "Video processing, piping"
+max_resolution = []
+special_params = []
+
+[[format]]
+extension = "dv"
+name = "DV (Digital Video)"
+category = "exotic"
+video_codecs = ["dvvideo"]
+audio_codecs = ["pcm_s16le"]
+container = "dv"
+stability = "stable"
+description = "Digital Video from cameras"
+typical_use = "MiniDV camcorders"
+max_resolution = [720, 576]
+special_params = []
