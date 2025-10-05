@@ -2,9 +2,9 @@
 name = "muxolotl-converter"
 version = "1.0.0"
 description = "High-Performance Audio & Video Converter"
-authors = ["MuXolotl Team"]
+authors = ["MuXolotl"]
 license = "MIT"
-repository = "https://github.com/muxolotl/converter"
+repository = "https://github.com/MuXolotl/MuXolotl-Converter"
 edition = "2021"
 
 [build-dependencies]
