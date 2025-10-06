@@ -1,6 +1,13 @@
 use regex::Regex;
 use std::time::Instant;
+use lazy_static::lazy_static;
 use super::ConversionProgress;
+
+lazy_static! {
+    static ref TIME_REGEX: Regex = Regex::new(r"out_time_ms=(\d+)").unwrap();
+    static ref FPS_REGEX: Regex = Regex::new(r"fps=([\d.]+)").unwrap();
+    static ref SPEED_REGEX: Regex = Regex::new(r"speed=([\d.]+)x").unwrap();
+}
 
 pub struct ProgressParser {
     total_duration: f64,
@@ -33,17 +40,17 @@ impl ProgressParser {
         let mut fps: Option<f64> = None;
         let mut speed: Option<f64> = None;
 
-        if let Some(time_match) = Regex::new(r"out_time_ms=(\d+)").unwrap().captures(line) {
+        if let Some(time_match) = TIME_REGEX.captures(line) {
             if let Ok(microseconds) = time_match[1].parse::<i64>() {
                 current_time = Some(microseconds as f64 / 1_000_000.0);
             }
         }
 
-        if let Some(fps_match) = Regex::new(r"fps=([\d.]+)").unwrap().captures(line) {
+        if let Some(fps_match) = FPS_REGEX.captures(line) {
             fps = fps_match[1].parse::<f64>().ok();
         }
 
-        if let Some(speed_match) = Regex::new(r"speed=([\d.]+)x").unwrap().captures(line) {
+        if let Some(speed_match) = SPEED_REGEX.captures(line) {
             speed = speed_match[1].parse::<f64>().ok();
         }
 

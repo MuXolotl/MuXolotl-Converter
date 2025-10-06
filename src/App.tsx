@@ -30,7 +30,7 @@ const App: React.FC = () => {
           if (f.id !== fileId) return f;
           const updated = { ...f, ...updates };
           if (outputFolder && updated.status === 'pending') {
-            if (updates.outputFormat !== undefined || updates.outputPath === undefined) {
+            if (updates.outputFormat !== undefined || updated.outputPath === undefined) {
               updated.outputPath = generateOutputPath(updated, outputFolder);
             }
           }

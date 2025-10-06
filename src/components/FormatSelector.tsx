@@ -45,32 +45,42 @@ const FormatSelector: React.FC<FormatSelectorProps> = React.memo(
     const [position, setPosition] = useState({ top: 0, left: 0, width: 0, maxHeight: 400 });
     const buttonRef = useRef<HTMLButtonElement>(null);
     const dropdownRef = useRef<HTMLDivElement>(null);
+    const updateTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+    const cleanupFnsRef = useRef<(() => void)[]>([]);
 
     const updatePosition = useCallback(() => {
       if (!buttonRef.current) return;
 
-      const rect = buttonRef.current.getBoundingClientRect();
-      const viewportHeight = window.innerHeight;
-      const viewportWidth = window.innerWidth;
-      const dropdownWidth = Math.max(rect.width, 320);
-      const spaceBelow = viewportHeight - rect.bottom - 10;
-      const spaceAbove = rect.top - 10;
-
-      let maxHeight = 450;
-      let top = rect.bottom + 4;
-
-      if (spaceBelow < 300 && spaceAbove > spaceBelow) {
-        maxHeight = Math.min(spaceAbove, 450);
-        top = rect.top - maxHeight - 4;
-      } else {
-        maxHeight = Math.min(spaceBelow, 450);
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
       }
 
-      let left = rect.left;
-      if (left + dropdownWidth > viewportWidth - 10) left = viewportWidth - dropdownWidth - 10;
-      if (left < 10) left = 10;
+      updateTimeoutRef.current = setTimeout(() => {
+        if (!buttonRef.current) return;
 
-      setPosition({ top, left, width: dropdownWidth, maxHeight });
+        const rect = buttonRef.current.getBoundingClientRect();
+        const viewportHeight = window.innerHeight;
+        const viewportWidth = window.innerWidth;
+        const dropdownWidth = Math.max(rect.width, 320);
+        const spaceBelow = viewportHeight - rect.bottom - 10;
+        const spaceAbove = rect.top - 10;
+
+        let maxHeight = 450;
+        let top = rect.bottom + 4;
+
+        if (spaceBelow < 300 && spaceAbove > spaceBelow) {
+          maxHeight = Math.min(spaceAbove, 450);
+          top = rect.top - maxHeight - 4;
+        } else {
+          maxHeight = Math.min(spaceBelow, 450);
+        }
+
+        let left = rect.left;
+        if (left + dropdownWidth > viewportWidth - 10) left = viewportWidth - dropdownWidth - 10;
+        if (left < 10) left = 10;
+
+        setPosition({ top, left, width: dropdownWidth, maxHeight });
+      }, 16);
     }, []);
 
     useEffect(() => {
@@ -98,14 +108,23 @@ const FormatSelector: React.FC<FormatSelectorProps> = React.memo(
 
       document.addEventListener('mousedown', handleClickOutside);
       document.addEventListener('keydown', handleEscape);
-      window.addEventListener('resize', updatePosition);
-      window.addEventListener('scroll', updatePosition, true);
+      window.addEventListener('resize', updatePosition, { passive: true });
+      window.addEventListener('scroll', updatePosition, { passive: true, capture: true });
+
+      cleanupFnsRef.current = [
+        () => document.removeEventListener('mousedown', handleClickOutside),
+        () => document.removeEventListener('keydown', handleEscape),
+        () => window.removeEventListener('resize', updatePosition),
+        () => window.removeEventListener('scroll', updatePosition, true),
+      ];
 
       return () => {
-        document.removeEventListener('mousedown', handleClickOutside);
-        document.removeEventListener('keydown', handleEscape);
-        window.removeEventListener('resize', updatePosition);
-        window.removeEventListener('scroll', updatePosition, true);
+        cleanupFnsRef.current.forEach(fn => fn());
+        cleanupFnsRef.current = [];
+        
+        if (updateTimeoutRef.current) {
+          clearTimeout(updateTimeoutRef.current);
+        }
       };
     }, [isOpen, updatePosition]);
 
@@ -173,6 +192,7 @@ const FormatSelector: React.FC<FormatSelectorProps> = React.memo(
                 borderRadius: '12px',
                 boxShadow: '0 20px 60px rgba(0, 0, 0, 0.7), 0 0 30px rgba(139, 92, 246, 0.4)',
                 overflow: 'hidden',
+                willChange: 'transform',
               }}
               onClick={e => e.stopPropagation()}
             >

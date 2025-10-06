@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { listen } from '@tauri-apps/api/event';
+import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/tauri';
 import { save } from '@tauri-apps/api/dialog';
 import type { FileItem, ConversionProgress, GpuInfo, ConversionContextType } from '@/types';
@@ -10,59 +10,67 @@ export const useConversion = (
 ): ConversionContextType => {
   const [isConverting, setIsConverting] = useState(false);
   const progressUpdateTimeouts = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const unlistenFns = useRef<UnlistenFn[]>([]);
 
   useEffect(() => {
-    const unlistenStart = listen<string>('conversion-started', event => {
-      console.log('✅ Conversion started:', event.payload);
-    });
-
-    const unlistenProgress = listen<ConversionProgress>('conversion-progress', event => {
-      const progress = event.payload;
-      const existingTimeout = progressUpdateTimeouts.current.get(progress.task_id);
-      if (existingTimeout) clearTimeout(existingTimeout);
-
-      const timeout = setTimeout(() => {
-        updateFile(progress.task_id, { status: 'processing', progress });
-        progressUpdateTimeouts.current.delete(progress.task_id);
-      }, 50);
-
-      progressUpdateTimeouts.current.set(progress.task_id, timeout);
-    });
-
-    const unlistenComplete = listen<string>('conversion-completed', event => {
-      console.log('✅ Conversion completed:', event.payload);
-      const taskId = event.payload;
-      const timeout = progressUpdateTimeouts.current.get(taskId);
-      if (timeout) {
-        clearTimeout(timeout);
-        progressUpdateTimeouts.current.delete(taskId);
-      }
-      updateFile(taskId, { status: 'completed', progress: null, completedAt: Date.now() });
-      setIsConverting(false);
-    });
-
-    const unlistenError = listen<{ task_id: string; error: string }>('conversion-error', event => {
-      console.error('❌ Conversion error:', event.payload);
-      const timeout = progressUpdateTimeouts.current.get(event.payload.task_id);
-      if (timeout) {
-        clearTimeout(timeout);
-        progressUpdateTimeouts.current.delete(event.payload.task_id);
-      }
-      updateFile(event.payload.task_id, {
-        status: 'failed',
-        error: event.payload.error,
-        completedAt: Date.now(),
+    const setupListeners = async () => {
+      const unlistenStart = await listen<string>('conversion-started', event => {
+        console.log('✅ Conversion started:', event.payload);
       });
-      setIsConverting(false);
-    });
+
+      const unlistenProgress = await listen<ConversionProgress>('conversion-progress', event => {
+        const progress = event.payload;
+        const existingTimeout = progressUpdateTimeouts.current.get(progress.task_id);
+        
+        if (existingTimeout) {
+          clearTimeout(existingTimeout);
+        }
+
+        const timeout = setTimeout(() => {
+          updateFile(progress.task_id, { status: 'processing', progress });
+          progressUpdateTimeouts.current.delete(progress.task_id);
+        }, 50);
+
+        progressUpdateTimeouts.current.set(progress.task_id, timeout);
+      });
+
+      const unlistenComplete = await listen<string>('conversion-completed', event => {
+        console.log('✅ Conversion completed:', event.payload);
+        const taskId = event.payload;
+        const timeout = progressUpdateTimeouts.current.get(taskId);
+        if (timeout) {
+          clearTimeout(timeout);
+          progressUpdateTimeouts.current.delete(taskId);
+        }
+        updateFile(taskId, { status: 'completed', progress: null, completedAt: Date.now() });
+        setIsConverting(false);
+      });
+
+      const unlistenError = await listen<{ task_id: string; error: string }>('conversion-error', event => {
+        console.error('❌ Conversion error:', event.payload);
+        const timeout = progressUpdateTimeouts.current.get(event.payload.task_id);
+        if (timeout) {
+          clearTimeout(timeout);
+          progressUpdateTimeouts.current.delete(event.payload.task_id);
+        }
+        updateFile(event.payload.task_id, {
+          status: 'failed',
+          error: event.payload.error,
+          completedAt: Date.now(),
+        });
+        setIsConverting(false);
+      });
+
+      unlistenFns.current = [unlistenStart, unlistenProgress, unlistenComplete, unlistenError];
+    };
+
+    setupListeners();
 
     return () => {
       progressUpdateTimeouts.current.forEach(timeout => clearTimeout(timeout));
       progressUpdateTimeouts.current.clear();
-      unlistenStart.then(fn => fn());
-      unlistenProgress.then(fn => fn());
-      unlistenComplete.then(fn => fn());
-      unlistenError.then(fn => fn());
+      unlistenFns.current.forEach(fn => fn());
+      unlistenFns.current = [];
     };
   }, [updateFile]);
 

@@ -12,19 +12,16 @@ mod validator;
 use tauri::Manager;
 use std::sync::Arc;
 use std::path::PathBuf;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::{Mutex, OnceCell};
 use std::collections::HashMap;
 use tokio::process::Child;
-use lazy_static::lazy_static;
 
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 
-lazy_static! {
-    static ref GPU_CACHE: RwLock<Option<gpu::GpuInfo>> = RwLock::new(None);
-    static ref AUDIO_FORMATS_CACHE: RwLock<Option<Vec<formats::audio::AudioFormat>>> = RwLock::new(None);
-    static ref VIDEO_FORMATS_CACHE: RwLock<Option<Vec<formats::video::VideoFormat>>> = RwLock::new(None);
-}
+static GPU_CACHE: OnceCell<gpu::GpuInfo> = OnceCell::const_new();
+static AUDIO_FORMATS_CACHE: OnceCell<Vec<formats::audio::AudioFormat>> = OnceCell::const_new();
+static VIDEO_FORMATS_CACHE: OnceCell<Vec<formats::video::VideoFormat>> = OnceCell::const_new();
 
 pub struct AppState {
     active_processes: Arc<Mutex<HashMap<String, Child>>>,
@@ -106,33 +103,25 @@ fn main() {
             let window = app.get_window("main").unwrap();
 
             tauri::async_runtime::spawn(async move {
-                let gpu_info = get_cached_or_compute(&GPU_CACHE, gpu::detect_gpu()).await;
+                let gpu_info = GPU_CACHE
+                    .get_or_init(|| async { gpu::detect_gpu().await })
+                    .await;
                 let _ = window.emit("gpu-detected", &gpu_info);
             });
 
             tauri::async_runtime::spawn(async {
-                let _ = get_cached_or_compute(&AUDIO_FORMATS_CACHE, async { formats::audio::get_all_formats() }).await;
-                let _ = get_cached_or_compute(&VIDEO_FORMATS_CACHE, async { formats::video::get_all_formats() }).await;
+                let _ = AUDIO_FORMATS_CACHE
+                    .get_or_init(|| async { formats::audio::get_all_formats() })
+                    .await;
+                let _ = VIDEO_FORMATS_CACHE
+                    .get_or_init(|| async { formats::video::get_all_formats() })
+                    .await;
             });
             
             Ok(())
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
-}
-
-async fn get_cached_or_compute<T, Fut>(cache: &RwLock<Option<T>>, compute: Fut) -> T
-where
-    T: Clone,
-    Fut: std::future::Future<Output = T>,
-{
-    if let Some(cached) = cache.read().await.clone() {
-        return cached;
-    }
-    
-    let value = compute.await;
-    *cache.write().await = Some(value.clone());
-    value
 }
 
 #[tauri::command]
@@ -265,7 +254,10 @@ fn open_folder(path: String) -> Result<(), String> {
 
 #[tauri::command]
 async fn detect_gpu() -> gpu::GpuInfo {
-    get_cached_or_compute(&GPU_CACHE, gpu::detect_gpu()).await
+    GPU_CACHE
+        .get_or_init(|| async { gpu::detect_gpu().await })
+        .await
+        .clone()
 }
 
 #[tauri::command]
@@ -275,12 +267,18 @@ async fn detect_media_type(app_handle: tauri::AppHandle, path: String) -> Result
 
 #[tauri::command]
 async fn get_audio_formats() -> Vec<formats::audio::AudioFormat> {
-    get_cached_or_compute(&AUDIO_FORMATS_CACHE, async { formats::audio::get_all_formats() }).await
+    AUDIO_FORMATS_CACHE
+        .get_or_init(|| async { formats::audio::get_all_formats() })
+        .await
+        .clone()
 }
 
 #[tauri::command]
 async fn get_video_formats() -> Vec<formats::video::VideoFormat> {
-    get_cached_or_compute(&VIDEO_FORMATS_CACHE, async { formats::video::get_all_formats() }).await
+    VIDEO_FORMATS_CACHE
+        .get_or_init(|| async { formats::video::get_all_formats() })
+        .await
+        .clone()
 }
 
 #[tauri::command]
