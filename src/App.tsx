@@ -144,7 +144,9 @@ const App: React.FC = () => {
       for (const chunk of chunks) {
         await Promise.allSettled(
           chunk.map((file) =>
-            conversionContext.startConversion(file).catch((err) => console.error(`Failed to convert ${file.name}:`, err))
+            conversionContext
+              .startConversion(file)
+              .catch((err) => console.error(`Failed to convert ${file.name}:`, err))
           )
         );
       }
