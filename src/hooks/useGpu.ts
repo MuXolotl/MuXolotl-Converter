@@ -28,7 +28,7 @@ export const useGpu = () => {
       }
     };
 
-    const unlisten = listen<GpuInfo>('gpu-detected', event => {
+    const unlisten = listen<GpuInfo>('gpu-detected', (event) => {
       setGpuInfo(event.payload);
       setIsLoading(false);
     });
@@ -36,7 +36,7 @@ export const useGpu = () => {
     initGpu();
 
     return () => {
-      unlisten.then(fn => fn());
+      unlisten.then((fn) => fn());
     };
   }, []);
 

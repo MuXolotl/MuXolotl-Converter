@@ -25,8 +25,8 @@ const App: React.FC = () => {
 
   const updateFile = useCallback(
     (fileId: string, updates: Partial<FileItem>) => {
-      setFiles(prev =>
-        prev.map(f => {
+      setFiles((prev) =>
+        prev.map((f) => {
           if (f.id !== fileId) return f;
           const updated = { ...f, ...updates };
           if (outputFolder && updated.status === 'pending') {
@@ -46,17 +46,19 @@ const App: React.FC = () => {
   useEffect(() => {
     invoke<boolean>('check_ffmpeg')
       .then(setFfmpegAvailable)
-      .catch(error => {
+      .catch((error) => {
         console.error('FFmpeg check failed:', error);
         setFfmpegAvailable(false);
-        alert(`⚠️ FFmpeg is not installed or not found in PATH.\n\nPlease install FFmpeg to use this application.\n\nError: ${error}`);
+        alert(
+          `⚠️ FFmpeg is not installed or not found in PATH.\n\nPlease install FFmpeg to use this application.\n\nError: ${error}`
+        );
       });
   }, []);
 
   useEffect(() => {
     if (outputFolder) {
-      setFiles(prev =>
-        prev.map(file =>
+      setFiles((prev) =>
+        prev.map((file) =>
           file.status === 'pending' ? { ...file, outputPath: generateOutputPath(file, outputFolder) } : file
         )
       );
@@ -78,16 +80,16 @@ const App: React.FC = () => {
   const handleFilesAdded = useCallback(
     (newFiles: FileItem[]) => {
       const filesWithPath = outputFolder
-        ? newFiles.map(file => ({ ...file, outputPath: generateOutputPath(file, outputFolder) }))
+        ? newFiles.map((file) => ({ ...file, outputPath: generateOutputPath(file, outputFolder) }))
         : newFiles;
-      setFiles(prev => [...filesWithPath, ...prev]);
+      setFiles((prev) => [...filesWithPath, ...prev]);
     },
     [outputFolder]
   );
 
   const handleFileRemove = useCallback((fileId: string) => {
-    setFiles(prev => prev.filter(f => f.id !== fileId));
-    setExpandedAdvanced(prev => {
+    setFiles((prev) => prev.filter((f) => f.id !== fileId));
+    setExpandedAdvanced((prev) => {
       const next = new Set(prev);
       next.delete(fileId);
       return next;
@@ -123,15 +125,17 @@ const App: React.FC = () => {
   }, [outputFolder]);
 
   const handleConvertAll = useCallback(async () => {
-    const pendingFiles = files.filter(f => f.status === 'pending');
+    const pendingFiles = files.filter((f) => f.status === 'pending');
     if (pendingFiles.length === 0) return;
 
-    console.log(`🚀 Starting ${parallelConversion ? 'parallel' : 'sequential'} conversion for ${pendingFiles.length} files`);
+    console.log(
+      `🚀 Starting ${parallelConversion ? 'parallel' : 'sequential'} conversion for ${pendingFiles.length} files`
+    );
 
     if (parallelConversion) {
       await Promise.allSettled(
-        pendingFiles.map(file =>
-          conversionContext.startConversion(file).catch(err => console.error(`Failed to convert ${file.name}:`, err))
+        pendingFiles.map((file) =>
+          conversionContext.startConversion(file).catch((err) => console.error(`Failed to convert ${file.name}:`, err))
         )
       );
     } else {
@@ -146,7 +150,7 @@ const App: React.FC = () => {
   }, [files, parallelConversion, conversionContext]);
 
   const handleToggleAdvanced = useCallback((fileId: string) => {
-    setExpandedAdvanced(prev => {
+    setExpandedAdvanced((prev) => {
       const next = new Set(prev);
       if (next.has(fileId)) {
         next.delete(fileId);
@@ -157,8 +161,9 @@ const App: React.FC = () => {
     });
   }, []);
 
-  const canConvert = files.some(f => f.status === 'pending') && !conversionContext.isConverting && ffmpegAvailable === true;
-  const pendingCount = files.filter(f => f.status === 'pending').length;
+  const canConvert =
+    files.some((f) => f.status === 'pending') && !conversionContext.isConverting && ffmpegAvailable === true;
+  const pendingCount = files.filter((f) => f.status === 'pending').length;
 
   if (ffmpegAvailable === null) {
     return (
@@ -228,7 +233,7 @@ const App: React.FC = () => {
                 <input
                   type="checkbox"
                   checked={parallelConversion}
-                  onChange={e => setParallelConversion(e.target.checked)}
+                  onChange={(e) => setParallelConversion(e.target.checked)}
                   className="w-4 h-4 rounded bg-white/10 border-white/20 checked:bg-primary-purple cursor-pointer"
                   title="Enable parallel processing (may increase CPU/GPU usage)"
                 />

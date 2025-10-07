@@ -25,7 +25,14 @@ import {
   formatDuration,
   formatETA,
 } from '@/constants';
-import type { FileItem, AudioFormat, VideoFormat, ValidationResult, ConversionProgress, RecommendedFormats } from '@/types';
+import type {
+  FileItem,
+  AudioFormat,
+  VideoFormat,
+  ValidationResult,
+  ConversionProgress,
+  RecommendedFormats,
+} from '@/types';
 
 interface FileCardProps {
   file: FileItem;
@@ -167,9 +174,10 @@ const FileCard: React.FC<FileCardProps> = React.memo(
     useEffect(() => {
       const loadFormats = async () => {
         try {
-          const data = shouldShowAudio || isAudio
-            ? await invoke<AudioFormat[]>('get_audio_formats')
-            : await invoke<VideoFormat[]>('get_video_formats');
+          const data =
+            shouldShowAudio || isAudio
+              ? await invoke<AudioFormat[]>('get_audio_formats')
+              : await invoke<VideoFormat[]>('get_video_formats');
           setFormats(data);
         } catch (error) {
           console.error('Failed to load formats:', error);
@@ -193,7 +201,7 @@ const FileCard: React.FC<FileCardProps> = React.memo(
           height: height || null,
         })
           .then(setRecommendedFormats)
-          .catch(error => console.error('Failed to get recommended formats:', error));
+          .catch((error) => console.error('Failed to get recommended formats:', error));
       }
     }, [file.mediaInfo, file.status]);
 
@@ -206,7 +214,7 @@ const FileCard: React.FC<FileCardProps> = React.memo(
           settings: file.settings,
         })
           .then(setValidation)
-          .catch(error => console.error('Validation failed:', error));
+          .catch((error) => console.error('Validation failed:', error));
       }
     }, [file.outputFormat, file.settings, file.status, file.mediaInfo]);
 
@@ -296,11 +304,11 @@ const FileCard: React.FC<FileCardProps> = React.memo(
                 <label className="block text-white/60 text-xs mb-1">Quality</label>
                 <select
                   value={file.settings.quality}
-                  onChange={e => handleSettingChange({ quality: e.target.value as any })}
+                  onChange={(e) => handleSettingChange({ quality: e.target.value as any })}
                   disabled={isDisabled}
                   className={selectClassName}
                 >
-                  {QUALITY_OPTIONS.map(opt => (
+                  {QUALITY_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}
                     </option>
@@ -315,7 +323,7 @@ const FileCard: React.FC<FileCardProps> = React.memo(
                   type="checkbox"
                   id={`extract-${file.id}`}
                   checked={file.settings.extractAudioOnly}
-                  onChange={e => handleExtractAudioToggle(e.target.checked)}
+                  onChange={(e) => handleExtractAudioToggle(e.target.checked)}
                   className="w-4 h-4 rounded bg-white/10 border-white/20 checked:bg-primary-purple cursor-pointer"
                 />
                 <label
@@ -354,10 +362,10 @@ const FileCard: React.FC<FileCardProps> = React.memo(
                           <label className="block text-white/60 text-xs mb-1">Sample Rate</label>
                           <select
                             value={file.settings.sampleRate || 44100}
-                            onChange={e => handleSettingChange({ sampleRate: parseInt(e.target.value) })}
+                            onChange={(e) => handleSettingChange({ sampleRate: parseInt(e.target.value) })}
                             className={selectClassName}
                           >
-                            {AUDIO_SAMPLE_RATES.map(rate => (
+                            {AUDIO_SAMPLE_RATES.map((rate) => (
                               <option key={rate} value={rate}>
                                 {rate} Hz
                               </option>
@@ -369,10 +377,10 @@ const FileCard: React.FC<FileCardProps> = React.memo(
                           <label className="block text-white/60 text-xs mb-1">Channels</label>
                           <select
                             value={file.settings.channels || 2}
-                            onChange={e => handleSettingChange({ channels: parseInt(e.target.value) })}
+                            onChange={(e) => handleSettingChange({ channels: parseInt(e.target.value) })}
                             className={selectClassName}
                           >
-                            {AUDIO_CHANNELS.map(ch => (
+                            {AUDIO_CHANNELS.map((ch) => (
                               <option key={ch.value} value={ch.value}>
                                 {ch.label}
                               </option>
@@ -386,7 +394,7 @@ const FileCard: React.FC<FileCardProps> = React.memo(
                             <input
                               type="number"
                               value={file.settings.bitrate || 192}
-                              onChange={e => handleSettingChange({ bitrate: parseInt(e.target.value) })}
+                              onChange={(e) => handleSettingChange({ bitrate: parseInt(e.target.value) })}
                               min="64"
                               max="320"
                               step="32"
@@ -407,7 +415,7 @@ const FileCard: React.FC<FileCardProps> = React.memo(
                                 ? `${file.settings.width}x${file.settings.height}`
                                 : 'original'
                             }
-                            onChange={e => {
+                            onChange={(e) => {
                               const value = e.target.value;
                               if (value === 'original') {
                                 handleSettingChange({ width: undefined, height: undefined });
@@ -418,7 +426,7 @@ const FileCard: React.FC<FileCardProps> = React.memo(
                             }}
                             className={selectClassName}
                           >
-                            {VIDEO_RESOLUTIONS.map(res => (
+                            {VIDEO_RESOLUTIONS.map((res) => (
                               <option key={res.value} value={res.value}>
                                 {res.label}
                               </option>
@@ -430,13 +438,13 @@ const FileCard: React.FC<FileCardProps> = React.memo(
                           <label className="block text-white/60 text-xs mb-1">Frame Rate</label>
                           <select
                             value={file.settings.fps?.toString() || 'original'}
-                            onChange={e => {
+                            onChange={(e) => {
                               const value = e.target.value;
                               handleSettingChange({ fps: value === 'original' ? undefined : parseInt(value) });
                             }}
                             className={selectClassName}
                           >
-                            {VIDEO_FPS.map(fps => (
+                            {VIDEO_FPS.map((fps) => (
                               <option key={fps.value} value={fps.value}>
                                 {fps.label}
                               </option>

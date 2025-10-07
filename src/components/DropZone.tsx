@@ -17,7 +17,7 @@ const DropZone: React.FC<DropZoneProps> = React.memo(({ onFilesAdded }) => {
   const processFiles = useCallback(
     async (paths: string[]) => {
       const results = await Promise.allSettled(
-        paths.map(async path => {
+        paths.map(async (path) => {
           const mediaInfo = await invoke<MediaInfo>('detect_media_type', { path });
           const fileName = path.split(/[\\/]/).pop() || path;
           return {
@@ -38,7 +38,7 @@ const DropZone: React.FC<DropZoneProps> = React.memo(({ onFilesAdded }) => {
       const fileItems: FileItem[] = [];
       const errors: string[] = [];
 
-      results.forEach(result => {
+      results.forEach((result) => {
         if (result.status === 'fulfilled') {
           fileItems.push(result.value);
         } else {
@@ -92,18 +92,18 @@ const DropZone: React.FC<DropZoneProps> = React.memo(({ onFilesAdded }) => {
       setIsDragging(false);
 
       const files = Array.from(e.dataTransfer.files) as (File & { path: string })[];
-      const paths = files.map(f => f.path).filter(Boolean);
+      const paths = files.map((f) => f.path).filter(Boolean);
       if (paths.length > 0) await processFiles(paths);
     },
     [processFiles]
   );
 
   useEffect(() => {
-    const unlisten = listen<string[]>('tauri://file-drop', async event => {
+    const unlisten = listen<string[]>('tauri://file-drop', async (event) => {
       await processFiles(event.payload);
     });
     return () => {
-      unlisten.then(fn => fn());
+      unlisten.then((fn) => fn());
     };
   }, [processFiles]);
 

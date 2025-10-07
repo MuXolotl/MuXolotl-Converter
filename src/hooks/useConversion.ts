@@ -14,14 +14,14 @@ export const useConversion = (
 
   useEffect(() => {
     const setupListeners = async () => {
-      const unlistenStart = await listen<string>('conversion-started', event => {
+      const unlistenStart = await listen<string>('conversion-started', (event) => {
         console.log('✅ Conversion started:', event.payload);
       });
 
-      const unlistenProgress = await listen<ConversionProgress>('conversion-progress', event => {
+      const unlistenProgress = await listen<ConversionProgress>('conversion-progress', (event) => {
         const progress = event.payload;
         const existingTimeout = progressUpdateTimeouts.current.get(progress.task_id);
-        
+
         if (existingTimeout) {
           clearTimeout(existingTimeout);
         }
@@ -34,7 +34,7 @@ export const useConversion = (
         progressUpdateTimeouts.current.set(progress.task_id, timeout);
       });
 
-      const unlistenComplete = await listen<string>('conversion-completed', event => {
+      const unlistenComplete = await listen<string>('conversion-completed', (event) => {
         console.log('✅ Conversion completed:', event.payload);
         const taskId = event.payload;
         const timeout = progressUpdateTimeouts.current.get(taskId);
@@ -46,7 +46,7 @@ export const useConversion = (
         setIsConverting(false);
       });
 
-      const unlistenError = await listen<{ task_id: string; error: string }>('conversion-error', event => {
+      const unlistenError = await listen<{ task_id: string; error: string }>('conversion-error', (event) => {
         console.error('❌ Conversion error:', event.payload);
         const timeout = progressUpdateTimeouts.current.get(event.payload.task_id);
         if (timeout) {
@@ -67,9 +67,9 @@ export const useConversion = (
     setupListeners();
 
     return () => {
-      progressUpdateTimeouts.current.forEach(timeout => clearTimeout(timeout));
+      progressUpdateTimeouts.current.forEach((timeout) => clearTimeout(timeout));
       progressUpdateTimeouts.current.clear();
-      unlistenFns.current.forEach(fn => fn());
+      unlistenFns.current.forEach((fn) => fn());
       unlistenFns.current = [];
     };
   }, [updateFile]);

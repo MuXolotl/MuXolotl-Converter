@@ -35,12 +35,6 @@ export default defineConfig({
     cssCodeSplit: true,
   },
   optimizeDeps: {
-    include: [
-      'react',
-      'react-dom',
-      'framer-motion',
-      '@tauri-apps/api',
-      'lucide-react',
-    ],
+    include: ['react', 'react-dom', 'framer-motion', '@tauri-apps/api', 'lucide-react'],
   },
 });

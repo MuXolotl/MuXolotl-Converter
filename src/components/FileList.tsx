@@ -41,7 +41,7 @@ const FileList: React.FC<FileListProps> = React.memo(
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-2">
           <div className="space-y-3">
-            {files.map(file => (
+            {files.map((file) => (
               <FileCard
                 key={file.id}
                 file={file}

@@ -87,7 +87,9 @@ const FormatItem = React.memo<{
         <div className="flex items-center gap-2 mb-1 flex-wrap">
           <span className="text-white font-bold text-sm uppercase font-mono">{format.extension}</span>
           {badge && (
-            <span className={`text-[9px] px-1.5 py-0.5 rounded font-semibold flex items-center gap-1 ${badge.className}`}>
+            <span
+              className={`text-[9px] px-1.5 py-0.5 rounded font-semibold flex items-center gap-1 ${badge.className}`}
+            >
               {badge.icon}
               {badge.label}
             </span>
@@ -191,22 +193,20 @@ const FormatSelector: React.FC<FormatSelectorProps> = React.memo(
       };
     }, [isOpen, updatePosition]);
 
-    const selectedFormat = useMemo(() => formats.find(f => f.extension === selected), [formats, selected]);
+    const selectedFormat = useMemo(() => formats.find((f) => f.extension === selected), [formats, selected]);
 
-    const hasRecommended = recommendedFormats && (
-      recommendedFormats.fast.length > 0 ||
-      recommendedFormats.safe.length > 0 ||
-      recommendedFormats.setup.length > 0
-    );
+    const hasRecommended =
+      recommendedFormats &&
+      (recommendedFormats.fast.length > 0 || recommendedFormats.safe.length > 0 || recommendedFormats.setup.length > 0);
 
     const filteredFormats = useMemo(() => {
       if (!hasRecommended || showAllFormats) {
         return formats;
       }
 
-      return formats.filter(f => {
+      return formats.filter((f) => {
         if (!recommendedFormats) return true;
-        
+
         return (
           recommendedFormats.fast.includes(f.extension) ||
           recommendedFormats.safe.includes(f.extension) ||
@@ -260,7 +260,9 @@ const FormatSelector: React.FC<FormatSelectorProps> = React.memo(
             </span>
             <span className="uppercase font-mono">{selectedFormat?.extension || selected}</span>
             {selectedBadge && (
-              <span className={`text-[8px] px-1 py-0.5 rounded font-semibold flex items-center gap-0.5 ${selectedBadge.className}`}>
+              <span
+                className={`text-[8px] px-1 py-0.5 rounded font-semibold flex items-center gap-0.5 ${selectedBadge.className}`}
+              >
                 {selectedBadge.icon}
                 {selectedBadge.label}
               </span>
@@ -289,7 +291,7 @@ const FormatSelector: React.FC<FormatSelectorProps> = React.memo(
                 overflow: 'hidden',
                 willChange: 'transform',
               }}
-              onClick={e => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
             >
               {hasRecommended && (
                 <div className="flex-shrink-0 p-2.5 border-b border-white/10 bg-gradient-to-r from-slate-700 to-slate-800">
@@ -297,7 +299,7 @@ const FormatSelector: React.FC<FormatSelectorProps> = React.memo(
                     <input
                       type="checkbox"
                       checked={showAllFormats}
-                      onChange={e => setShowAllFormats(e.target.checked)}
+                      onChange={(e) => setShowAllFormats(e.target.checked)}
                       className="w-3.5 h-3.5 rounded bg-white/10 border-white/20 checked:bg-primary-purple cursor-pointer"
                     />
                     <Filter size={12} className="text-white/60" />
@@ -346,7 +348,7 @@ const FormatSelector: React.FC<FormatSelectorProps> = React.memo(
                         {CATEGORY_LABELS[category as Category]}
                       </span>
                     </div>
-                    {categoryFormats.map(format => (
+                    {categoryFormats.map((format) => (
                       <FormatItem
                         key={format.extension}
                         format={format}

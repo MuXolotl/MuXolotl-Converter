@@ -7,8 +7,7 @@ export const truncatePath = (path: string, maxLength: number = 25): string => {
   return `${parts[0]}/.../${parts[parts.length - 1]}`;
 };
 
-export const getDefaultFormat = (mediaType: MediaType): string =>
-  mediaType === 'audio' ? 'mp3' : 'mp4';
+export const getDefaultFormat = (mediaType: MediaType): string => (mediaType === 'audio' ? 'mp3' : 'mp4');
 
 export const getDefaultSettings = (mediaType: MediaType, gpuAvailable: boolean): FileSettings => ({
   quality: 'medium',

@@ -47,10 +47,7 @@
       "identifier": "com.muxolotl.converter",
       "icon": ["icons/icon.ico"],
       "resources": [],
-      "externalBin": [
-        "binaries/ffmpeg",
-        "binaries/ffprobe"
-      ],
+      "externalBin": ["binaries/ffmpeg", "binaries/ffprobe"],
       "shortDescription": "High-Performance Media Converter",
       "longDescription": "Professional cross-platform audio and video converter with GPU acceleration and support for 40+ formats.",
       "windows": {
