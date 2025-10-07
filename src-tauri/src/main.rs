@@ -27,94 +27,62 @@ pub struct AppState {
     active_processes: Arc<Mutex<HashMap<String, Child>>>,
 }
 
-pub fn get_ffmpeg_path(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
-    #[cfg(target_os = "windows")]
-    let binary_name = "ffmpeg-x86_64-pc-windows-msvc.exe";
-    
-    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
-    let binary_name = "ffmpeg-x86_64-apple-darwin";
-    
-    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-    let binary_name = "ffmpeg-aarch64-apple-darwin";
-    
-    #[cfg(target_os = "linux")]
-    let binary_name = "ffmpeg-x86_64-unknown-linux-gnu";
+#[cfg(target_os = "windows")]
+const BINARY_SUFFIX: &str = "-x86_64-pc-windows-msvc.exe";
 
-    let resource_path = format!("binaries/{}", binary_name);
+#[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+const BINARY_SUFFIX: &str = "-x86_64-apple-darwin";
+
+#[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+const BINARY_SUFFIX: &str = "-aarch64-apple-darwin";
+
+#[cfg(target_os = "linux")]
+const BINARY_SUFFIX: &str = "-x86_64-unknown-linux-gnu";
+
+fn get_binary_path(app_handle: &tauri::AppHandle, binary_name: &str) -> Result<PathBuf, String> {
+    let full_name = format!("{}{}", binary_name, BINARY_SUFFIX);
+    let resource_path = format!("binaries/{}", full_name);
+
+    // Checking bundled binary
     if let Some(sidecar_path) = app_handle.path_resolver().resolve_resource(&resource_path) {
         if sidecar_path.exists() {
-            println!("✅ Found bundled FFmpeg at: {:?}", sidecar_path);
+            println!("✅ Found bundled {} at: {:?}", binary_name, sidecar_path);
             return Ok(sidecar_path);
         }
     }
 
+    // Dev mode
     #[cfg(debug_assertions)]
     {
         let dev_path = std::env::current_dir()
             .ok()
             .and_then(|p| {
-                let paths = [
-                    p.join("src-tauri").join("binaries").join(binary_name),
-                    p.join("binaries").join(binary_name),
-                ];
-                paths.iter().find(|p| p.exists()).cloned()
+                [
+                    p.join("src-tauri").join("binaries").join(&full_name),
+                    p.join("binaries").join(&full_name),
+                ]
+                .into_iter()
+                .find(|p| p.exists())
             });
 
         if let Some(path) = dev_path {
-            println!("✅ Found dev FFmpeg at: {:?}", path);
+            println!("✅ Found dev {} at: {:?}", binary_name, path);
             return Ok(path);
         }
     }
 
     Err(format!(
-        "FFmpeg binary '{}' not found. Please ensure binaries are placed in 'src-tauri/binaries/' directory.",
-        binary_name
+        "{} binary '{}' not found. Please ensure binaries are in 'src-tauri/binaries/' directory.",
+        binary_name, full_name
     ))
 }
 
+pub fn get_ffmpeg_path(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
+    get_binary_path(app_handle, "ffmpeg")
+}
+
 pub fn get_ffprobe_path(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
-    #[cfg(target_os = "windows")]
-    let binary_name = "ffprobe-x86_64-pc-windows-msvc.exe";
-    
-    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
-    let binary_name = "ffprobe-x86_64-apple-darwin";
-    
-    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-    let binary_name = "ffprobe-aarch64-apple-darwin";
-    
-    #[cfg(target_os = "linux")]
-    let binary_name = "ffprobe-x86_64-unknown-linux-gnu";
-
-    let resource_path = format!("binaries/{}", binary_name);
-    if let Some(sidecar_path) = app_handle.path_resolver().resolve_resource(&resource_path) {
-        if sidecar_path.exists() {
-            println!("✅ Found bundled FFprobe at: {:?}", sidecar_path);
-            return Ok(sidecar_path);
-        }
-    }
-
-    #[cfg(debug_assertions)]
-    {
-        let dev_path = std::env::current_dir()
-            .ok()
-            .and_then(|p| {
-                let paths = [
-                    p.join("src-tauri").join("binaries").join(binary_name),
-                    p.join("binaries").join(binary_name),
-                ];
-                paths.iter().find(|p| p.exists()).cloned()
-            });
-
-        if let Some(path) = dev_path {
-            println!("✅ Found dev FFprobe at: {:?}", path);
-            return Ok(path);
-        }
-    }
-
-    Err(format!(
-        "FFprobe binary '{}' not found. Please ensure binaries are placed in 'src-tauri/binaries/' directory.",
-        binary_name
-    ))
+    get_binary_path(app_handle, "ffprobe")
 }
 
 fn main() {
@@ -139,22 +107,18 @@ fn main() {
         .setup(|app| {
             let window = app.get_window("main").unwrap();
 
+            // Asynchronous GPU initialization
             tauri::async_runtime::spawn(async move {
-                let gpu_info = GPU_CACHE
-                    .get_or_init(|| async { gpu::detect_gpu().await })
-                    .await;
+                let gpu_info = GPU_CACHE.get_or_init(|| async { gpu::detect_gpu().await }).await;
                 let _ = window.emit("gpu-detected", &gpu_info);
             });
 
+            // Preloading formats
             tauri::async_runtime::spawn(async {
-                let _ = AUDIO_FORMATS_CACHE
-                    .get_or_init(|| async { formats::audio::get_all_formats() })
-                    .await;
-                let _ = VIDEO_FORMATS_CACHE
-                    .get_or_init(|| async { formats::video::get_all_formats() })
-                    .await;
+                let _ = AUDIO_FORMATS_CACHE.get_or_init(|| async { formats::audio::get_all_formats() }).await;
+                let _ = VIDEO_FORMATS_CACHE.get_or_init(|| async { formats::video::get_all_formats() }).await;
             });
-            
+
             Ok(())
         })
         .run(tauri::generate_context!())
@@ -165,58 +129,65 @@ fn main() {
 async fn check_ffmpeg(app_handle: tauri::AppHandle) -> Result<bool, String> {
     println!("🔍 Checking for bundled FFmpeg and FFprobe...");
 
-    let ffmpeg_path = get_ffmpeg_path(&app_handle)
-        .map_err(|e| format!("FFmpeg not found: {}\n\n📦 Please download FFmpeg binaries and place them in 'src-tauri/binaries/' directory.", e))?;
+    let ffmpeg_path = get_ffmpeg_path(&app_handle).map_err(|e| {
+        format!(
+            "FFmpeg not found: {}\n\n📦 Please download FFmpeg binaries and place them in 'src-tauri/binaries/' directory.",
+            e
+        )
+    })?;
 
-    let ffprobe_path = get_ffprobe_path(&app_handle)
-        .map_err(|e| format!("FFprobe not found: {}\n\n📦 Please download FFprobe binaries and place them in 'src-tauri/binaries/' directory.", e))?;
+    let ffprobe_path = get_ffprobe_path(&app_handle).map_err(|e| {
+        format!(
+            "FFprobe not found: {}\n\n📦 Please download FFprobe binaries and place them in 'src-tauri/binaries/' directory.",
+            e
+        )
+    })?;
 
     let ffmpeg_result = tokio::task::spawn_blocking(move || {
         let mut cmd = std::process::Command::new(&ffmpeg_path);
         cmd.arg("-version");
-        
+
         #[cfg(target_os = "windows")]
         {
             const CREATE_NO_WINDOW: u32 = 0x08000000;
             cmd.creation_flags(CREATE_NO_WINDOW);
         }
-        
+
         cmd.output()
-    }).await;
+    })
+    .await;
 
     let ffprobe_result = tokio::task::spawn_blocking(move || {
         let mut cmd = std::process::Command::new(&ffprobe_path);
         cmd.arg("-version");
-        
+
         #[cfg(target_os = "windows")]
         {
             const CREATE_NO_WINDOW: u32 = 0x08000000;
             cmd.creation_flags(CREATE_NO_WINDOW);
         }
-        
+
         cmd.output()
-    }).await;
+    })
+    .await;
 
     match (ffmpeg_result, ffprobe_result) {
         (Ok(Ok(ff)), Ok(Ok(fp))) if ff.status.success() && fp.status.success() => {
             println!("✅ Bundled FFmpeg and FFprobe are working correctly");
             Ok(true)
         }
-        (Ok(Ok(ff)), _) if !ff.status.success() => {
-            Err(format!(
-                "FFmpeg binary is corrupted or incompatible.\n\nError: {}\n\n📦 Please re-download FFmpeg binaries.",
-                String::from_utf8_lossy(&ff.stderr)
-            ))
-        }
-        (_, Ok(Ok(fp))) if !fp.status.success() => {
-            Err(format!(
-                "FFprobe binary is corrupted or incompatible.\n\nError: {}\n\n📦 Please re-download FFprobe binaries.",
-                String::from_utf8_lossy(&fp.stderr)
-            ))
-        }
-        _ => {
-            Err("Failed to execute FFmpeg/FFprobe binaries. They may be corrupted.\n\n📦 Please re-download the binaries.".to_string())
-        }
+        (Ok(Ok(ff)), _) if !ff.status.success() => Err(format!(
+            "FFmpeg binary is corrupted or incompatible.\n\nError: {}\n\n📦 Please re-download FFmpeg binaries.",
+            String::from_utf8_lossy(&ff.stderr)
+        )),
+        (_, Ok(Ok(fp))) if !fp.status.success() => Err(format!(
+            "FFprobe binary is corrupted or incompatible.\n\nError: {}\n\n📦 Please re-download FFprobe binaries.",
+            String::from_utf8_lossy(&fp.stderr)
+        )),
+        _ => Err(
+            "Failed to execute FFmpeg/FFprobe binaries. They may be corrupted.\n\n📦 Please re-download the binaries."
+                .to_string(),
+        ),
     }
 }
 
@@ -227,10 +198,8 @@ fn open_folder(path: String) -> Result<(), String> {
         {
             let mut cmd = std::process::Command::new("explorer");
             cmd.arg(&path);
-            
             const CREATE_NO_WINDOW: u32 = 0x08000000;
             cmd.creation_flags(CREATE_NO_WINDOW);
-            
             let _ = cmd.spawn();
         }
 
@@ -250,10 +219,7 @@ fn open_folder(path: String) -> Result<(), String> {
 
 #[tauri::command]
 async fn detect_gpu() -> gpu::GpuInfo {
-    GPU_CACHE
-        .get_or_init(|| async { gpu::detect_gpu().await })
-        .await
-        .clone()
+    GPU_CACHE.get_or_init(|| async { gpu::detect_gpu().await }).await.clone()
 }
 
 #[tauri::command]
@@ -286,93 +252,58 @@ async fn get_recommended_formats(
     height: Option<u32>,
 ) -> serde_json::Value {
     use serde_json::json;
-    
+
     if media_type == "video" {
         let all_formats = VIDEO_FORMATS_CACHE
             .get_or_init(|| async { formats::video::get_all_formats() })
             .await;
-        
-        let mut fast = Vec::new();
-        let mut safe = Vec::new();
-        let mut setup = Vec::new();
-        let mut experimental = Vec::new();
-        let mut problematic = Vec::new();
-        
+
+        let (mut fast, mut safe, mut setup, mut experimental, mut problematic) =
+            (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
+
         for format in all_formats.iter() {
-            let compat = format.get_compatibility_level(
-                &video_codec,
-                &audio_codec,
-                width,
-                height,
-            );
-            
-            match compat {
-                formats::video::FormatCompatibility::Fast => {
-                    fast.push(format.extension.clone());
-                }
-                formats::video::FormatCompatibility::Safe => {
-                    safe.push(format.extension.clone());
-                }
-                formats::video::FormatCompatibility::Setup => {
-                    setup.push(format.extension.clone());
-                }
-                formats::video::FormatCompatibility::Experimental => {
-                    experimental.push(format.extension.clone());
-                }
-                formats::video::FormatCompatibility::Problematic => {
-                    problematic.push(format.extension.clone());
-                }
-            }
+            let compat = format.get_compatibility_level(&video_codec, &audio_codec, width, height);
+
+            let list = match compat {
+                formats::video::FormatCompatibility::Fast => &mut fast,
+                formats::video::FormatCompatibility::Safe => &mut safe,
+                formats::video::FormatCompatibility::Setup => &mut setup,
+                formats::video::FormatCompatibility::Experimental => &mut experimental,
+                formats::video::FormatCompatibility::Problematic => &mut problematic,
+            };
+
+            list.push(format.extension.clone());
         }
-        
-        json!({
-            "fast": fast,
-            "safe": safe,
-            "setup": setup,
-            "experimental": experimental,
-            "problematic": problematic
-        })
+
+        json!({ "fast": fast, "safe": safe, "setup": setup, "experimental": experimental, "problematic": problematic })
     } else {
         let all_formats = AUDIO_FORMATS_CACHE
             .get_or_init(|| async { formats::audio::get_all_formats() })
             .await;
-        
-        let mut fast = Vec::new();
-        let mut safe = Vec::new();
-        let mut setup = Vec::new();
-        let mut experimental = Vec::new();
-        let mut problematic = Vec::new();
-        
+
+        let (mut fast, mut safe, mut setup, mut experimental, mut problematic) =
+            (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new());
+
         for format in all_formats.iter() {
             let can_copy = format.can_copy_codec(&audio_codec);
-            
-            match format.stability {
+
+            let list = match format.stability {
                 formats::Stability::Stable => {
                     if can_copy {
-                        fast.push(format.extension.clone());
+                        &mut fast
                     } else {
-                        safe.push(format.extension.clone());
+                        &mut safe
                     }
                 }
-                formats::Stability::RequiresSetup => {
-                    setup.push(format.extension.clone());
-                }
-                formats::Stability::Experimental => {
-                    experimental.push(format.extension.clone());
-                }
-                formats::Stability::Problematic => {
-                    problematic.push(format.extension.clone());
-                }
-            }
+                formats::Stability::RequiresSetup => &mut setup,
+                formats::Stability::Experimental => &mut experimental,
+                formats::Stability::Problematic => &mut problematic,
+            };
+
+            list.push(format.extension.clone());
         }
-        
-        json!({
-            "fast": fast,
-            "safe": safe,
-            "setup": setup,
-            "experimental": experimental,
-            "problematic": problematic
-        })
+
+        json!({ "fast": fast, "safe": safe, "setup": setup, "experimental": experimental, "problematic": problematic })
     }
 }
 
@@ -430,12 +361,9 @@ async fn extract_audio(
 }
 
 #[tauri::command]
-async fn cancel_conversion(
-    state: tauri::State<'_, AppState>,
-    task_id: String,
-) -> Result<(), String> {
+async fn cancel_conversion(state: tauri::State<'_, AppState>, task_id: String) -> Result<(), String> {
     println!("⛔ Cancelling conversion: {}", task_id);
-    
+
     if let Some(mut child) = state.active_processes.lock().await.remove(&task_id) {
         match child.kill().await {
             Ok(_) => println!("✅ Killed FFmpeg process for task: {}", task_id),
@@ -444,6 +372,6 @@ async fn cancel_conversion(
     } else {
         println!("⚠️ No active process found for task: {}", task_id);
     }
-    
+
     Ok(())
 }

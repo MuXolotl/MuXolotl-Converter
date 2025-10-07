@@ -66,7 +66,8 @@ pub async fn detect_media_type(app_handle: &tauri::AppHandle, path: &str) -> Res
     }
 
     let json_str = String::from_utf8(output.stdout).context("Invalid UTF-8 in ffprobe output")?;
-    let probe_result: serde_json::Value = serde_json::from_str(&json_str).context("Failed to parse ffprobe JSON")?;
+    let probe_result: serde_json::Value = serde_json::from_str(&json_str)
+        .context("Failed to parse ffprobe JSON")?;
 
     parse_media_info(&probe_result, path)
 }
@@ -74,15 +75,23 @@ pub async fn detect_media_type(app_handle: &tauri::AppHandle, path: &str) -> Res
 fn parse_media_info(probe: &serde_json::Value, path: &str) -> Result<MediaInfo> {
     let format = probe.get("format").context("No format information")?;
 
-    let duration = format.get("duration")
+    let duration = format
+        .get("duration")
         .and_then(|d| d.as_str())
         .and_then(|s| s.parse::<f64>().ok())
         .unwrap_or(0.0);
 
     let file_size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
-    let format_name = format.get("format_name").and_then(|f| f.as_str()).unwrap_or("unknown").to_string();
+    let format_name = format
+        .get("format_name")
+        .and_then(|f| f.as_str())
+        .unwrap_or("unknown")
+        .to_string();
 
-    let streams = probe.get("streams").and_then(|s| s.as_array()).context("No streams found")?;
+    let streams = probe
+        .get("streams")
+        .and_then(|s| s.as_array())
+        .context("No streams found")?;
 
     let mut video_streams = Vec::new();
     let mut audio_streams = Vec::new();
@@ -126,13 +135,14 @@ fn parse_video_stream(stream: &serde_json::Value) -> Option<VideoStream> {
     let width = stream.get("width")?.as_u64()? as u32;
     let height = stream.get("height")?.as_u64()? as u32;
 
-    let fps = stream.get("r_frame_rate")
+    let fps = stream
+        .get("r_frame_rate")
         .and_then(|f| f.as_str())
         .and_then(|s| {
             let parts: Vec<&str> = s.split('/').collect();
             if parts.len() == 2 {
-                let num: f64 = parts[0].parse().ok()?;
-                let den: f64 = parts[1].parse().ok()?;
+                let num = parts[0].parse::<f64>().ok()?;
+                let den = parts[1].parse::<f64>().ok()?;
                 Some(if den != 0.0 { num / den } else { 0.0 })
             } else {
                 None
@@ -140,20 +150,33 @@ fn parse_video_stream(stream: &serde_json::Value) -> Option<VideoStream> {
         })
         .unwrap_or(0.0);
 
-    let bitrate = stream.get("bit_rate")
+    let bitrate = stream
+        .get("bit_rate")
         .and_then(|b| b.as_str())
         .and_then(|s| s.parse::<u64>().ok());
 
-    Some(VideoStream { codec, width, height, fps, bitrate })
+    Some(VideoStream {
+        codec,
+        width,
+        height,
+        fps,
+        bitrate,
+    })
 }
 
 fn parse_audio_stream(stream: &serde_json::Value) -> Option<AudioStream> {
     let codec = stream.get("codec_name")?.as_str()?.to_string();
     let sample_rate = stream.get("sample_rate")?.as_str()?.parse::<u32>().ok()?;
     let channels = stream.get("channels")?.as_u64()? as u32;
-    let bitrate = stream.get("bit_rate")
+    let bitrate = stream
+        .get("bit_rate")
         .and_then(|b| b.as_str())
         .and_then(|s| s.parse::<u64>().ok());
 
-    Some(AudioStream { codec, sample_rate, channels, bitrate })
+    Some(AudioStream {
+        codec,
+        sample_rate,
+        channels,
+        bitrate,
+    })
 }

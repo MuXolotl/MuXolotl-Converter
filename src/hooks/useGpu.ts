@@ -17,25 +17,32 @@ export const useGpu = () => {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
+
     const initGpu = async () => {
       try {
         const info = await invoke<GpuInfo>('detect_gpu');
-        setGpuInfo(info);
+        if (isMounted) {
+          setGpuInfo(info);
+          setIsLoading(false);
+        }
       } catch (error) {
         console.error('Failed to detect GPU:', error);
-      } finally {
-        setIsLoading(false);
+        if (isMounted) setIsLoading(false);
       }
     };
 
     const unlisten = listen<GpuInfo>('gpu-detected', (event) => {
-      setGpuInfo(event.payload);
-      setIsLoading(false);
+      if (isMounted) {
+        setGpuInfo(event.payload);
+        setIsLoading(false);
+      }
     });
 
     initGpu();
 
     return () => {
+      isMounted = false;
       unlisten.then((fn) => fn());
     };
   }, []);

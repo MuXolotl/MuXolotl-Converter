@@ -31,11 +31,21 @@ impl ProgressParser {
     }
 
     pub fn parse_line(&mut self, line: &str) -> Option<ConversionProgress> {
-        let elapsed = self.last_update.elapsed().as_millis();
-        
         let is_final_progress = line.contains("progress=end");
-        
-        if elapsed < self.update_interval_ms && self.last_progress.is_some() && !is_final_progress {
+
+        if is_final_progress {
+            if let Some(last) = &self.last_progress {
+                let mut final_progress = last.clone();
+                final_progress.percent = 100.0;
+                final_progress.eta_seconds = Some(0);
+                final_progress.current_time = self.total_duration;
+                return Some(final_progress);
+            }
+        }
+
+        let elapsed = self.last_update.elapsed().as_millis();
+
+        if elapsed < self.update_interval_ms && self.last_progress.is_some() {
             return None;
         }
 
@@ -66,25 +76,29 @@ impl ProgressParser {
 
             let eta_seconds = if time > 0.0 && self.total_duration > time {
                 if let Some(spd) = speed {
-                    let remaining = self.total_duration - time;
                     if spd > 0.0 {
+                        let remaining = self.total_duration - time;
                         Some((remaining / spd) as u64)
                     } else {
                         None
                     }
                 } else {
                     let elapsed = self.start_time.elapsed().as_secs_f64();
-                    let remaining_duration = self.total_duration - time;
-                    let current_speed = time / elapsed;
-                    
-                    if current_speed > 0.0 {
-                        Some((remaining_duration / current_speed) as u64)
+                    if elapsed > 0.0 && time > 0.0 {
+                        let remaining_duration = self.total_duration - time;
+                        let current_speed = time / elapsed;
+                        
+                        if current_speed > 0.0 {
+                            Some((remaining_duration / current_speed) as u64)
+                        } else {
+                            None
+                        }
                     } else {
                         None
                     }
                 }
             } else {
-                None
+                Some(0)
             };
 
             self.last_update = Instant::now();
@@ -101,15 +115,6 @@ impl ProgressParser {
 
             self.last_progress = Some(progress.clone());
             return Some(progress);
-        }
-
-        if is_final_progress {
-            if let Some(last) = &self.last_progress {
-                let mut final_progress = last.clone();
-                final_progress.percent = 100.0;
-                final_progress.eta_seconds = Some(0);
-                return Some(final_progress);
-            }
         }
 
         None

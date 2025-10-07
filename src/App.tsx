@@ -2,15 +2,15 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { open as openDialog } from '@tauri-apps/api/dialog';
 import { FolderOpen, ExternalLink } from 'lucide-react';
-import Header from './components/Header';
-import GpuIndicator from './components/GpuIndicator';
-import DropZone from './components/DropZone';
-import FileList from './components/FileList';
-import ConvertButton from './components/ConvertButton';
-import { useGpu } from './hooks/useGpu';
-import { useConversion } from './hooks/useConversion';
-import { truncatePath, generateOutputPath } from './utils';
-import type { FileItem, ConversionContextType } from './types';
+import Header from '@/components/Header';
+import GpuIndicator from '@/components/GpuIndicator';
+import DropZone from '@/components/DropZone';
+import FileList from '@/components/FileList';
+import ConvertButton from '@/components/ConvertButton';
+import { useGpu } from '@/hooks/useGpu';
+import { useConversion } from '@/hooks/useConversion';
+import { truncatePath, generateOutputPath, sortFilesByStatus } from '@/utils';
+import type { FileItem, ConversionContextType } from '@/types';
 
 export const ConversionContext = React.createContext<ConversionContextType | null>(null);
 
@@ -23,23 +23,22 @@ const App: React.FC = () => {
 
   const { gpuInfo, isLoading: gpuLoading } = useGpu();
 
-  const updateFile = useCallback(
-    (fileId: string, updates: Partial<FileItem>) => {
-      setFiles((prev) =>
-        prev.map((f) => {
-          if (f.id !== fileId) return f;
-          const updated = { ...f, ...updates };
-          if (outputFolder && updated.status === 'pending') {
-            if (updates.outputFormat !== undefined || updated.outputPath === undefined) {
-              updated.outputPath = generateOutputPath(updated, outputFolder);
-            }
+  const updateFile = useCallback((fileId: string, updates: Partial<FileItem>) => {
+    setFiles((prev) =>
+      prev.map((f) => {
+        if (f.id !== fileId) return f;
+        const updated = { ...f, ...updates };
+        
+        if (outputFolder && updated.status === 'pending') {
+          if (updates.outputFormat !== undefined || updated.outputPath === undefined) {
+            updated.outputPath = generateOutputPath(updated, outputFolder);
           }
-          return updated;
-        })
-      );
-    },
-    [outputFolder]
-  );
+        }
+        
+        return updated;
+      })
+    );
+  }, [outputFolder]);
 
   const conversionContext = useConversion(updateFile, gpuInfo);
 
@@ -59,28 +58,23 @@ const App: React.FC = () => {
     if (outputFolder) {
       setFiles((prev) =>
         prev.map((file) =>
-          file.status === 'pending' ? { ...file, outputPath: generateOutputPath(file, outputFolder) } : file
+          file.status === 'pending' 
+            ? { ...file, outputPath: generateOutputPath(file, outputFolder) } 
+            : file
         )
       );
     }
   }, [outputFolder]);
 
-  const sortedFiles = useMemo(() => {
-    const statusOrder = { processing: 0, pending: 1, cancelled: 2, failed: 3, completed: 4 };
-    return [...files].sort((a, b) => {
-      const diff = statusOrder[a.status] - statusOrder[b.status];
-      if (diff !== 0) return diff;
-      if (['completed', 'failed', 'cancelled'].includes(a.status)) {
-        return (b.completedAt || 0) - (a.completedAt || 0);
-      }
-      return (b.addedAt || 0) - (a.addedAt || 0);
-    });
-  }, [files]);
+  const sortedFiles = useMemo(() => sortFilesByStatus(files), [files]);
 
   const handleFilesAdded = useCallback(
     (newFiles: FileItem[]) => {
       const filesWithPath = outputFolder
-        ? newFiles.map((file) => ({ ...file, outputPath: generateOutputPath(file, outputFolder) }))
+        ? newFiles.map((file) => ({ 
+            ...file, 
+            outputPath: generateOutputPath(file, outputFolder) 
+          }))
         : newFiles;
       setFiles((prev) => [...filesWithPath, ...prev]);
     },
@@ -98,7 +92,12 @@ const App: React.FC = () => {
 
   const handleRetry = useCallback(
     (fileId: string) => {
-      updateFile(fileId, { status: 'pending', progress: null, error: null, completedAt: undefined });
+      updateFile(fileId, { 
+        status: 'pending', 
+        progress: null, 
+        error: null, 
+        completedAt: undefined 
+      });
     },
     [updateFile]
   );
@@ -135,7 +134,8 @@ const App: React.FC = () => {
     if (parallelConversion) {
       await Promise.allSettled(
         pendingFiles.map((file) =>
-          conversionContext.startConversion(file).catch((err) => console.error(`Failed to convert ${file.name}:`, err))
+          conversionContext.startConversion(file)
+            .catch((err) => console.error(`Failed to convert ${file.name}:`, err))
         )
       );
     } else {
@@ -152,17 +152,15 @@ const App: React.FC = () => {
   const handleToggleAdvanced = useCallback((fileId: string) => {
     setExpandedAdvanced((prev) => {
       const next = new Set(prev);
-      if (next.has(fileId)) {
-        next.delete(fileId);
-      } else {
-        next.add(fileId);
-      }
+      next.has(fileId) ? next.delete(fileId) : next.add(fileId);
       return next;
     });
   }, []);
 
-  const canConvert =
-    files.some((f) => f.status === 'pending') && !conversionContext.isConverting && ffmpegAvailable === true;
+  const canConvert = files.some((f) => f.status === 'pending') 
+    && !conversionContext.isConverting 
+    && ffmpegAvailable === true;
+    
   const pendingCount = files.filter((f) => f.status === 'pending').length;
 
   if (ffmpegAvailable === null) {
@@ -206,7 +204,9 @@ const App: React.FC = () => {
                     {outputFolder ? (
                       <>
                         <div className="text-white text-xs font-semibold">Output Folder:</div>
-                        <div className="text-white/80 text-xs truncate font-mono">{truncatePath(outputFolder)}</div>
+                        <div className="text-white/80 text-xs truncate font-mono">
+                          {truncatePath(outputFolder)}
+                        </div>
                       </>
                     ) : (
                       <div className="text-white text-sm font-semibold">Select Output Folder</div>
@@ -217,13 +217,16 @@ const App: React.FC = () => {
                 <button
                   onClick={handleOpenOutputFolder}
                   disabled={!outputFolder}
-                  className={`glass px-3 py-3 flex items-center justify-center transition-all flex-shrink-0 w-12
-                           ${outputFolder ? 'hover:bg-white/10 cursor-pointer' : 'opacity-30 cursor-not-allowed'}`}
+                  className={`glass px-3 py-3 flex items-center justify-center transition-all flex-shrink-0 w-12 ${
+                    outputFolder ? 'hover:bg-white/10 cursor-pointer' : 'opacity-30 cursor-not-allowed'
+                  }`}
                   title={outputFolder ? 'Open output folder' : 'No folder selected'}
                 >
                   <ExternalLink
                     size={18}
-                    className={`${outputFolder ? 'text-primary-pink hover:scale-110' : 'text-white/40'} transition-all`}
+                    className={`${
+                      outputFolder ? 'text-primary-pink hover:scale-110' : 'text-white/40'
+                    } transition-all`}
                   />
                 </button>
               </div>

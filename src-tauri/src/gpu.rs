@@ -37,14 +37,14 @@ impl Default for GpuInfo {
     }
 }
 
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 fn create_hidden_command(program: &str) -> Command {
     let mut cmd = Command::new(program);
     
     #[cfg(target_os = "windows")]
-    {
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        cmd.creation_flags(CREATE_NO_WINDOW);
-    }
+    cmd.creation_flags(CREATE_NO_WINDOW);
     
     cmd
 }
@@ -54,14 +54,8 @@ fn check_ffmpeg_encoder(encoder: &str) -> bool {
         .args(&["-hide_banner", "-encoders"])
         .output()
         .ok()
-        .and_then(|output| {
-            if output.status.success() {
-                let encoders = String::from_utf8_lossy(&output.stdout);
-                Some(encoders.contains(encoder))
-            } else {
-                None
-            }
-        })
+        .filter(|output| output.status.success())
+        .map(|output| String::from_utf8_lossy(&output.stdout).contains(encoder))
         .unwrap_or(false)
 }
 
@@ -73,27 +67,24 @@ fn detect_gpu_by_keywords(keywords: &[&str]) -> Option<String> {
             .output()
             .ok()?;
         
-        let devices = String::from_utf8_lossy(&output.stdout);
-        for line in devices.lines() {
-            if keywords.iter().any(|kw| line.to_lowercase().contains(kw)) {
-                return Some(line.trim().to_string());
-            }
-        }
+        String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .find(|line| keywords.iter().any(|kw| line.to_lowercase().contains(kw)))
+            .map(|s| s.trim().to_string())
     }
 
     #[cfg(target_os = "linux")]
     {
         let output = create_hidden_command("lspci").output().ok()?;
-        let devices = String::from_utf8_lossy(&output.stdout);
-        for line in devices.lines() {
-            if keywords.iter().any(|kw| line.to_lowercase().contains(kw)) && 
-               line.to_lowercase().contains("vga") {
-                let parts: Vec<&str> = line.split(':').collect();
-                if parts.len() > 2 {
-                    return Some(parts[2].trim().to_string());
-                }
-            }
-        }
+        String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .find(|line| {
+                keywords.iter().any(|kw| line.to_lowercase().contains(kw)) &&
+                line.to_lowercase().contains("vga")
+            })
+            .and_then(|line| {
+                line.split(':').nth(2).map(|s| s.trim().to_string())
+            })
     }
 
     #[cfg(target_os = "macos")]
@@ -105,22 +96,54 @@ fn detect_gpu_by_keywords(keywords: &[&str]) -> Option<String> {
         
         let info = String::from_utf8_lossy(&output.stdout);
         if keywords.iter().any(|kw| info.to_lowercase().contains(kw)) {
-            for line in info.lines() {
-                if line.contains("Chipset Model:") {
-                    let parts: Vec<&str> = line.split(':').collect();
-                    if parts.len() > 1 {
-                        return Some(parts[1].trim().to_string());
-                    }
-                }
-            }
+            info.lines()
+                .find(|line| line.contains("Chipset Model:"))
+                .and_then(|line| {
+                    line.split(':').nth(1).map(|s| s.trim().to_string())
+                })
+        } else {
+            None
         }
     }
 
+    #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
     None
 }
 
+struct GpuDetector {
+    vendor: GpuVendor,
+    keywords: &'static [&'static str],
+    h264_encoder: &'static str,
+    h265_encoder: &'static str,
+    decoder: &'static str,
+}
+
+const GPU_DETECTORS: &[GpuDetector] = &[
+    GpuDetector {
+        vendor: GpuVendor::Nvidia,
+        keywords: &["nvidia"],
+        h264_encoder: "h264_nvenc",
+        h265_encoder: "hevc_nvenc",
+        decoder: "h264_cuvid",
+    },
+    GpuDetector {
+        vendor: GpuVendor::Intel,
+        keywords: &["intel", "hd graphics", "uhd graphics", "iris"],
+        h264_encoder: "h264_qsv",
+        h265_encoder: "hevc_qsv",
+        decoder: "h264_qsv",
+    },
+    GpuDetector {
+        vendor: GpuVendor::Amd,
+        keywords: &["amd", "radeon"],
+        h264_encoder: "h264_amf",
+        h265_encoder: "hevc_amf",
+        decoder: "h264_amf",
+    },
+];
+
 pub async fn detect_gpu() -> GpuInfo {
-    // NVIDIA
+    // NVIDIA (nvidia-smi)
     if let Some(gpu_name) = create_hidden_command("nvidia-smi")
         .args(&["--query-gpu=name", "--format=csv,noheader"])
         .output()
@@ -144,35 +167,23 @@ pub async fn detect_gpu() -> GpuInfo {
         }
     }
 
-    // Intel
-    if let Some(gpu_name) = detect_gpu_by_keywords(&["intel", "hd graphics", "uhd graphics", "iris"]) {
-        if check_ffmpeg_encoder("h264_qsv") {
-            return GpuInfo {
-                vendor: GpuVendor::Intel,
-                name: gpu_name,
-                encoder_h264: Some("h264_qsv".to_string()),
-                encoder_h265: Some("hevc_qsv".to_string()),
-                decoder: Some("h264_qsv".to_string()),
-                available: true,
-            };
+    // Other GPU
+    for detector in GPU_DETECTORS {
+        if let Some(gpu_name) = detect_gpu_by_keywords(detector.keywords) {
+            if check_ffmpeg_encoder(detector.h264_encoder) {
+                return GpuInfo {
+                    vendor: detector.vendor.clone(),
+                    name: gpu_name,
+                    encoder_h264: Some(detector.h264_encoder.to_string()),
+                    encoder_h265: Some(detector.h265_encoder.to_string()),
+                    decoder: Some(detector.decoder.to_string()),
+                    available: true,
+                };
+            }
         }
     }
 
-    // AMD
-    if let Some(gpu_name) = detect_gpu_by_keywords(&["amd", "radeon"]) {
-        if check_ffmpeg_encoder("h264_amf") {
-            return GpuInfo {
-                vendor: GpuVendor::Amd,
-                name: gpu_name,
-                encoder_h264: Some("h264_amf".to_string()),
-                encoder_h265: Some("hevc_amf".to_string()),
-                decoder: Some("h264_amf".to_string()),
-                available: true,
-            };
-        }
-    }
-
-    // Apple
+    // Apple Silicon (macOS)
     #[cfg(target_os = "macos")]
     {
         if check_ffmpeg_encoder("h264_videotoolbox") {
@@ -181,16 +192,11 @@ pub async fn detect_gpu() -> GpuInfo {
                 .output()
                 .ok()
                 .and_then(|output| {
-                    let info = String::from_utf8_lossy(&output.stdout);
-                    for line in info.lines() {
-                        if line.contains("Chipset Model:") {
-                            let parts: Vec<&str> = line.split(':').collect();
-                            if parts.len() > 1 {
-                                return Some(parts[1].trim().to_string());
-                            }
-                        }
-                    }
-                    None
+                    String::from_utf8_lossy(&output.stdout)
+                        .lines()
+                        .find(|line| line.contains("Chipset Model:"))
+                        .and_then(|line| line.split(':').nth(1))
+                        .map(|s| s.trim().to_string())
                 })
                 .unwrap_or_else(|| "Apple GPU".to_string());
 

@@ -60,6 +60,7 @@ fn validate_audio(
         return result;
     };
 
+    // Stability check
     match output.stability {
         formats::Stability::Problematic => {
             result.add_error(format!(
@@ -68,95 +69,77 @@ fn validate_audio(
             ));
         }
         formats::Stability::Experimental => {
-            result.add_warning(format!(
-                "Format '{}' is experimental. Use with caution.",
-                output.extension
-            ));
+            result.add_warning(format!("Format '{}' is experimental. Use with caution.", output.extension));
         }
         formats::Stability::RequiresSetup => {
-            result.add_warning(format!(
-                "Format '{}' requires special setup or libraries.",
-                output.extension
-            ));
+            result.add_warning(format!("Format '{}' requires special setup or libraries.", output.extension));
             result.extend_params(output.special_params.clone());
         }
         _ => {}
     }
 
+    // Checking the conversion quality
     if let Some(input) = formats::audio::get_format(input_format) {
-        if input.lossy && !output.lossy {
-            result.add_warning(
-                "Converting lossy→lossless will NOT improve quality. File size will increase unnecessarily."
-            );
-        } else if !input.lossy && output.lossy {
-            result.add_warning(
-                "Converting lossless→lossy will reduce quality permanently."
-            );
+        match (input.lossy, output.lossy) {
+            (true, false) => {
+                result.add_warning(
+                    "Converting lossy→lossless will NOT improve quality. File size will increase unnecessarily."
+                );
+            }
+            (false, true) => {
+                result.add_warning("Converting lossless→lossy will reduce quality permanently.");
+            }
+            _ => {}
         }
     }
 
-    if let Some(sample_rate) = settings.get("sampleRate").and_then(|s| s.as_u64()) {
-        let sr = sample_rate as u32;
-        
-        if !output.supports_sample_rate(sr) {
+    // Checking the sample rate
+    if let Some(sr) = settings.get("sampleRate").and_then(|s| s.as_u64()) {
+        let sample_rate = sr as u32;
+        if !output.supports_sample_rate(sample_rate) {
             result.add_warning(format!(
-                "Sample rate {}Hz is not supported by {}. Supported rates: {:?}. Recommended: {}Hz",
-                sr, output.extension, output.sample_rates, output.recommended_sample_rate
+                "Sample rate {}Hz not supported by {}. Recommended: {}Hz",
+                sample_rate, output.extension, output.recommended_sample_rate
             ));
         }
     }
 
-    if let Some(channels) = settings.get("channels").and_then(|c| c.as_u64()) {
-        let ch = channels as u32;
-        
-        if !output.supports_channels(ch) {
+    // Checking channels
+    if let Some(ch) = settings.get("channels").and_then(|c| c.as_u64()) {
+        let channels = ch as u32;
+        if !output.supports_channels(channels) {
             result.add_error(format!(
                 "Format '{}' does not support {} channel(s). Supported: {:?}",
-                output.extension, ch, output.channels_support
+                output.extension, channels, output.channels_support
             ));
         }
     }
 
+    // Checking bitrate
     if output.lossy {
-        if let Some(bitrate) = settings.get("bitrate").and_then(|b| b.as_u64()) {
-            let br = bitrate as u32;
-            
-            if let Err(err) = output.validate_bitrate(br) {
+        if let Some(br) = settings.get("bitrate").and_then(|b| b.as_u64()) {
+            if let Err(err) = output.validate_bitrate(br as u32) {
                 result.add_warning(err);
             }
         }
     }
 
+    // Specific warnings
     match output.extension.as_str() {
-        "amr" => {
-            result.add_warning("AMR is designed for voice/telephony. Not suitable for music.");
-        }
-        "ac3" | "dts" => {
-            if settings.get("channels").and_then(|c| c.as_u64()).unwrap_or(2) < 3 {
-                result.add_warning(format!(
-                    "{} is designed for surround sound (3+ channels). For stereo, consider AAC or MP3.",
-                    output.extension.to_uppercase()
-                ));
-            }
-        }
-        "ape" | "tak" | "tta" => {
+        "amr" => result.add_warning("AMR is designed for voice/telephony. Not suitable for music."),
+        "ac3" | "dts" if settings.get("channels").and_then(|c| c.as_u64()).unwrap_or(2) < 3 => {
             result.add_warning(format!(
-                "{} is a niche format with limited player support.",
-                output.name
+                "{} is designed for surround sound (3+ channels). For stereo, consider AAC or MP3.",
+                output.extension.to_uppercase()
             ));
         }
-        "shn" => {
-            result.add_warning("Shorten (SHN) is an obsolete format. Consider FLAC instead.");
+        "ape" | "tak" | "tta" => {
+            result.add_warning(format!("{} is a niche format with limited player support.", output.name));
         }
-        "ra" => {
-            result.add_warning("RealAudio is a legacy format. Modern players may not support it.");
-        }
-        "spx" => {
-            result.add_warning("Speex is optimized for speech, not music. Consider Opus for better quality.");
-        }
-        "wma" => {
-            result.add_warning("WMA has limited support outside Windows ecosystem.");
-        }
+        "shn" => result.add_warning("Shorten (SHN) is an obsolete format. Consider FLAC instead."),
+        "ra" => result.add_warning("RealAudio is a legacy format. Modern players may not support it."),
+        "spx" => result.add_warning("Speex is optimized for speech, not music. Consider Opus for better quality."),
+        "wma" => result.add_warning("WMA has limited support outside Windows ecosystem."),
         _ => {}
     }
 
@@ -175,29 +158,22 @@ fn validate_video(output_format: &str, settings: serde_json::Value) -> Validatio
         return result;
     };
 
+    // Stability check
     match output.stability {
         formats::Stability::Problematic => {
-            result.add_error(format!(
-                "Format '{}' is problematic. Conversion may fail.",
-                output.extension
-            ));
+            result.add_error(format!("Format '{}' is problematic. Conversion may fail.", output.extension));
         }
         formats::Stability::Experimental => {
-            result.add_warning(format!(
-                "Format '{}' is experimental.",
-                output.extension
-            ));
+            result.add_warning(format!("Format '{}' is experimental.", output.extension));
         }
         formats::Stability::RequiresSetup => {
-            result.add_warning(format!(
-                "Format '{}' requires special setup.",
-                output.extension
-            ));
+            result.add_warning(format!("Format '{}' requires special setup.", output.extension));
             result.extend_params(output.special_params.clone());
         }
         _ => {}
     }
 
+    // Checking resolution
     if let Some(max_res) = output.max_resolution {
         if let (Some(width), Some(height)) = (
             settings.get("width").and_then(|w| w.as_u64()),
@@ -209,35 +185,30 @@ fn validate_video(output_format: &str, settings: serde_json::Value) -> Validatio
                     width, height, max_res.0, max_res.1, output.extension
                 ));
             }
-            
+
             if width % 2 != 0 || height % 2 != 0 {
-                result.add_warning(
-                    "Odd dimensions will be adjusted to even values automatically."
-                );
+                result.add_warning("Odd dimensions will be adjusted to even values automatically.");
             }
         }
     }
 
+    // Checking the video codec
     if let Some(codec) = settings.get("videoCodec").and_then(|c| c.as_str()) {
         if !output.supports_video_codec(codec) {
             result.add_error(format!(
                 "{} doesn't support '{}' video codec. Allowed: {:?}",
                 output.extension, codec, output.video_codecs
             ));
-            
+
             if let Some(default) = output.get_default_video_codec() {
                 result.alternative_codec = Some(default.to_string());
             }
         }
-    } else {
-        if let Some(default) = output.get_default_video_codec() {
-            result.add_warning(format!(
-                "Video will use {} codec (default for {}).",
-                default, output.extension
-            ));
-        }
+    } else if let Some(default) = output.get_default_video_codec() {
+        result.add_warning(format!("Video will use {} codec (default for {}).", default, output.extension));
     }
 
+    // Checking the audio codec
     if let Some(audio_codec) = settings.get("audioCodec").and_then(|c| c.as_str()) {
         if !output.supports_audio_codec(audio_codec) {
             result.add_error(format!(
@@ -247,10 +218,7 @@ fn validate_video(output_format: &str, settings: serde_json::Value) -> Validatio
         }
     } else if !output.audio_codecs.is_empty() {
         if let Some(default) = output.get_default_audio_codec() {
-            result.add_warning(format!(
-                "Audio will use {} codec.",
-                default
-            ));
+            result.add_warning(format!("Audio will use {} codec.", default));
         }
     }
 

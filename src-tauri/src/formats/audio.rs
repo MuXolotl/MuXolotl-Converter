@@ -26,10 +26,12 @@ pub struct AudioFormat {
 }
 
 impl AudioFormat {
+    #[inline]
     pub fn supports_sample_rate(&self, sample_rate: u32) -> bool {
         self.sample_rates.contains(&sample_rate)
     }
 
+    #[inline]
     pub fn supports_channels(&self, channels: u32) -> bool {
         self.channels_support.contains(&channels)
     }
@@ -40,16 +42,10 @@ impl AudioFormat {
         }
 
         if let Some((min, max)) = self.bitrate_range {
-            if bitrate < min {
+            if bitrate < min || bitrate > max {
                 return Err(format!(
-                    "Bitrate {}kbps is below minimum {}kbps for {}",
-                    bitrate, min, self.extension
-                ));
-            }
-            if bitrate > max {
-                return Err(format!(
-                    "Bitrate {}kbps exceeds maximum {}kbps for {}",
-                    bitrate, max, self.extension
+                    "Bitrate {}kbps out of range [{}-{}] for {}",
+                    bitrate, min, max, self.extension
                 ));
             }
         }
@@ -73,118 +69,81 @@ impl AudioFormat {
         })
     }
 
+    #[inline]
     pub fn get_ffmpeg_codec(&self) -> String {
-        match self.codec.as_str() {
-            "aac" => "aac".to_string(),
-            "libmp3lame" => "libmp3lame".to_string(),
-            "libvorbis" => "libvorbis".to_string(),
-            "libopus" => "libopus".to_string(),
-            "flac" => "flac".to_string(),
-            "alac" => "alac".to_string(),
-            "pcm_s16le" => "pcm_s16le".to_string(),
-            "pcm_s16be" => "pcm_s16be".to_string(),
-            "wavpack" => "wavpack".to_string(),
-            "ac3" => "ac3".to_string(),
-            "dca" => "dca".to_string(),
-            "wmav2" => "wmav2".to_string(),
-            "libopencore_amrnb" => "libopencore_amrnb".to_string(),
-            other => other.to_string(),
-        }
+        self.codec.clone()
     }
 
+    #[inline]
     pub fn is_suitable_for_extraction(&self) -> bool {
-        !matches!(
-            self.extension.as_str(),
-            "shn" | "ra" | "tak"
-        )
+        !matches!(self.extension.as_str(), "shn" | "ra" | "tak")
     }
 
+    #[inline]
     pub fn get_container_format(&self) -> Option<String> {
         self.container.clone()
     }
 
     pub fn can_copy_codec(&self, source_codec: &str) -> bool {
-        let normalized_source = source_codec.to_lowercase();
-        let normalized_target = self.codec.to_lowercase();
+        let source = source_codec.to_lowercase();
+        let target = self.codec.to_lowercase();
 
-        if normalized_source == normalized_target {
+        if source == target {
             return true;
         }
 
         match self.extension.as_str() {
-            "mp3" => normalized_source.contains("mp3"),
-            "aac" | "m4a" => {
-                normalized_source.contains("aac") || 
-                normalized_source.contains("alac")
-            }
-            "ogg" => {
-                normalized_source.contains("vorbis") || 
-                normalized_source.contains("opus")
-            }
-            "opus" => normalized_source.contains("opus"),
-            "flac" => normalized_source.contains("flac"),
-            "wav" => normalized_source.starts_with("pcm_"),
-            "wma" => normalized_source.starts_with("wmav"),
-            "ac3" => normalized_source.contains("ac3"),
-            "dts" => normalized_source.contains("dts") || normalized_source.contains("dca"),
-            "amr" => normalized_source.starts_with("amr"),
-            "alac" => normalized_source.contains("alac"),
-            "aiff" => normalized_source.starts_with("pcm_"),
-            "wv" => normalized_source.contains("wavpack"),
-            "ape" => normalized_source.contains("ape"),
-            "tta" => normalized_source.contains("tta"),
+            "mp3" => source.contains("mp3"),
+            "aac" | "m4a" => source.contains("aac") || source.contains("alac"),
+            "ogg" => source.contains("vorbis") || source.contains("opus"),
+            "opus" => source.contains("opus"),
+            "flac" => source.contains("flac"),
+            "wav" => source.starts_with("pcm_"),
+            "wma" => source.starts_with("wmav"),
+            "ac3" => source.contains("ac3"),
+            "dts" => source.contains("dts") || source.contains("dca"),
+            "amr" => source.starts_with("amr"),
+            "alac" => source.contains("alac"),
+            "aiff" => source.starts_with("pcm_"),
+            "wv" => source.contains("wavpack"),
+            "ape" => source.contains("ape"),
+            "tta" => source.contains("tta"),
             "mka" => true,
             _ => false,
         }
     }
 
     pub fn get_quality_args(&self, quality: &str) -> Vec<String> {
-        let mut args = Vec::new();
-
         match self.codec.as_str() {
             "libvorbis" => {
                 let q = match quality {
                     "low" => "3",
-                    "medium" => "5",
                     "high" => "7",
                     "ultra" => "9",
                     _ => "5",
                 };
-                args.extend_from_slice(&["-q:a".to_string(), q.to_string()]);
+                vec!["-q:a".to_string(), q.to_string()]
             }
-            "libopus" => {
-                args.extend_from_slice(&["-vbr".to_string(), "on".to_string()]);
-            }
+            "libopus" => vec!["-vbr".to_string(), "on".to_string()],
             "flac" => {
-                let compression = match quality {
+                let comp = match quality {
                     "low" => "0",
-                    "medium" => "5",
                     "high" => "8",
                     "ultra" => "12",
-                    _ => "8",
+                    _ => "5",
                 };
-                args.extend_from_slice(&[
-                    "-compression_level".to_string(),
-                    compression.to_string(),
-                ]);
+                vec!["-compression_level".to_string(), comp.to_string()]
             }
             "wavpack" => {
-                let compression = match quality {
+                let comp = match quality {
                     "low" => "0",
-                    "medium" => "4",
-                    "high" => "8",
-                    "ultra" => "8",
-                    _ => "8",
+                    "ultra" | "high" => "8",
+                    _ => "4",
                 };
-                args.extend_from_slice(&[
-                    "-compression_level".to_string(),
-                    compression.to_string(),
-                ]);
+                vec!["-compression_level".to_string(), comp.to_string()]
             }
-            _ => {}
+            _ => Vec::new(),
         }
-
-        args
     }
 }
 
@@ -219,11 +178,7 @@ impl From<TomlAudioFormat> for AudioFormat {
             name: toml.name,
             category: toml.category,
             codec: toml.codec,
-            container: if toml.container.is_empty() {
-                None
-            } else {
-                Some(toml.container)
-            },
+            container: if toml.container.is_empty() { None } else { Some(toml.container) },
             stability: toml.stability,
             description: toml.description,
             typical_use: toml.typical_use,
@@ -268,6 +223,7 @@ pub fn get_all_formats() -> Vec<AudioFormat> {
     formats
 }
 
+#[inline]
 pub fn get_format(extension: &str) -> Option<AudioFormat> {
     AUDIO_FORMATS.get(extension).cloned()
 }

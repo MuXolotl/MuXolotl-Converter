@@ -4,14 +4,15 @@ import { open } from '@tauri-apps/api/dialog';
 import { invoke } from '@tauri-apps/api/tauri';
 import { listen } from '@tauri-apps/api/event';
 import { MEDIA_EXTENSIONS } from '@/constants';
-import { getDefaultFormat, getDefaultSettings, generateFileId } from '@/utils';
+import { getDefaultFormat, generateFileId } from '@/utils';
+import { getDefaultSettings } from '@/utils/file';
 import type { FileItem, MediaInfo } from '@/types';
 
 interface DropZoneProps {
   onFilesAdded: (files: FileItem[]) => void;
 }
 
-const DropZone: React.FC<DropZoneProps> = React.memo(({ onFilesAdded }) => {
+const DropZone: React.FC<DropZoneProps> = ({ onFilesAdded }) => {
   const [isDragging, setIsDragging] = useState(false);
 
   const processFiles = useCallback(
@@ -26,7 +27,7 @@ const DropZone: React.FC<DropZoneProps> = React.memo(({ onFilesAdded }) => {
             name: fileName,
             mediaInfo,
             outputFormat: getDefaultFormat(mediaInfo.media_type),
-            settings: getDefaultSettings(mediaInfo.media_type, false),
+            settings: getDefaultSettings(false),
             status: 'pending' as const,
             progress: null,
             error: null,
@@ -47,7 +48,6 @@ const DropZone: React.FC<DropZoneProps> = React.memo(({ onFilesAdded }) => {
       });
 
       if (fileItems.length > 0) onFilesAdded(fileItems);
-
       if (errors.length > 0) {
         alert(`Failed to process ${errors.length} file(s): ${errors[0]}`);
       }
@@ -113,14 +113,12 @@ const DropZone: React.FC<DropZoneProps> = React.memo(({ onFilesAdded }) => {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       onClick={handleBrowse}
-      className={`glass px-6 py-4 flex items-center justify-between gap-4 h-full cursor-pointer transition-all duration-200 border-2 border-dashed rounded-xl
-        ${isDragging ? 'border-primary-purple bg-primary-purple/10 scale-[1.01]' : 'border-white/20 hover:border-primary-pink/50'}`}
+      className={`glass px-6 py-4 flex items-center justify-between gap-4 h-full cursor-pointer transition-all duration-200 border-2 border-dashed rounded-xl ${
+        isDragging ? 'border-primary-purple bg-primary-purple/10 scale-[1.01]' : 'border-white/20 hover:border-primary-pink/50'
+      }`}
     >
       <div className="flex items-center gap-4">
-        <Upload
-          size={32}
-          className={`transition-all ${isDragging ? 'text-primary-purple scale-110' : 'text-white/40'}`}
-        />
+        <Upload size={32} className={`transition-all ${isDragging ? 'text-primary-purple scale-110' : 'text-white/40'}`} />
         <div>
           <p className="text-white text-lg font-bold">Drop media files here</p>
           <p className="text-white/60 text-sm">Audio & Video • 40+ formats supported</p>
@@ -136,8 +134,6 @@ const DropZone: React.FC<DropZoneProps> = React.memo(({ onFilesAdded }) => {
       </button>
     </div>
   );
-});
+};
 
-DropZone.displayName = 'DropZone';
-
-export default DropZone;
+export default React.memo(DropZone);

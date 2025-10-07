@@ -4,71 +4,81 @@ import { invoke } from '@tauri-apps/api/tauri';
 import { save } from '@tauri-apps/api/dialog';
 import type { FileItem, ConversionProgress, GpuInfo, ConversionContextType } from '@/types';
 
+const PROGRESS_THROTTLE_MS = 50;
+
 export const useConversion = (
   updateFile: (fileId: string, updates: Partial<FileItem>) => void,
   gpuInfo: GpuInfo
 ): ConversionContextType => {
   const [isConverting, setIsConverting] = useState(false);
-  const progressUpdateTimeouts = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const progressTimeouts = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const unlistenFns = useRef<UnlistenFn[]>([]);
 
   useEffect(() => {
     const setupListeners = async () => {
-      const unlistenStart = await listen<string>('conversion-started', (event) => {
-        console.log('✅ Conversion started:', event.payload);
-      });
+      const listeners = await Promise.all([
+        listen<string>('conversion-started', (event) => {
+          console.log('✅ Conversion started:', event.payload);
+        }),
 
-      const unlistenProgress = await listen<ConversionProgress>('conversion-progress', (event) => {
-        const progress = event.payload;
-        const existingTimeout = progressUpdateTimeouts.current.get(progress.task_id);
+        listen<ConversionProgress>('conversion-progress', (event) => {
+          const progress = event.payload;
+          const existing = progressTimeouts.current.get(progress.task_id);
 
-        if (existingTimeout) {
-          clearTimeout(existingTimeout);
-        }
+          if (existing) clearTimeout(existing);
 
-        const timeout = setTimeout(() => {
-          updateFile(progress.task_id, { status: 'processing', progress });
-          progressUpdateTimeouts.current.delete(progress.task_id);
-        }, 50);
+          const timeout = setTimeout(() => {
+            updateFile(progress.task_id, { status: 'processing', progress });
+            progressTimeouts.current.delete(progress.task_id);
+          }, PROGRESS_THROTTLE_MS);
 
-        progressUpdateTimeouts.current.set(progress.task_id, timeout);
-      });
+          progressTimeouts.current.set(progress.task_id, timeout);
+        }),
 
-      const unlistenComplete = await listen<string>('conversion-completed', (event) => {
-        console.log('✅ Conversion completed:', event.payload);
-        const taskId = event.payload;
-        const timeout = progressUpdateTimeouts.current.get(taskId);
-        if (timeout) {
-          clearTimeout(timeout);
-          progressUpdateTimeouts.current.delete(taskId);
-        }
-        updateFile(taskId, { status: 'completed', progress: null, completedAt: Date.now() });
-        setIsConverting(false);
-      });
+        listen<string>('conversion-completed', (event) => {
+          const taskId = event.payload;
+          console.log('✅ Conversion completed:', taskId);
+          
+          const timeout = progressTimeouts.current.get(taskId);
+          if (timeout) {
+            clearTimeout(timeout);
+            progressTimeouts.current.delete(taskId);
+          }
+          
+          updateFile(taskId, { 
+            status: 'completed', 
+            progress: null, 
+            completedAt: Date.now() 
+          });
+          setIsConverting(false);
+        }),
 
-      const unlistenError = await listen<{ task_id: string; error: string }>('conversion-error', (event) => {
-        console.error('❌ Conversion error:', event.payload);
-        const timeout = progressUpdateTimeouts.current.get(event.payload.task_id);
-        if (timeout) {
-          clearTimeout(timeout);
-          progressUpdateTimeouts.current.delete(event.payload.task_id);
-        }
-        updateFile(event.payload.task_id, {
-          status: 'failed',
-          error: event.payload.error,
-          completedAt: Date.now(),
-        });
-        setIsConverting(false);
-      });
+        listen<{ task_id: string; error: string }>('conversion-error', (event) => {
+          console.error('❌ Conversion error:', event.payload);
+          
+          const timeout = progressTimeouts.current.get(event.payload.task_id);
+          if (timeout) {
+            clearTimeout(timeout);
+            progressTimeouts.current.delete(event.payload.task_id);
+          }
+          
+          updateFile(event.payload.task_id, {
+            status: 'failed',
+            error: event.payload.error,
+            completedAt: Date.now(),
+          });
+          setIsConverting(false);
+        }),
+      ]);
 
-      unlistenFns.current = [unlistenStart, unlistenProgress, unlistenComplete, unlistenError];
+      unlistenFns.current = listeners;
     };
 
     setupListeners();
 
     return () => {
-      progressUpdateTimeouts.current.forEach((timeout) => clearTimeout(timeout));
-      progressUpdateTimeouts.current.clear();
+      progressTimeouts.current.forEach((timeout) => clearTimeout(timeout));
+      progressTimeouts.current.clear();
       unlistenFns.current.forEach((fn) => fn());
       unlistenFns.current = [];
     };
@@ -114,7 +124,11 @@ export const useConversion = (
           },
         });
 
-        console.log('🚀 Starting conversion:', { input: file.path, output: outputPath, format: outputFormat });
+        console.log('🚀 Starting conversion:', { 
+          input: file.path, 
+          output: outputPath, 
+          format: outputFormat 
+        });
 
         const conversionSettings = {
           taskId: file.id,
@@ -125,7 +139,10 @@ export const useConversion = (
           useGpu: file.settings.useGpu,
         };
 
-        if (file.settings.extractAudioOnly && file.mediaInfo?.media_type === 'video') {
+        const isVideo = file.mediaInfo?.media_type === 'video';
+        const extractAudio = file.settings.extractAudioOnly;
+
+        if (extractAudio && isVideo) {
           await invoke<string>('extract_audio', {
             input: file.path,
             output: outputPath,
@@ -139,7 +156,7 @@ export const useConversion = (
             format: outputFormat,
             settings: conversionSettings,
           });
-        } else if (file.mediaInfo?.media_type === 'video') {
+        } else if (isVideo) {
           await invoke<string>('convert_video', {
             input: file.path,
             output: outputPath,
@@ -166,12 +183,18 @@ export const useConversion = (
     async (fileId: string) => {
       try {
         await invoke('cancel_conversion', { taskId: fileId });
-        const timeout = progressUpdateTimeouts.current.get(fileId);
+        
+        const timeout = progressTimeouts.current.get(fileId);
         if (timeout) {
           clearTimeout(timeout);
-          progressUpdateTimeouts.current.delete(fileId);
+          progressTimeouts.current.delete(fileId);
         }
-        updateFile(fileId, { status: 'cancelled', progress: null, completedAt: Date.now() });
+        
+        updateFile(fileId, { 
+          status: 'cancelled', 
+          progress: null, 
+          completedAt: Date.now() 
+        });
         setIsConverting(false);
       } catch (error) {
         console.error('Failed to cancel conversion:', error);
