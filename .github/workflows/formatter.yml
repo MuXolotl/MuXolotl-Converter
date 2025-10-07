@@ -1,0 +1,87 @@
+name: Code Formatter
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '**/*.py'
+      - '**/*.js'
+      - '**/*.ts'
+      - '**/*.tsx'
+      - '**/*.json'
+      - '**/*.html'
+      - '**/*.css'
+      - '**/*.rs'
+      - '.github/workflows/formatter.yml'
+
+jobs:
+  format_code:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      # JavaScript/TypeScript/JSON/CSS/HTML (Prettier)
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Prettier
+        run: npm install -g prettier
+
+      - name: Run Prettier
+        run: |
+          prettier --write "**/*.{js,ts,tsx,json,css,html}" \
+            --print-width 120 \
+            --tab-width 2 \
+            --single-quote \
+            --trailing-comma es5 \
+            --ignore-path .gitignore || true
+
+      # Rust (rustfmt)
+      - name: Set up Rust
+        if: hashFiles('**/*.rs') != ''
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+          override: true
+
+      - name: Run rustfmt
+        if: hashFiles('**/*.rs') != ''
+        run: cargo fmt --all || true
+
+      # Commit changes
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and push to main
+        if: steps.changes.outputs.has_changes == 'true'
+        env:
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: |
+          git config --global user.name  "$GIT_COMMITTER_NAME"
+          git config --global user.email "$GIT_COMMITTER_EMAIL"
+
+          git pull --rebase origin "${{ github.ref_name }}" || true
+
+          git add -A
+          git commit -m "style: automatic code formatting" || exit 0
+          git push origin HEAD:"${{ github.ref_name }}"
