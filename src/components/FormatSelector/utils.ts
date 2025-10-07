@@ -6,10 +6,7 @@ export interface BadgeInfo {
   className: string;
 }
 
-export const getBadgeInfo = (
-  format: AudioFormat | VideoFormat,
-  recommended?: RecommendedFormats
-): BadgeInfo | null => {
+export const getBadgeInfo = (format: AudioFormat | VideoFormat, recommended?: RecommendedFormats): BadgeInfo | null => {
   if (!recommended) return null;
 
   const badges = [
@@ -64,18 +61,17 @@ export const getBadgeInfo = (
 };
 
 export const groupFormatsByCategory = <T extends { category: string }>(formats: T[]) => {
-  return formats.reduce((acc, format) => {
-    if (!acc[format.category]) acc[format.category] = [];
-    acc[format.category].push(format);
-    return acc;
-  }, {} as Record<string, T[]>);
+  return formats.reduce(
+    (acc, format) => {
+      if (!acc[format.category]) acc[format.category] = [];
+      acc[format.category].push(format);
+      return acc;
+    },
+    {} as Record<string, T[]>
+  );
 };
 
-export const calculateDropdownPosition = (
-  buttonRect: DOMRect,
-  dropdownWidth: number,
-  maxHeight: number
-) => {
+export const calculateDropdownPosition = (buttonRect: DOMRect, dropdownWidth: number, maxHeight: number) => {
   const viewportHeight = window.innerHeight;
   const viewportWidth = window.innerWidth;
   const spaceBelow = viewportHeight - buttonRect.bottom - 10;

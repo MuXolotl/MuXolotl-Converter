@@ -23,22 +23,25 @@ const App: React.FC = () => {
 
   const { gpuInfo, isLoading: gpuLoading } = useGpu();
 
-  const updateFile = useCallback((fileId: string, updates: Partial<FileItem>) => {
-    setFiles((prev) =>
-      prev.map((f) => {
-        if (f.id !== fileId) return f;
-        const updated = { ...f, ...updates };
-        
-        if (outputFolder && updated.status === 'pending') {
-          if (updates.outputFormat !== undefined || updated.outputPath === undefined) {
-            updated.outputPath = generateOutputPath(updated, outputFolder);
+  const updateFile = useCallback(
+    (fileId: string, updates: Partial<FileItem>) => {
+      setFiles((prev) =>
+        prev.map((f) => {
+          if (f.id !== fileId) return f;
+          const updated = { ...f, ...updates };
+
+          if (outputFolder && updated.status === 'pending') {
+            if (updates.outputFormat !== undefined || updated.outputPath === undefined) {
+              updated.outputPath = generateOutputPath(updated, outputFolder);
+            }
           }
-        }
-        
-        return updated;
-      })
-    );
-  }, [outputFolder]);
+
+          return updated;
+        })
+      );
+    },
+    [outputFolder]
+  );
 
   const conversionContext = useConversion(updateFile, gpuInfo);
 
@@ -58,9 +61,7 @@ const App: React.FC = () => {
     if (outputFolder) {
       setFiles((prev) =>
         prev.map((file) =>
-          file.status === 'pending' 
-            ? { ...file, outputPath: generateOutputPath(file, outputFolder) } 
-            : file
+          file.status === 'pending' ? { ...file, outputPath: generateOutputPath(file, outputFolder) } : file
         )
       );
     }
@@ -71,9 +72,9 @@ const App: React.FC = () => {
   const handleFilesAdded = useCallback(
     (newFiles: FileItem[]) => {
       const filesWithPath = outputFolder
-        ? newFiles.map((file) => ({ 
-            ...file, 
-            outputPath: generateOutputPath(file, outputFolder) 
+        ? newFiles.map((file) => ({
+            ...file,
+            outputPath: generateOutputPath(file, outputFolder),
           }))
         : newFiles;
       setFiles((prev) => [...filesWithPath, ...prev]);
@@ -92,11 +93,11 @@ const App: React.FC = () => {
 
   const handleRetry = useCallback(
     (fileId: string) => {
-      updateFile(fileId, { 
-        status: 'pending', 
-        progress: null, 
-        error: null, 
-        completedAt: undefined 
+      updateFile(fileId, {
+        status: 'pending',
+        progress: null,
+        error: null,
+        completedAt: undefined,
       });
     },
     [updateFile]
@@ -134,8 +135,7 @@ const App: React.FC = () => {
     if (parallelConversion) {
       await Promise.allSettled(
         pendingFiles.map((file) =>
-          conversionContext.startConversion(file)
-            .catch((err) => console.error(`Failed to convert ${file.name}:`, err))
+          conversionContext.startConversion(file).catch((err) => console.error(`Failed to convert ${file.name}:`, err))
         )
       );
     } else {
@@ -157,10 +157,9 @@ const App: React.FC = () => {
     });
   }, []);
 
-  const canConvert = files.some((f) => f.status === 'pending') 
-    && !conversionContext.isConverting 
-    && ffmpegAvailable === true;
-    
+  const canConvert =
+    files.some((f) => f.status === 'pending') && !conversionContext.isConverting && ffmpegAvailable === true;
+
   const pendingCount = files.filter((f) => f.status === 'pending').length;
 
   if (ffmpegAvailable === null) {
@@ -204,9 +203,7 @@ const App: React.FC = () => {
                     {outputFolder ? (
                       <>
                         <div className="text-white text-xs font-semibold">Output Folder:</div>
-                        <div className="text-white/80 text-xs truncate font-mono">
-                          {truncatePath(outputFolder)}
-                        </div>
+                        <div className="text-white/80 text-xs truncate font-mono">{truncatePath(outputFolder)}</div>
                       </>
                     ) : (
                       <div className="text-white text-sm font-semibold">Select Output Folder</div>
@@ -224,9 +221,7 @@ const App: React.FC = () => {
                 >
                   <ExternalLink
                     size={18}
-                    className={`${
-                      outputFolder ? 'text-primary-pink hover:scale-110' : 'text-white/40'
-                    } transition-all`}
+                    className={`${outputFolder ? 'text-primary-pink hover:scale-110' : 'text-white/40'} transition-all`}
                   />
                 </button>
               </div>

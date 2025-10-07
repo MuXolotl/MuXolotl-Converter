@@ -90,9 +90,7 @@ const FormatSelector: React.FC<FormatSelectorProps> = ({
   const hasRecommended = useMemo(
     () =>
       recommendedFormats &&
-      (recommendedFormats.fast.length > 0 ||
-        recommendedFormats.safe.length > 0 ||
-        recommendedFormats.setup.length > 0),
+      (recommendedFormats.fast.length > 0 || recommendedFormats.safe.length > 0 || recommendedFormats.setup.length > 0),
     [recommendedFormats]
   );
 
@@ -144,12 +142,17 @@ const FormatSelector: React.FC<FormatSelectorProps> = ({
           </span>
           <span className="uppercase font-mono">{selectedFormat?.extension || selected}</span>
           {selectedBadge && (
-            <span className={`text-[8px] px-1 py-0.5 rounded font-semibold flex items-center gap-0.5 ${selectedBadge.className}`}>
+            <span
+              className={`text-[8px] px-1 py-0.5 rounded font-semibold flex items-center gap-0.5 ${selectedBadge.className}`}
+            >
               {selectedBadge.icon} {selectedBadge.label}
             </span>
           )}
         </div>
-        <ChevronDown size={14} className={`text-white/60 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown
+          size={14}
+          className={`text-white/60 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`}
+        />
       </button>
 
       {typeof document !== 'undefined' &&

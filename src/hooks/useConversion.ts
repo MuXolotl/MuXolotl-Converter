@@ -38,30 +38,30 @@ export const useConversion = (
         listen<string>('conversion-completed', (event) => {
           const taskId = event.payload;
           console.log('✅ Conversion completed:', taskId);
-          
+
           const timeout = progressTimeouts.current.get(taskId);
           if (timeout) {
             clearTimeout(timeout);
             progressTimeouts.current.delete(taskId);
           }
-          
-          updateFile(taskId, { 
-            status: 'completed', 
-            progress: null, 
-            completedAt: Date.now() 
+
+          updateFile(taskId, {
+            status: 'completed',
+            progress: null,
+            completedAt: Date.now(),
           });
           setIsConverting(false);
         }),
 
         listen<{ task_id: string; error: string }>('conversion-error', (event) => {
           console.error('❌ Conversion error:', event.payload);
-          
+
           const timeout = progressTimeouts.current.get(event.payload.task_id);
           if (timeout) {
             clearTimeout(timeout);
             progressTimeouts.current.delete(event.payload.task_id);
           }
-          
+
           updateFile(event.payload.task_id, {
             status: 'failed',
             error: event.payload.error,
@@ -124,10 +124,10 @@ export const useConversion = (
           },
         });
 
-        console.log('🚀 Starting conversion:', { 
-          input: file.path, 
-          output: outputPath, 
-          format: outputFormat 
+        console.log('🚀 Starting conversion:', {
+          input: file.path,
+          output: outputPath,
+          format: outputFormat,
         });
 
         const conversionSettings = {
@@ -183,17 +183,17 @@ export const useConversion = (
     async (fileId: string) => {
       try {
         await invoke('cancel_conversion', { taskId: fileId });
-        
+
         const timeout = progressTimeouts.current.get(fileId);
         if (timeout) {
           clearTimeout(timeout);
           progressTimeouts.current.delete(fileId);
         }
-        
-        updateFile(fileId, { 
-          status: 'cancelled', 
-          progress: null, 
-          completedAt: Date.now() 
+
+        updateFile(fileId, {
+          status: 'cancelled',
+          progress: null,
+          completedAt: Date.now(),
         });
         setIsConverting(false);
       } catch (error) {

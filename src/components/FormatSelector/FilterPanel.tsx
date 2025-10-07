@@ -9,12 +9,7 @@ interface FilterPanelProps {
   onToggle: (show: boolean) => void;
 }
 
-const FilterPanel: React.FC<FilterPanelProps> = ({
-  showAllFormats,
-  hiddenCount,
-  recommendedFormats,
-  onToggle,
-}) => (
+const FilterPanel: React.FC<FilterPanelProps> = ({ showAllFormats, hiddenCount, recommendedFormats, onToggle }) => (
   <div className="flex-shrink-0 p-2.5 border-b border-white/10 bg-gradient-to-r from-slate-700 to-slate-800">
     <label className="flex items-center gap-2 cursor-pointer text-xs">
       <input

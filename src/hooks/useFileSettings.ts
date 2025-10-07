@@ -4,8 +4,8 @@ import type { FileItem } from '@/types';
 export const useFileSettings = (updateFile: (fileId: string, updates: Partial<FileItem>) => void) => {
   const updateSettings = useCallback(
     (fileId: string, currentSettings: FileItem['settings'], updates: Partial<FileItem['settings']>) => {
-      updateFile(fileId, { 
-        settings: { ...currentSettings, ...updates }
+      updateFile(fileId, {
+        settings: { ...currentSettings, ...updates },
       });
     },
     [updateFile]

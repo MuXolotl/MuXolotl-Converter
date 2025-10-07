@@ -104,9 +104,7 @@ const AdvancedSettings: React.FC<AdvancedSettingsProps> = ({
                   <div>
                     <label className="block text-white/60 text-xs mb-1">Resolution</label>
                     <select
-                      value={
-                        settings.width && settings.height ? `${settings.width}x${settings.height}` : 'original'
-                      }
+                      value={settings.width && settings.height ? `${settings.width}x${settings.height}` : 'original'}
                       onChange={(e) => {
                         const value = e.target.value;
                         if (value === 'original') {

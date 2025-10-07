@@ -16,7 +16,11 @@ interface GpuIndicatorProps {
 }
 
 const GpuIndicator: React.FC<GpuIndicatorProps> = ({ gpuInfo }) => (
-  <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="glass px-4 py-2 flex items-center gap-3">
+  <motion.div
+    initial={{ opacity: 0, scale: 0.9 }}
+    animate={{ opacity: 1, scale: 1 }}
+    className="glass px-4 py-2 flex items-center gap-3"
+  >
     <div className={`w-3 h-3 rounded-full ${GPU_COLORS[gpuInfo.vendor]} animate-pulse`} />
     {gpuInfo.available ? (
       <>

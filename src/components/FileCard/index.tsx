@@ -20,13 +20,7 @@ interface FileCardProps {
   onToggleAdvanced: () => void;
 }
 
-const FileCard: React.FC<FileCardProps> = ({
-  file,
-  onRemove,
-  onRetry,
-  isAdvancedOpen,
-  onToggleAdvanced,
-}) => {
+const FileCard: React.FC<FileCardProps> = ({ file, onRemove, onRetry, isAdvancedOpen, onToggleAdvanced }) => {
   const conversionContext = useContext(ConversionContext);
   if (!conversionContext) throw new Error('FileCard must be used within ConversionContext');
 
@@ -168,7 +162,10 @@ const FileCard: React.FC<FileCardProps> = ({
                 onChange={(e) => handleExtractAudioToggle(e.target.checked)}
                 className="w-4 h-4 rounded bg-white/10 border-white/20 checked:bg-primary-purple cursor-pointer"
               />
-              <label htmlFor={`extract-${file.id}`} className="flex items-center gap-2 text-white/80 text-sm cursor-pointer">
+              <label
+                htmlFor={`extract-${file.id}`}
+                className="flex items-center gap-2 text-white/80 text-sm cursor-pointer"
+              >
                 <Music size={14} />
                 <span>Extract audio only (Video → Audio)</span>
               </label>

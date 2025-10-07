@@ -27,14 +27,14 @@ const FormatItem: React.FC<FormatItemProps> = ({ format, isSelected, recommended
       onClick={onClick}
       className={`w-full p-3 flex items-start gap-2.5 text-left border-b border-white/5 transition-colors ${bgClass}`}
     >
-      <span className="w-5 text-center text-lg flex-shrink-0 mt-0.5">
-        {STABILITY_ICONS[format.stability]}
-      </span>
+      <span className="w-5 text-center text-lg flex-shrink-0 mt-0.5">{STABILITY_ICONS[format.stability]}</span>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1 flex-wrap">
           <span className="text-white font-bold text-sm uppercase font-mono">{format.extension}</span>
           {badge && (
-            <span className={`text-[9px] px-1.5 py-0.5 rounded font-semibold flex items-center gap-1 ${badge.className}`}>
+            <span
+              className={`text-[9px] px-1.5 py-0.5 rounded font-semibold flex items-center gap-1 ${badge.className}`}
+            >
               {badge.icon} {badge.label}
             </span>
           )}

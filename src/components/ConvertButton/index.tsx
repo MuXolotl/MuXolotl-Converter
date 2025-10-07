@@ -17,7 +17,12 @@ const ConvertButton: React.FC<ConvertButtonProps> = ({ disabled, isConverting, o
     if (fileCount === 0) {
       return { icon: Play, title: 'Convert All', subtitle: 'Add files to start', iconClass: '' };
     }
-    return { icon: Play, title: 'Convert All', subtitle: `${fileCount} ${fileCount === 1 ? 'file' : 'files'}`, iconClass: '' };
+    return {
+      icon: Play,
+      title: 'Convert All',
+      subtitle: `${fileCount} ${fileCount === 1 ? 'file' : 'files'}`,
+      iconClass: '',
+    };
   }, [isConverting, fileCount]);
 
   const Icon = content.icon;

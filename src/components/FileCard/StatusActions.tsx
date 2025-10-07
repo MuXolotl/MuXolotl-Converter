@@ -10,14 +10,7 @@ interface StatusActionsProps {
   onRemove: () => void;
 }
 
-const StatusActions: React.FC<StatusActionsProps> = ({
-  status,
-  error,
-  outputPath,
-  isRetrying,
-  onRetry,
-  onRemove,
-}) => {
+const StatusActions: React.FC<StatusActionsProps> = ({ status, error, outputPath, isRetrying, onRetry, onRemove }) => {
   if (status === 'pending') {
     return (
       <div className="space-y-2">

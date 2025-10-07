@@ -56,7 +56,12 @@ const FormatSettings: React.FC<FormatSettingsProps> = ({
 
       <div className="col-span-4">
         <label className="block text-white/60 text-xs mb-1">Quality</label>
-        <select value={quality} onChange={(e) => onQualityChange(e.target.value)} disabled={disabled} className={selectClassName}>
+        <select
+          value={quality}
+          onChange={(e) => onQualityChange(e.target.value)}
+          disabled={disabled}
+          className={selectClassName}
+        >
           {QUALITY_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
               {opt.label}

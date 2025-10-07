@@ -114,11 +114,16 @@ const DropZone: React.FC<DropZoneProps> = ({ onFilesAdded }) => {
       onDrop={handleDrop}
       onClick={handleBrowse}
       className={`glass px-6 py-4 flex items-center justify-between gap-4 h-full cursor-pointer transition-all duration-200 border-2 border-dashed rounded-xl ${
-        isDragging ? 'border-primary-purple bg-primary-purple/10 scale-[1.01]' : 'border-white/20 hover:border-primary-pink/50'
+        isDragging
+          ? 'border-primary-purple bg-primary-purple/10 scale-[1.01]'
+          : 'border-white/20 hover:border-primary-pink/50'
       }`}
     >
       <div className="flex items-center gap-4">
-        <Upload size={32} className={`transition-all ${isDragging ? 'text-primary-purple scale-110' : 'text-white/40'}`} />
+        <Upload
+          size={32}
+          className={`transition-all ${isDragging ? 'text-primary-purple scale-110' : 'text-white/40'}`}
+        />
         <div>
           <p className="text-white text-lg font-bold">Drop media files here</p>
           <p className="text-white/60 text-sm">Audio & Video • 40+ formats supported</p>
