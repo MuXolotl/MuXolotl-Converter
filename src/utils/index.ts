@@ -12,7 +12,7 @@ export const getDefaultFormat = (mediaType: MediaType): string =>
 
 export const getDefaultSettings = (mediaType: MediaType, gpuAvailable: boolean): FileSettings => ({
   quality: 'medium',
-  useGpu: mediaType === 'video' && gpuAvailable,
+  useGpu: true,
   extractAudioOnly: false,
   sampleRate: 44100,
   channels: 2,

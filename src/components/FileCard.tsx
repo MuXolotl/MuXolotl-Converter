@@ -8,7 +8,6 @@ import {
   AlertCircle,
   Loader,
   Music,
-  Zap,
   ChevronDown,
   ChevronUp,
   RotateCcw,
@@ -26,7 +25,7 @@ import {
   formatDuration,
   formatETA,
 } from '@/constants';
-import type { FileItem, AudioFormat, VideoFormat, ValidationResult, ConversionProgress } from '@/types';
+import type { FileItem, AudioFormat, VideoFormat, ValidationResult, ConversionProgress, RecommendedFormats } from '@/types';
 
 interface FileCardProps {
   file: FileItem;
@@ -128,7 +127,9 @@ const ValidationMessages = React.memo<{ validation: ValidationResult | null }>((
         <div className="mb-3 p-2 bg-red-500/20 border border-red-500/30 rounded">
           <div className="text-red-400 text-xs font-semibold mb-1">⚠️ Validation Errors:</div>
           {validation.errors.map((err, idx) => (
-            <div key={idx} className="text-red-300 text-xs">• {err}</div>
+            <div key={idx} className="text-red-300 text-xs">
+              • {err}
+            </div>
           ))}
         </div>
       )}
@@ -136,7 +137,9 @@ const ValidationMessages = React.memo<{ validation: ValidationResult | null }>((
         <div className="mb-3 p-2 bg-yellow-500/20 border border-yellow-500/30 rounded">
           <div className="text-yellow-400 text-xs font-semibold mb-1">ℹ️ Warnings:</div>
           {validation.warnings.map((warn, idx) => (
-            <div key={idx} className="text-yellow-300 text-xs">• {warn}</div>
+            <div key={idx} className="text-yellow-300 text-xs">
+              • {warn}
+            </div>
           ))}
         </div>
       )}
@@ -154,6 +157,7 @@ const FileCard: React.FC<FileCardProps> = React.memo(
     const [formats, setFormats] = useState<(AudioFormat | VideoFormat)[]>([]);
     const [validation, setValidation] = useState<ValidationResult | null>(null);
     const [isRetrying, setIsRetrying] = useState(false);
+    const [recommendedFormats, setRecommendedFormats] = useState<RecommendedFormats | undefined>(undefined);
 
     const isVideo = file.mediaInfo?.media_type === 'video';
     const isAudio = file.mediaInfo?.media_type === 'audio';
@@ -173,6 +177,25 @@ const FileCard: React.FC<FileCardProps> = React.memo(
       };
       loadFormats();
     }, [shouldShowAudio, isAudio]);
+
+    useEffect(() => {
+      if (file.mediaInfo && file.status === 'pending') {
+        const videoCodec = file.mediaInfo.video_streams[0]?.codec || '';
+        const audioCodec = file.mediaInfo.audio_streams[0]?.codec || '';
+        const width = file.mediaInfo.video_streams[0]?.width;
+        const height = file.mediaInfo.video_streams[0]?.height;
+
+        invoke<RecommendedFormats>('get_recommended_formats', {
+          videoCodec,
+          audioCodec,
+          mediaType: file.mediaInfo.media_type,
+          width: width || null,
+          height: height || null,
+        })
+          .then(setRecommendedFormats)
+          .catch(error => console.error('Failed to get recommended formats:', error));
+      }
+    }, [file.mediaInfo, file.status]);
 
     useEffect(() => {
       if (file.status === 'pending' && file.mediaInfo) {
@@ -219,7 +242,8 @@ const FileCard: React.FC<FileCardProps> = React.memo(
       setTimeout(() => setIsRetrying(false), 500);
     }, [isRetrying, onRetry]);
 
-    const selectClassName = 'w-full px-2 py-1.5 bg-white/5 border border-white/10 rounded text-white text-sm focus:outline-none focus:border-primary-purple cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed';
+    const selectClassName =
+      'w-full px-2 py-1.5 bg-white/5 border border-white/10 rounded text-white text-sm focus:outline-none focus:border-primary-purple cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed';
 
     return (
       <div className="glass p-4 relative group overflow-visible" style={{ isolation: 'isolate' }}>
@@ -264,6 +288,7 @@ const FileCard: React.FC<FileCardProps> = React.memo(
                   selected={file.outputFormat}
                   onChange={handleFormatChange}
                   disabled={isDisabled}
+                  recommendedFormats={recommendedFormats}
                 />
               </div>
 
@@ -293,7 +318,10 @@ const FileCard: React.FC<FileCardProps> = React.memo(
                   onChange={e => handleExtractAudioToggle(e.target.checked)}
                   className="w-4 h-4 rounded bg-white/10 border-white/20 checked:bg-primary-purple cursor-pointer"
                 />
-                <label htmlFor={`extract-${file.id}`} className="flex items-center gap-2 text-white/80 text-sm cursor-pointer">
+                <label
+                  htmlFor={`extract-${file.id}`}
+                  className="flex items-center gap-2 text-white/80 text-sm cursor-pointer"
+                >
                   <Music size={14} />
                   <span>Extract audio only (Video → Audio)</span>
                 </label>
@@ -373,7 +401,23 @@ const FileCard: React.FC<FileCardProps> = React.memo(
                       <>
                         <div>
                           <label className="block text-white/60 text-xs mb-1">Resolution</label>
-                          <select className={selectClassName}>
+                          <select
+                            value={
+                              file.settings.width && file.settings.height
+                                ? `${file.settings.width}x${file.settings.height}`
+                                : 'original'
+                            }
+                            onChange={e => {
+                              const value = e.target.value;
+                              if (value === 'original') {
+                                handleSettingChange({ width: undefined, height: undefined });
+                              } else {
+                                const [w, h] = value.split('x').map(Number);
+                                handleSettingChange({ width: w, height: h });
+                              }
+                            }}
+                            className={selectClassName}
+                          >
                             {VIDEO_RESOLUTIONS.map(res => (
                               <option key={res.value} value={res.value}>
                                 {res.label}
@@ -384,7 +428,14 @@ const FileCard: React.FC<FileCardProps> = React.memo(
 
                         <div>
                           <label className="block text-white/60 text-xs mb-1">Frame Rate</label>
-                          <select className={selectClassName}>
+                          <select
+                            value={file.settings.fps?.toString() || 'original'}
+                            onChange={e => {
+                              const value = e.target.value;
+                              handleSettingChange({ fps: value === 'original' ? undefined : parseInt(value) });
+                            }}
+                            className={selectClassName}
+                          >
                             {VIDEO_FPS.map(fps => (
                               <option key={fps.value} value={fps.value}>
                                 {fps.label}
@@ -392,23 +443,6 @@ const FileCard: React.FC<FileCardProps> = React.memo(
                             ))}
                           </select>
                         </div>
-
-                        {gpuAvailable && (
-                          <div className="col-span-2 p-2 bg-gradient-primary/20 rounded border border-primary-purple/30">
-                            <label className="flex items-center justify-between cursor-pointer">
-                              <div className="flex items-center gap-2">
-                                <Zap size={14} className="text-yellow-400" />
-                                <span className="text-white font-semibold text-sm">GPU Acceleration</span>
-                              </div>
-                              <input
-                                type="checkbox"
-                                checked={file.settings.useGpu}
-                                onChange={e => handleSettingChange({ useGpu: e.target.checked })}
-                                className="w-4 h-4 rounded bg-white/10 border-white/20 checked:bg-primary-purple cursor-pointer"
-                              />
-                            </label>
-                          </div>
-                        )}
                       </>
                     )}
                   </div>

@@ -32,7 +32,10 @@ impl ProgressParser {
 
     pub fn parse_line(&mut self, line: &str) -> Option<ConversionProgress> {
         let elapsed = self.last_update.elapsed().as_millis();
-        if elapsed < self.update_interval_ms && self.last_progress.is_some() {
+        
+        let is_final_progress = line.contains("progress=end");
+        
+        if elapsed < self.update_interval_ms && self.last_progress.is_some() && !is_final_progress {
             return None;
         }
 
@@ -98,6 +101,15 @@ impl ProgressParser {
 
             self.last_progress = Some(progress.clone());
             return Some(progress);
+        }
+
+        if is_final_progress {
+            if let Some(last) = &self.last_progress {
+                let mut final_progress = last.clone();
+                final_progress.percent = 100.0;
+                final_progress.eta_seconds = Some(0);
+                return Some(final_progress);
+            }
         }
 
         None

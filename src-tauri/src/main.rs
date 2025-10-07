@@ -41,17 +41,35 @@ pub fn get_ffmpeg_path(app_handle: &tauri::AppHandle) -> Result<PathBuf, String>
     let binary_name = "ffmpeg-x86_64-unknown-linux-gnu";
 
     let resource_path = format!("binaries/{}", binary_name);
-    let sidecar_path = app_handle
-        .path_resolver()
-        .resolve_resource(&resource_path)
-        .ok_or(format!("FFmpeg binary not found: {}", resource_path))?;
-
-    if sidecar_path.exists() {
-        println!("✅ Found bundled FFmpeg at: {:?}", sidecar_path);
-        Ok(sidecar_path)
-    } else {
-        Err(format!("FFmpeg binary not found at {:?}", sidecar_path))
+    if let Some(sidecar_path) = app_handle.path_resolver().resolve_resource(&resource_path) {
+        if sidecar_path.exists() {
+            println!("✅ Found bundled FFmpeg at: {:?}", sidecar_path);
+            return Ok(sidecar_path);
+        }
     }
+
+    #[cfg(debug_assertions)]
+    {
+        let dev_path = std::env::current_dir()
+            .ok()
+            .and_then(|p| {
+                let paths = [
+                    p.join("src-tauri").join("binaries").join(binary_name),
+                    p.join("binaries").join(binary_name),
+                ];
+                paths.iter().find(|p| p.exists()).cloned()
+            });
+
+        if let Some(path) = dev_path {
+            println!("✅ Found dev FFmpeg at: {:?}", path);
+            return Ok(path);
+        }
+    }
+
+    Err(format!(
+        "FFmpeg binary '{}' not found. Please ensure binaries are placed in 'src-tauri/binaries/' directory.",
+        binary_name
+    ))
 }
 
 pub fn get_ffprobe_path(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -68,17 +86,35 @@ pub fn get_ffprobe_path(app_handle: &tauri::AppHandle) -> Result<PathBuf, String
     let binary_name = "ffprobe-x86_64-unknown-linux-gnu";
 
     let resource_path = format!("binaries/{}", binary_name);
-    let sidecar_path = app_handle
-        .path_resolver()
-        .resolve_resource(&resource_path)
-        .ok_or(format!("FFprobe binary not found: {}", resource_path))?;
-
-    if sidecar_path.exists() {
-        println!("✅ Found bundled FFprobe at: {:?}", sidecar_path);
-        Ok(sidecar_path)
-    } else {
-        Err(format!("FFprobe binary not found at {:?}", sidecar_path))
+    if let Some(sidecar_path) = app_handle.path_resolver().resolve_resource(&resource_path) {
+        if sidecar_path.exists() {
+            println!("✅ Found bundled FFprobe at: {:?}", sidecar_path);
+            return Ok(sidecar_path);
+        }
     }
+
+    #[cfg(debug_assertions)]
+    {
+        let dev_path = std::env::current_dir()
+            .ok()
+            .and_then(|p| {
+                let paths = [
+                    p.join("src-tauri").join("binaries").join(binary_name),
+                    p.join("binaries").join(binary_name),
+                ];
+                paths.iter().find(|p| p.exists()).cloned()
+            });
+
+        if let Some(path) = dev_path {
+            println!("✅ Found dev FFprobe at: {:?}", path);
+            return Ok(path);
+        }
+    }
+
+    Err(format!(
+        "FFprobe binary '{}' not found. Please ensure binaries are placed in 'src-tauri/binaries/' directory.",
+        binary_name
+    ))
 }
 
 fn main() {
@@ -92,6 +128,7 @@ fn main() {
             detect_media_type,
             get_audio_formats,
             get_video_formats,
+            get_recommended_formats,
             validate_conversion,
             convert_audio,
             convert_video,
@@ -126,101 +163,60 @@ fn main() {
 
 #[tauri::command]
 async fn check_ffmpeg(app_handle: tauri::AppHandle) -> Result<bool, String> {
-    println!("🔍 Checking for FFmpeg...");
+    println!("🔍 Checking for bundled FFmpeg and FFprobe...");
 
-    let ffmpeg_path = match get_ffmpeg_path(&app_handle) {
-        Ok(path) => path,
-        Err(e) => {
-            eprintln!("⚠️ Bundled FFmpeg not found: {}", e);
-            eprintln!("⚠️ Falling back to system FFmpeg");
-            return check_system_ffmpeg().await;
+    let ffmpeg_path = get_ffmpeg_path(&app_handle)
+        .map_err(|e| format!("FFmpeg not found: {}\n\n📦 Please download FFmpeg binaries and place them in 'src-tauri/binaries/' directory.", e))?;
+
+    let ffprobe_path = get_ffprobe_path(&app_handle)
+        .map_err(|e| format!("FFprobe not found: {}\n\n📦 Please download FFprobe binaries and place them in 'src-tauri/binaries/' directory.", e))?;
+
+    let ffmpeg_result = tokio::task::spawn_blocking(move || {
+        let mut cmd = std::process::Command::new(&ffmpeg_path);
+        cmd.arg("-version");
+        
+        #[cfg(target_os = "windows")]
+        {
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            cmd.creation_flags(CREATE_NO_WINDOW);
         }
-    };
+        
+        cmd.output()
+    }).await;
 
-    let ffprobe_path = match get_ffprobe_path(&app_handle) {
-        Ok(path) => path,
-        Err(e) => {
-            eprintln!("⚠️ Bundled FFprobe not found: {}", e);
-            eprintln!("⚠️ Falling back to system FFmpeg");
-            return check_system_ffmpeg().await;
+    let ffprobe_result = tokio::task::spawn_blocking(move || {
+        let mut cmd = std::process::Command::new(&ffprobe_path);
+        cmd.arg("-version");
+        
+        #[cfg(target_os = "windows")]
+        {
+            const CREATE_NO_WINDOW: u32 = 0x08000000;
+            cmd.creation_flags(CREATE_NO_WINDOW);
         }
-    };
-
-    let (ffmpeg_result, ffprobe_result) = tokio::join!(
-        tokio::task::spawn_blocking(move || {
-            let mut cmd = std::process::Command::new(&ffmpeg_path);
-            cmd.arg("-version");
-            
-            #[cfg(target_os = "windows")]
-            {
-                const CREATE_NO_WINDOW: u32 = 0x08000000;
-                cmd.creation_flags(CREATE_NO_WINDOW);
-            }
-            
-            cmd.output()
-        }),
-        tokio::task::spawn_blocking(move || {
-            let mut cmd = std::process::Command::new(&ffprobe_path);
-            cmd.arg("-version");
-            
-            #[cfg(target_os = "windows")]
-            {
-                const CREATE_NO_WINDOW: u32 = 0x08000000;
-                cmd.creation_flags(CREATE_NO_WINDOW);
-            }
-            
-            cmd.output()
-        })
-    );
+        
+        cmd.output()
+    }).await;
 
     match (ffmpeg_result, ffprobe_result) {
         (Ok(Ok(ff)), Ok(Ok(fp))) if ff.status.success() && fp.status.success() => {
-            println!("✅ Bundled FFmpeg and FFprobe are working");
+            println!("✅ Bundled FFmpeg and FFprobe are working correctly");
             Ok(true)
-        },
+        }
+        (Ok(Ok(ff)), _) if !ff.status.success() => {
+            Err(format!(
+                "FFmpeg binary is corrupted or incompatible.\n\nError: {}\n\n📦 Please re-download FFmpeg binaries.",
+                String::from_utf8_lossy(&ff.stderr)
+            ))
+        }
+        (_, Ok(Ok(fp))) if !fp.status.success() => {
+            Err(format!(
+                "FFprobe binary is corrupted or incompatible.\n\nError: {}\n\n📦 Please re-download FFprobe binaries.",
+                String::from_utf8_lossy(&fp.stderr)
+            ))
+        }
         _ => {
-            eprintln!("❌ Bundled FFmpeg check failed, trying system FFmpeg");
-            check_system_ffmpeg().await
-        },
-    }
-}
-
-async fn check_system_ffmpeg() -> Result<bool, String> {
-    let (ffmpeg_result, ffprobe_result) = tokio::join!(
-        tokio::task::spawn_blocking(|| {
-            let mut cmd = std::process::Command::new("ffmpeg");
-            cmd.arg("-version");
-            
-            #[cfg(target_os = "windows")]
-            {
-                const CREATE_NO_WINDOW: u32 = 0x08000000;
-                cmd.creation_flags(CREATE_NO_WINDOW);
-            }
-            
-            cmd.output()
-        }),
-        tokio::task::spawn_blocking(|| {
-            let mut cmd = std::process::Command::new("ffprobe");
-            cmd.arg("-version");
-            
-            #[cfg(target_os = "windows")]
-            {
-                const CREATE_NO_WINDOW: u32 = 0x08000000;
-                cmd.creation_flags(CREATE_NO_WINDOW);
-            }
-            
-            cmd.output()
-        })
-    );
-
-    match (ffmpeg_result, ffprobe_result) {
-        (Ok(Ok(ff)), Ok(Ok(fp))) if ff.status.success() && fp.status.success() => {
-            println!("✅ System FFmpeg and FFprobe found");
-            Ok(true)
-        },
-        _ => {
-            Err("FFmpeg not found. Please install FFmpeg or reinstall the application.".to_string())
-        },
+            Err("Failed to execute FFmpeg/FFprobe binaries. They may be corrupted.\n\n📦 Please re-download the binaries.".to_string())
+        }
     }
 }
 
@@ -279,6 +275,105 @@ async fn get_video_formats() -> Vec<formats::video::VideoFormat> {
         .get_or_init(|| async { formats::video::get_all_formats() })
         .await
         .clone()
+}
+
+#[tauri::command]
+async fn get_recommended_formats(
+    video_codec: String,
+    audio_codec: String,
+    media_type: String,
+    width: Option<u32>,
+    height: Option<u32>,
+) -> serde_json::Value {
+    use serde_json::json;
+    
+    if media_type == "video" {
+        let all_formats = VIDEO_FORMATS_CACHE
+            .get_or_init(|| async { formats::video::get_all_formats() })
+            .await;
+        
+        let mut fast = Vec::new();
+        let mut safe = Vec::new();
+        let mut setup = Vec::new();
+        let mut experimental = Vec::new();
+        let mut problematic = Vec::new();
+        
+        for format in all_formats.iter() {
+            let compat = format.get_compatibility_level(
+                &video_codec,
+                &audio_codec,
+                width,
+                height,
+            );
+            
+            match compat {
+                formats::video::FormatCompatibility::Fast => {
+                    fast.push(format.extension.clone());
+                }
+                formats::video::FormatCompatibility::Safe => {
+                    safe.push(format.extension.clone());
+                }
+                formats::video::FormatCompatibility::Setup => {
+                    setup.push(format.extension.clone());
+                }
+                formats::video::FormatCompatibility::Experimental => {
+                    experimental.push(format.extension.clone());
+                }
+                formats::video::FormatCompatibility::Problematic => {
+                    problematic.push(format.extension.clone());
+                }
+            }
+        }
+        
+        json!({
+            "fast": fast,
+            "safe": safe,
+            "setup": setup,
+            "experimental": experimental,
+            "problematic": problematic
+        })
+    } else {
+        let all_formats = AUDIO_FORMATS_CACHE
+            .get_or_init(|| async { formats::audio::get_all_formats() })
+            .await;
+        
+        let mut fast = Vec::new();
+        let mut safe = Vec::new();
+        let mut setup = Vec::new();
+        let mut experimental = Vec::new();
+        let mut problematic = Vec::new();
+        
+        for format in all_formats.iter() {
+            let can_copy = format.can_copy_codec(&audio_codec);
+            
+            match format.stability {
+                formats::Stability::Stable => {
+                    if can_copy {
+                        fast.push(format.extension.clone());
+                    } else {
+                        safe.push(format.extension.clone());
+                    }
+                }
+                formats::Stability::RequiresSetup => {
+                    setup.push(format.extension.clone());
+                }
+                formats::Stability::Experimental => {
+                    experimental.push(format.extension.clone());
+                }
+                formats::Stability::Problematic => {
+                    problematic.push(format.extension.clone());
+                }
+            }
+        }
+        
+        json!({
+            "fast": fast,
+            "safe": safe,
+            "setup": setup,
+            "experimental": experimental,
+            "problematic": problematic
+        })
+    }
 }
 
 #[tauri::command]

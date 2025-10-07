@@ -33,38 +33,106 @@ pub async fn convert(
         input.to_string(),
         "-vn".to_string(),
         "-c:a".to_string(),
-        format_info.codec.clone(),
+        format_info.get_ffmpeg_codec(),
     ];
 
-    if let Some(container) = &format_info.container {
-        args.extend_from_slice(&["-f".to_string(), container.clone()]);
+    if let Some(container) = format_info.get_container_format() {
+        args.extend_from_slice(&["-f".to_string(), container]);
     }
 
+    let quality = settings.get("quality").and_then(|q| q.as_str()).unwrap_or("medium");
+
     if format_info.lossy {
-        let bitrate = if let Some(br) = settings.get("bitrate").and_then(|b| b.as_u64()) {
-            br as u32
-        } else {
-            let quality = settings.get("quality").and_then(|q| q.as_str()).unwrap_or("medium");
-            match quality {
-                "low" => format_info.bitrate_range.map(|(min, _)| min).unwrap_or(128),
-                "high" => format_info.recommended_bitrate.unwrap_or(256),
-                "ultra" => format_info.bitrate_range.map(|(_, max)| max).unwrap_or(320),
-                _ => format_info.recommended_bitrate.unwrap_or(192),
+        match format_info.codec.as_str() {
+            "libvorbis" => {
+                args.extend(format_info.get_quality_args(quality));
             }
-        };
-        args.extend_from_slice(&["-b:a".to_string(), format!("{}k", bitrate)]);
+            "libopus" => {
+                let bitrate = if let Some(br) = settings.get("bitrate").and_then(|b| b.as_u64()) {
+                    let br = br as u32;
+                    if let Err(e) = format_info.validate_bitrate(br) {
+                        println!("⚠️ {}", e);
+                        format_info.get_bitrate_for_quality(quality).unwrap_or(128)
+                    } else {
+                        br
+                    }
+                } else {
+                    format_info.get_bitrate_for_quality(quality).unwrap_or(128)
+                };
+                args.extend_from_slice(&["-b:a".to_string(), format!("{}k", bitrate)]);
+                args.extend(format_info.get_quality_args(quality)); // Adds -vbr on
+            }
+            _ => {
+                let bitrate = if let Some(br) = settings.get("bitrate").and_then(|b| b.as_u64()) {
+                    let br = br as u32;
+                    if let Err(e) = format_info.validate_bitrate(br) {
+                        println!("⚠️ {}", e);
+                        format_info.get_bitrate_for_quality(quality).unwrap_or(192)
+                    } else {
+                        br
+                    }
+                } else {
+                    format_info.get_bitrate_for_quality(quality).unwrap_or(192)
+                };
+                args.extend_from_slice(&["-b:a".to_string(), format!("{}k", bitrate)]);
+            }
+        }
+    } else {
+        args.extend(format_info.get_quality_args(quality));
     }
 
     let sample_rate = settings.get("sampleRate")
         .and_then(|sr| sr.as_u64())
-        .unwrap_or(format_info.recommended_sample_rate as u64);
-    args.extend_from_slice(&["-ar".to_string(), sample_rate.to_string()]);
+        .map(|sr| sr as u32)
+        .unwrap_or(format_info.recommended_sample_rate);
 
-    let channels = settings.get("channels").and_then(|ch| ch.as_u64()).unwrap_or(2);
-    args.extend_from_slice(&["-ac".to_string(), channels.to_string()]);
+    let final_sample_rate = if format_info.supports_sample_rate(sample_rate) {
+        sample_rate
+    } else {
+        println!(
+            "⚠️ Sample rate {}Hz not supported by {}, using {}Hz",
+            sample_rate, format_info.extension, format_info.recommended_sample_rate
+        );
+        format_info.recommended_sample_rate
+    };
 
-    args.extend(format_info.special_params.clone());
-    args.extend_from_slice(&["-progress".to_string(), "pipe:1".to_string(), "-y".to_string(), output.to_string()]);
+    args.extend_from_slice(&["-ar".to_string(), final_sample_rate.to_string()]);
+
+    let channels = settings.get("channels")
+        .and_then(|ch| ch.as_u64())
+        .map(|ch| ch as u32)
+        .unwrap_or(2);
+
+    let final_channels = if format_info.supports_channels(channels) {
+        channels
+    } else {
+        let fallback = if format_info.channels_support.contains(&2) {
+            2
+        } else if let Some(&first) = format_info.channels_support.first() {
+            first
+        } else {
+            2
+        };
+
+        println!(
+            "⚠️ {} channels not supported by {}, using {} channels",
+            channels, format_info.extension, fallback
+        );
+        fallback
+    };
+
+    args.extend_from_slice(&["-ac".to_string(), final_channels.to_string()]);
+
+    if !matches!(format_info.codec.as_str(), "libvorbis" | "libopus" | "flac" | "wavpack") {
+        args.extend(format_info.special_params.clone());
+    }
+
+    args.extend_from_slice(&[
+        "-progress".to_string(),
+        "pipe:1".to_string(),
+        "-y".to_string(),
+        output.to_string()
+    ]);
 
     super::spawn_ffmpeg(window, task_id, media_info.duration, args, processes).await
 }
@@ -85,33 +153,99 @@ pub async fn extract_from_video(
     println!("🎵 Extracting audio from video: {} -> {} (task: {})", input, output, task_id);
 
     let app_handle = window.app_handle();
-    let copy_audio = settings.get("copyAudio").and_then(|c| c.as_bool()).unwrap_or(false);
     let media_info = media::detect_media_type(&app_handle, input).await?;
+
+    if media_info.audio_streams.is_empty() {
+        anyhow::bail!("No audio streams found in video file");
+    }
+
+    let format_info = audio::get_format(format)
+        .context(format!("Unknown audio format: {}", format))?;
+
+    if !format_info.is_suitable_for_extraction() {
+        println!(
+            "⚠️ Format '{}' may not be ideal for audio extraction",
+            format_info.extension
+        );
+    }
 
     let mut args = vec!["-i".to_string(), input.to_string(), "-vn".to_string()];
 
+    let copy_audio = settings.get("copyAudio").and_then(|c| c.as_bool()).unwrap_or(false);
+    let mut is_copying = false;
+
     if copy_audio {
-        args.extend_from_slice(&["-c:a".to_string(), "copy".to_string()]);
-    } else {
-        let format_info = audio::get_format(format)
-            .context(format!("Unknown audio format: {}", format))?;
+        let source_codec = &media_info.audio_streams[0].codec;
 
-        args.extend_from_slice(&["-c:a".to_string(), format_info.codec.clone()]);
-
-        if let Some(container) = &format_info.container {
-            args.extend_from_slice(&["-f".to_string(), container.clone()]);
+        if format_info.can_copy_codec(source_codec) {
+            args.extend_from_slice(&["-c:a".to_string(), "copy".to_string()]);
+            is_copying = true;
+            println!("✅ Copying audio stream ({})", source_codec);
+        } else {
+            println!(
+                "⚠️ Cannot copy '{}' to '{}', transcoding required",
+                source_codec, format_info.extension
+            );
         }
-
-        if format_info.lossy {
-            if let Some(bitrate) = format_info.recommended_bitrate {
-                args.extend_from_slice(&["-b:a".to_string(), format!("{}k", bitrate)]);
-            }
-        }
-
-        args.extend(format_info.special_params.clone());
     }
 
-    args.extend_from_slice(&["-progress".to_string(), "pipe:1".to_string(), "-y".to_string(), output.to_string()]);
+    if !is_copying {
+        args.extend_from_slice(&[
+            "-c:a".to_string(),
+            format_info.get_ffmpeg_codec(),
+        ]);
+
+        if let Some(container) = format_info.get_container_format() {
+            args.extend_from_slice(&["-f".to_string(), container]);
+        }
+
+        let quality = settings.get("quality").and_then(|q| q.as_str()).unwrap_or("medium");
+
+        if format_info.lossy {
+            match format_info.codec.as_str() {
+                "libvorbis" => {
+                    args.extend(format_info.get_quality_args(quality));
+                }
+                "libopus" => {
+                    let bitrate = format_info.get_bitrate_for_quality(quality).unwrap_or(128);
+                    args.extend_from_slice(&["-b:a".to_string(), format!("{}k", bitrate)]);
+                    args.extend(format_info.get_quality_args(quality));
+                }
+                _ => {
+                    let bitrate = format_info.get_bitrate_for_quality(quality).unwrap_or(192);
+                    args.extend_from_slice(&["-b:a".to_string(), format!("{}k", bitrate)]);
+                }
+            }
+        } else {
+            args.extend(format_info.get_quality_args(quality));
+        }
+
+        args.extend_from_slice(&[
+            "-ar".to_string(),
+            format_info.recommended_sample_rate.to_string(),
+        ]);
+
+        let channels = if format_info.channels_support.contains(&2) {
+            2
+        } else if let Some(&first) = format_info.channels_support.first() {
+            first
+        } else {
+            2
+        };
+
+        args.extend_from_slice(&["-ac".to_string(), channels.to_string()]);
+
+        if !matches!(format_info.codec.as_str(), "libvorbis" | "libopus" | "flac" | "wavpack") {
+            args.extend(format_info.special_params.clone());
+        }
+    }
+
+    args.extend_from_slice(&[
+        "-progress".to_string(),
+        "pipe:1".to_string(),
+        "-y".to_string(),
+        output.to_string()
+    ]);
 
     super::spawn_ffmpeg(window, task_id, media_info.duration, args, processes).await
 }

@@ -60,49 +60,102 @@ fn validate_audio(
         return result;
     };
 
-    // Проверка стабильности
     match output.stability {
         formats::Stability::Problematic => {
-            result.add_warning(format!("Format '{}' has known issues. Conversion may fail.", output.extension));
+            result.add_error(format!(
+                "Format '{}' is marked as problematic. Conversion may fail or produce poor results.",
+                output.extension
+            ));
         }
         formats::Stability::Experimental => {
-            result.add_warning(format!("Format '{}' is experimental. Use with caution.", output.extension));
+            result.add_warning(format!(
+                "Format '{}' is experimental. Use with caution.",
+                output.extension
+            ));
         }
         formats::Stability::RequiresSetup => {
+            result.add_warning(format!(
+                "Format '{}' requires special setup or libraries.",
+                output.extension
+            ));
             result.extend_params(output.special_params.clone());
         }
         _ => {}
     }
 
-    // Lossy/lossless конверсия
     if let Some(input) = formats::audio::get_format(input_format) {
         if input.lossy && !output.lossy {
-            result.add_warning("Converting from lossy to lossless will not improve quality.");
+            result.add_warning(
+                "Converting lossy→lossless will NOT improve quality. File size will increase unnecessarily."
+            );
         } else if !input.lossy && output.lossy {
-            result.add_warning("Converting from lossless to lossy will reduce quality.");
+            result.add_warning(
+                "Converting lossless→lossy will reduce quality permanently."
+            );
         }
     }
 
-    // Sample rate
     if let Some(sample_rate) = settings.get("sampleRate").and_then(|s| s.as_u64()) {
-        if !output.sample_rates.contains(&(sample_rate as u32)) {
+        let sr = sample_rate as u32;
+        
+        if !output.supports_sample_rate(sr) {
             result.add_warning(format!(
-                "Sample rate {}Hz may not be optimal for {}. Recommended: {}Hz",
-                sample_rate, output.extension, output.recommended_sample_rate
+                "Sample rate {}Hz is not supported by {}. Supported rates: {:?}. Recommended: {}Hz",
+                sr, output.extension, output.sample_rates, output.recommended_sample_rate
             ));
         }
     }
 
-    // Специфичные форматы
-    match output_format {
-        "amr" => {
-            result.extend_params(vec!["-ar".to_string(), "8000".to_string()]);
-            if settings.get("sampleRate").and_then(|s| s.as_u64()) != Some(8000) {
-                result.add_error("AMR format requires 8000Hz sample rate.");
+    if let Some(channels) = settings.get("channels").and_then(|c| c.as_u64()) {
+        let ch = channels as u32;
+        
+        if !output.supports_channels(ch) {
+            result.add_error(format!(
+                "Format '{}' does not support {} channel(s). Supported: {:?}",
+                output.extension, ch, output.channels_support
+            ));
+        }
+    }
+
+    if output.lossy {
+        if let Some(bitrate) = settings.get("bitrate").and_then(|b| b.as_u64()) {
+            let br = bitrate as u32;
+            
+            if let Err(err) = output.validate_bitrate(br) {
+                result.add_warning(err);
             }
         }
-        "ac3" if settings.get("channels").and_then(|c| c.as_u64()) == Some(2) => {
-            result.add_warning("AC3 is typically used for 5.1 surround sound.");
+    }
+
+    match output.extension.as_str() {
+        "amr" => {
+            result.add_warning("AMR is designed for voice/telephony. Not suitable for music.");
+        }
+        "ac3" | "dts" => {
+            if settings.get("channels").and_then(|c| c.as_u64()).unwrap_or(2) < 3 {
+                result.add_warning(format!(
+                    "{} is designed for surround sound (3+ channels). For stereo, consider AAC or MP3.",
+                    output.extension.to_uppercase()
+                ));
+            }
+        }
+        "ape" | "tak" | "tta" => {
+            result.add_warning(format!(
+                "{} is a niche format with limited player support.",
+                output.name
+            ));
+        }
+        "shn" => {
+            result.add_warning("Shorten (SHN) is an obsolete format. Consider FLAC instead.");
+        }
+        "ra" => {
+            result.add_warning("RealAudio is a legacy format. Modern players may not support it.");
+        }
+        "spx" => {
+            result.add_warning("Speex is optimized for speech, not music. Consider Opus for better quality.");
+        }
+        "wma" => {
+            result.add_warning("WMA has limited support outside Windows ecosystem.");
         }
         _ => {}
     }
@@ -122,21 +175,29 @@ fn validate_video(output_format: &str, settings: serde_json::Value) -> Validatio
         return result;
     };
 
-    // Стабильность
     match output.stability {
         formats::Stability::Problematic => {
-            result.add_warning(format!("Format '{}' has known issues. Conversion may fail.", output.extension));
+            result.add_error(format!(
+                "Format '{}' is problematic. Conversion may fail.",
+                output.extension
+            ));
         }
         formats::Stability::Experimental => {
-            result.add_warning(format!("Format '{}' is experimental. Use with caution.", output.extension));
+            result.add_warning(format!(
+                "Format '{}' is experimental.",
+                output.extension
+            ));
         }
         formats::Stability::RequiresSetup => {
+            result.add_warning(format!(
+                "Format '{}' requires special setup.",
+                output.extension
+            ));
             result.extend_params(output.special_params.clone());
         }
         _ => {}
     }
 
-    // Разрешение
     if let Some(max_res) = output.max_resolution {
         if let (Some(width), Some(height)) = (
             settings.get("width").and_then(|w| w.as_u64()),
@@ -144,51 +205,53 @@ fn validate_video(output_format: &str, settings: serde_json::Value) -> Validatio
         ) {
             if width > max_res.0 as u64 || height > max_res.1 as u64 {
                 result.add_error(format!(
-                    "Resolution {}x{} exceeds maximum {}x{} for {}",
+                    "Resolution {}x{} exceeds max {}x{} for {}",
                     width, height, max_res.0, max_res.1, output.extension
                 ));
+            }
+            
+            if width % 2 != 0 || height % 2 != 0 {
+                result.add_warning(
+                    "Odd dimensions will be adjusted to even values automatically."
+                );
             }
         }
     }
 
-    // Специфичные форматы
-    match output_format {
-        "webm" => {
-            if let Some(codec) = settings.get("videoCodec").and_then(|c| c.as_str()) {
-                if !["vp8", "vp9", "av1"].contains(&codec) {
-                    result.add_error("WebM only supports VP8, VP9, or AV1 video codecs.");
-                    result.alternative_codec = Some("vp9".to_string());
-                }
-            }
-            if let Some(audio_codec) = settings.get("audioCodec").and_then(|c| c.as_str()) {
-                if !["opus", "vorbis"].contains(&audio_codec) {
-                    result.add_error("WebM only supports Opus or Vorbis audio codecs.");
-                }
+    if let Some(codec) = settings.get("videoCodec").and_then(|c| c.as_str()) {
+        if !output.supports_video_codec(codec) {
+            result.add_error(format!(
+                "{} doesn't support '{}' video codec. Allowed: {:?}",
+                output.extension, codec, output.video_codecs
+            ));
+            
+            if let Some(default) = output.get_default_video_codec() {
+                result.alternative_codec = Some(default.to_string());
             }
         }
-        "vob" => {
-            result.extend_params(vec!["-target".to_string(), "dvd".to_string()]);
-            if let (Some(width), Some(height)) = (
-                settings.get("width").and_then(|w| w.as_u64()),
-                settings.get("height").and_then(|h| h.as_u64()),
-            ) {
-                if width != 720 || (height != 576 && height != 480) {
-                    result.add_warning("VOB format should use 720x576 (PAL) or 720x480 (NTSC).");
-                }
-            }
+    } else {
+        if let Some(default) = output.get_default_video_codec() {
+            result.add_warning(format!(
+                "Video will use {} codec (default for {}).",
+                default, output.extension
+            ));
         }
-        "3gp" => {
-            result.extend_params(vec!["-strict".to_string(), "experimental".to_string()]);
-            if let (Some(width), Some(height)) = (
-                settings.get("width").and_then(|w| w.as_u64()),
-                settings.get("height").and_then(|h| h.as_u64()),
-            ) {
-                if width > 352 || height > 288 {
-                    result.add_warning("3GP typically uses 352x288 resolution for compatibility.");
-                }
-            }
+    }
+
+    if let Some(audio_codec) = settings.get("audioCodec").and_then(|c| c.as_str()) {
+        if !output.supports_audio_codec(audio_codec) {
+            result.add_error(format!(
+                "{} doesn't support '{}' audio codec. Allowed: {:?}",
+                output.extension, audio_codec, output.audio_codecs
+            ));
         }
-        _ => {}
+    } else if !output.audio_codecs.is_empty() {
+        if let Some(default) = output.get_default_audio_codec() {
+            result.add_warning(format!(
+                "Audio will use {} codec.",
+                default
+            ));
+        }
     }
 
     if !output.special_params.is_empty() {

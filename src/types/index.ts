@@ -132,6 +132,14 @@ export interface FileItem {
   addedAt: number;
 }
 
+export interface RecommendedFormats {
+  fast: string[];
+  safe: string[];
+  setup: string[];
+  experimental: string[];
+  problematic: string[];
+}
+
 export type TabType = 'audio' | 'video';
 
 export interface ConversionContextType {

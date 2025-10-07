@@ -7,16 +7,11 @@ use anyhow::{Context, Result};
 use std::process::Stdio;
 use std::sync::Arc;
 use std::collections::HashMap;
-use std::path::PathBuf;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Command, Child};
 use tokio::sync::Mutex;
 use progress::ProgressParser;
 use tauri::Manager;
-
-#[cfg(target_os = "windows")]
-#[allow(unused_imports)]
-use std::os::windows::process::CommandExt;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConversionProgress {
@@ -39,17 +34,8 @@ pub async fn spawn_ffmpeg(
     println!("🎬 FFmpeg args: {:?}", args);
 
     let app_handle = window.app_handle();
-    let ffmpeg_path = match crate::get_ffmpeg_path(&app_handle) {
-        Ok(path) => {
-            println!("✅ Using bundled FFmpeg: {:?}", path);
-            path
-        },
-        Err(e) => {
-            eprintln!("⚠️ Bundled FFmpeg not found: {}", e);
-            eprintln!("⚠️ Falling back to system FFmpeg");
-            PathBuf::from("ffmpeg")
-        }
-    };
+    let ffmpeg_path = crate::get_ffmpeg_path(&app_handle)
+        .map_err(|e| anyhow::anyhow!("FFmpeg not found: {}", e))?;
 
     let mut cmd = Command::new(&ffmpeg_path);
     cmd.args(&args)

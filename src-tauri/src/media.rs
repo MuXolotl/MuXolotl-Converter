@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use std::process::Command;
-use std::path::PathBuf;
 use anyhow::{Context, Result};
 
 #[cfg(target_os = "windows")]
@@ -42,17 +41,8 @@ pub struct MediaInfo {
 }
 
 pub async fn detect_media_type(app_handle: &tauri::AppHandle, path: &str) -> Result<MediaInfo> {
-    let ffprobe_path = match crate::get_ffprobe_path(app_handle) {
-        Ok(path) => {
-            println!("✅ Using bundled FFprobe: {:?}", path);
-            path
-        },
-        Err(e) => {
-            eprintln!("⚠️ Bundled FFprobe not found: {}", e);
-            eprintln!("⚠️ Falling back to system FFprobe");
-            PathBuf::from("ffprobe")
-        }
-    };
+    let ffprobe_path = crate::get_ffprobe_path(app_handle)
+        .map_err(|e| anyhow::anyhow!("FFprobe not found: {}", e))?;
 
     let mut cmd = Command::new(&ffprobe_path);
     cmd.args(&[
