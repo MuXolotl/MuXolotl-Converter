@@ -8,6 +8,7 @@ mod media;
 mod formats;
 mod converter;
 mod validator;
+mod utils;
 
 use tauri::Manager;
 use std::sync::Arc;
@@ -15,9 +16,6 @@ use std::path::PathBuf;
 use tokio::sync::{Mutex, OnceCell};
 use std::collections::HashMap;
 use tokio::process::Child;
-
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
 
 static GPU_CACHE: OnceCell<gpu::GpuInfo> = OnceCell::const_new();
 static AUDIO_FORMATS_CACHE: OnceCell<Vec<formats::audio::AudioFormat>> = OnceCell::const_new();
@@ -46,6 +44,7 @@ fn get_binary_path(app_handle: &tauri::AppHandle, binary_name: &str) -> Result<P
     // Checking bundled binary
     if let Some(sidecar_path) = app_handle.path_resolver().resolve_resource(&resource_path) {
         if sidecar_path.exists() {
+            #[cfg(debug_assertions)]
             println!("✅ Found bundled {} at: {:?}", binary_name, sidecar_path);
             return Ok(sidecar_path);
         }
@@ -106,6 +105,23 @@ fn main() {
         ])
         .setup(|app| {
             let window = app.get_window("main").unwrap();
+            let state = app.state::<AppState>();
+            let processes = state.active_processes.clone();
+
+            // Cleanup FFmpeg processes on window close
+            window.on_window_event(move |event| {
+                if let tauri::WindowEvent::CloseRequested { .. } = event {
+                    let processes = processes.clone();
+                    tauri::async_runtime::block_on(async move {
+                        let mut procs = processes.lock().await;
+                        for (task_id, mut child) in procs.drain() {
+                            #[cfg(debug_assertions)]
+                            println!("🛑 Killing FFmpeg process on shutdown: {}", task_id);
+                            let _ = child.kill().await;
+                        }
+                    });
+                }
+            });
 
             // Asynchronous GPU initialization
             tauri::async_runtime::spawn(async move {
@@ -127,6 +143,7 @@ fn main() {
 
 #[tauri::command]
 async fn check_ffmpeg(app_handle: tauri::AppHandle) -> Result<bool, String> {
+    #[cfg(debug_assertions)]
     println!("🔍 Checking for bundled FFmpeg and FFprobe...");
 
     let ffmpeg_path = get_ffmpeg_path(&app_handle).map_err(|e| {
@@ -144,35 +161,28 @@ async fn check_ffmpeg(app_handle: tauri::AppHandle) -> Result<bool, String> {
     })?;
 
     let ffmpeg_result = tokio::task::spawn_blocking(move || {
-        let mut cmd = std::process::Command::new(&ffmpeg_path);
+        let mut cmd = utils::create_hidden_command(
+            ffmpeg_path.to_str()
+                .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid FFmpeg path"))?
+        );
         cmd.arg("-version");
-
-        #[cfg(target_os = "windows")]
-        {
-            const CREATE_NO_WINDOW: u32 = 0x08000000;
-            cmd.creation_flags(CREATE_NO_WINDOW);
-        }
-
         cmd.output()
     })
     .await;
 
     let ffprobe_result = tokio::task::spawn_blocking(move || {
-        let mut cmd = std::process::Command::new(&ffprobe_path);
+        let mut cmd = utils::create_hidden_command(
+            ffprobe_path.to_str()
+                .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid FFprobe path"))?
+        );
         cmd.arg("-version");
-
-        #[cfg(target_os = "windows")]
-        {
-            const CREATE_NO_WINDOW: u32 = 0x08000000;
-            cmd.creation_flags(CREATE_NO_WINDOW);
-        }
-
         cmd.output()
     })
     .await;
 
     match (ffmpeg_result, ffprobe_result) {
         (Ok(Ok(ff)), Ok(Ok(fp))) if ff.status.success() && fp.status.success() => {
+            #[cfg(debug_assertions)]
             println!("✅ Bundled FFmpeg and FFprobe are working correctly");
             Ok(true)
         }
@@ -196,10 +206,8 @@ fn open_folder(path: String) -> Result<(), String> {
     std::thread::spawn(move || {
         #[cfg(target_os = "windows")]
         {
-            let mut cmd = std::process::Command::new("explorer");
+            let mut cmd = utils::create_hidden_command("explorer");
             cmd.arg(&path);
-            const CREATE_NO_WINDOW: u32 = 0x08000000;
-            cmd.creation_flags(CREATE_NO_WINDOW);
             let _ = cmd.spawn();
         }
 
@@ -362,14 +370,19 @@ async fn extract_audio(
 
 #[tauri::command]
 async fn cancel_conversion(state: tauri::State<'_, AppState>, task_id: String) -> Result<(), String> {
+    #[cfg(debug_assertions)]
     println!("⛔ Cancelling conversion: {}", task_id);
 
     if let Some(mut child) = state.active_processes.lock().await.remove(&task_id) {
         match child.kill().await {
-            Ok(_) => println!("✅ Killed FFmpeg process for task: {}", task_id),
+            Ok(_) => {
+                #[cfg(debug_assertions)]
+                println!("✅ Killed FFmpeg process for task: {}", task_id);
+            }
             Err(e) => eprintln!("⚠️ Failed to kill process {}: {}", task_id, e),
         }
     } else {
+        #[cfg(debug_assertions)]
         println!("⚠️ No active process found for task: {}", task_id);
     }
 

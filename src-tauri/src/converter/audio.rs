@@ -44,6 +44,7 @@ fn get_bitrate(format_info: &audio::AudioFormat, quality: &str, settings: &serde
                 .get("bitrate")
                 .and_then(|b| b.as_u64())
                 .map(|br| {
+                    #[cfg(debug_assertions)]
                     println!("⚠️ Invalid bitrate {}, using default", br);
                     br
                 });
@@ -66,6 +67,7 @@ fn add_audio_params(
     let final_sample_rate = if format_info.supports_sample_rate(sample_rate) {
         sample_rate
     } else {
+        #[cfg(debug_assertions)]
         println!(
             "⚠️ Sample rate {}Hz not supported by {}, using {}Hz",
             sample_rate, format_info.extension, format_info.recommended_sample_rate
@@ -91,6 +93,7 @@ fn add_audio_params(
             .copied()
             .unwrap_or(2);
 
+        #[cfg(debug_assertions)]
         println!(
             "⚠️ {} channels not supported by {}, using {} channels",
             channels, format_info.extension, fallback
@@ -151,6 +154,7 @@ pub async fn convert(
         .unwrap_or("unknown")
         .to_string();
 
+    #[cfg(debug_assertions)]
     println!("🎵 Converting audio: {} -> {} (task: {})", input, output, task_id);
 
     let format_info = audio::get_format(format)
@@ -179,6 +183,7 @@ pub async fn extract_from_video(
         .unwrap_or("unknown")
         .to_string();
 
+    #[cfg(debug_assertions)]
     println!("🎵 Extracting audio from video: {} -> {} (task: {})", input, output, task_id);
 
     let app_handle = window.app_handle();
@@ -192,6 +197,7 @@ pub async fn extract_from_video(
         .context(format!("Unknown audio format: {}", format))?;
 
     if !format_info.is_suitable_for_extraction() {
+        #[cfg(debug_assertions)]
         println!("⚠️ Format '{}' may not be ideal for audio extraction", format_info.extension);
     }
 
@@ -202,9 +208,11 @@ pub async fn extract_from_video(
 
     if copy_audio && format_info.can_copy_codec(source_codec) {
         args.extend_from_slice(&["-c:a".to_string(), "copy".to_string()]);
+        #[cfg(debug_assertions)]
         println!("✅ Copying audio stream ({})", source_codec);
     } else {
         if copy_audio {
+            #[cfg(debug_assertions)]
             println!("⚠️ Cannot copy '{}' to '{}', transcoding required", source_codec, format_info.extension);
         }
 

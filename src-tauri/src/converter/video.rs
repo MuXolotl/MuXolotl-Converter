@@ -225,6 +225,7 @@ fn handle_audio_codec(
             args.extend_from_slice(&["-c:a".to_string(), audio_codec.to_string()]);
             return;
         }
+        #[cfg(debug_assertions)]
         println!("⚠️ Audio codec '{}' not compatible, using default", audio_codec);
     }
 
@@ -280,6 +281,7 @@ pub async fn convert(
         .unwrap_or("unknown")
         .to_string();
 
+    #[cfg(debug_assertions)]
     println!("🎬 Converting video: {} -> {} (task: {})", input, output, task_id);
 
     let format_info = video::get_format(format)

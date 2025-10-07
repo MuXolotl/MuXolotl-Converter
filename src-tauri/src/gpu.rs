@@ -1,8 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::process::Command;
-
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
+use crate::utils::create_hidden_command;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -35,18 +32,6 @@ impl Default for GpuInfo {
             available: false,
         }
     }
-}
-
-#[cfg(target_os = "windows")]
-const CREATE_NO_WINDOW: u32 = 0x08000000;
-
-fn create_hidden_command(program: &str) -> Command {
-    let mut cmd = Command::new(program);
-    
-    #[cfg(target_os = "windows")]
-    cmd.creation_flags(CREATE_NO_WINDOW);
-    
-    cmd
 }
 
 fn check_ffmpeg_encoder(encoder: &str) -> bool {

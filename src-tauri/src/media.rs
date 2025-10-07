@@ -1,9 +1,6 @@
 use serde::{Deserialize, Serialize};
-use std::process::Command;
 use anyhow::{Context, Result};
-
-#[cfg(target_os = "windows")]
-use std::os::windows::process::CommandExt;
+use crate::utils::create_hidden_command;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -44,7 +41,10 @@ pub async fn detect_media_type(app_handle: &tauri::AppHandle, path: &str) -> Res
     let ffprobe_path = crate::get_ffprobe_path(app_handle)
         .map_err(|e| anyhow::anyhow!("FFprobe not found: {}", e))?;
 
-    let mut cmd = Command::new(&ffprobe_path);
+    let ffprobe_str = ffprobe_path.to_str()
+        .ok_or_else(|| anyhow::anyhow!("Invalid FFprobe path encoding"))?;
+
+    let mut cmd = create_hidden_command(ffprobe_str);
     cmd.args(&[
         "-v", "quiet",
         "-print_format", "json",
@@ -52,12 +52,6 @@ pub async fn detect_media_type(app_handle: &tauri::AppHandle, path: &str) -> Res
         "-show_streams",
         path,
     ]);
-    
-    #[cfg(target_os = "windows")]
-    {
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        cmd.creation_flags(CREATE_NO_WINDOW);
-    }
     
     let output = cmd.output().context("Failed to execute ffprobe")?;
 
@@ -141,8 +135,8 @@ fn parse_video_stream(stream: &serde_json::Value) -> Option<VideoStream> {
         .and_then(|s| {
             let parts: Vec<&str> = s.split('/').collect();
             if parts.len() == 2 {
-                let num = parts[0].parse::<f64>().ok()?;
-                let den = parts[1].parse::<f64>().ok()?;
+                let num: f64 = parts[0].parse().ok()?;
+                let den: f64 = parts[1].parse().ok()?;
                 Some(if den != 0.0 { num / den } else { 0.0 })
             } else {
                 None

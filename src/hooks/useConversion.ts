@@ -10,17 +10,15 @@ export const useConversion = (
   updateFile: (fileId: string, updates: Partial<FileItem>) => void,
   gpuInfo: GpuInfo
 ): ConversionContextType => {
-  const [isConverting, setIsConverting] = useState(false);
+  const [activeConversions, setActiveConversions] = useState<Set<string>>(new Set());
   const progressTimeouts = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const unlistenFns = useRef<UnlistenFn[]>([]);
+
+  const isConverting = activeConversions.size > 0;
 
   useEffect(() => {
     const setupListeners = async () => {
       const listeners = await Promise.all([
-        listen<string>('conversion-started', (event) => {
-          console.log('✅ Conversion started:', event.payload);
-        }),
-
         listen<ConversionProgress>('conversion-progress', (event) => {
           const progress = event.payload;
           const existing = progressTimeouts.current.get(progress.task_id);
@@ -50,7 +48,12 @@ export const useConversion = (
             progress: null,
             completedAt: Date.now(),
           });
-          setIsConverting(false);
+
+          setActiveConversions((prev) => {
+            const next = new Set(prev);
+            next.delete(taskId);
+            return next;
+          });
         }),
 
         listen<{ task_id: string; error: string }>('conversion-error', (event) => {
@@ -67,7 +70,12 @@ export const useConversion = (
             error: event.payload.error,
             completedAt: Date.now(),
           });
-          setIsConverting(false);
+
+          setActiveConversions((prev) => {
+            const next = new Set(prev);
+            next.delete(event.payload.task_id);
+            return next;
+          });
         }),
       ]);
 
@@ -96,6 +104,8 @@ export const useConversion = (
 
   const startConversion = useCallback(
     async (file: FileItem) => {
+      setActiveConversions((prev) => new Set(prev).add(file.id));
+
       try {
         const outputFormat = file.outputFormat;
         let outputPath = file.outputPath;
@@ -104,13 +114,17 @@ export const useConversion = (
           const selected = await selectOutputPath(file, outputFormat);
           if (!selected) {
             console.log('❌ User cancelled output path selection');
+            setActiveConversions((prev) => {
+              const next = new Set(prev);
+              next.delete(file.id);
+              return next;
+            });
             return;
           }
           outputPath = selected;
           updateFile(file.id, { outputPath });
         }
 
-        setIsConverting(true);
         updateFile(file.id, {
           status: 'processing',
           progress: {
@@ -172,7 +186,11 @@ export const useConversion = (
           error: String(error),
           completedAt: Date.now(),
         });
-        setIsConverting(false);
+        setActiveConversions((prev) => {
+          const next = new Set(prev);
+          next.delete(file.id);
+          return next;
+        });
         throw error;
       }
     },
@@ -195,7 +213,12 @@ export const useConversion = (
           progress: null,
           completedAt: Date.now(),
         });
-        setIsConverting(false);
+
+        setActiveConversions((prev) => {
+          const next = new Set(prev);
+          next.delete(fileId);
+          return next;
+        });
       } catch (error) {
         console.error('Failed to cancel conversion:', error);
       }

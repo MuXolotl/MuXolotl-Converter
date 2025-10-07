@@ -14,6 +14,9 @@ import type { FileItem, ConversionContextType } from '@/types';
 
 export const ConversionContext = React.createContext<ConversionContextType | null>(null);
 
+// Maximum parallel conversions
+const MAX_PARALLEL_CONVERSIONS = 4;
+
 const App: React.FC = () => {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [ffmpegAvailable, setFfmpegAvailable] = useState<boolean | null>(null);
@@ -133,11 +136,18 @@ const App: React.FC = () => {
     );
 
     if (parallelConversion) {
-      await Promise.allSettled(
-        pendingFiles.map((file) =>
-          conversionContext.startConversion(file).catch((err) => console.error(`Failed to convert ${file.name}:`, err))
-        )
-      );
+      const chunks = [];
+      for (let i = 0; i < pendingFiles.length; i += MAX_PARALLEL_CONVERSIONS) {
+        chunks.push(pendingFiles.slice(i, i + MAX_PARALLEL_CONVERSIONS));
+      }
+
+      for (const chunk of chunks) {
+        await Promise.allSettled(
+          chunk.map((file) =>
+            conversionContext.startConversion(file).catch((err) => console.error(`Failed to convert ${file.name}:`, err))
+          )
+        );
+      }
     } else {
       for (const file of pendingFiles) {
         try {
@@ -233,7 +243,7 @@ const App: React.FC = () => {
                   checked={parallelConversion}
                   onChange={(e) => setParallelConversion(e.target.checked)}
                   className="w-4 h-4 rounded bg-white/10 border-white/20 checked:bg-primary-purple cursor-pointer"
-                  title="Enable parallel processing (may increase CPU/GPU usage)"
+                  title={`Enable parallel processing (max ${MAX_PARALLEL_CONVERSIONS} files at once)`}
                 />
               </div>
             </div>

@@ -1,7 +1,9 @@
 import type { FileItem, FileSettings } from '@/types';
 
-export const generateFileId = (): string => {
-  return `${Math.random().toString(36).slice(2)}_${Date.now()}`;
+let idCounter = 0;
+export const generateFileId = () => {
+  idCounter = (idCounter + 1) % 10000;
+  return `${Date.now()}_${idCounter}_${Math.random().toString(36).slice(2, 9)}`;
 };
 
 export const generateOutputPath = (file: FileItem, folder: string): string => {

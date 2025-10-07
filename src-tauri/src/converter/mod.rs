@@ -8,8 +8,9 @@ use std::process::Stdio;
 use std::sync::Arc;
 use std::collections::HashMap;
 use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::process::{Command, Child};
+use tokio::process::Child;
 use tokio::sync::Mutex;
+use tokio::time::{timeout, Duration};
 use progress::ProgressParser;
 use tauri::Manager;
 
@@ -31,22 +32,27 @@ pub async fn spawn_ffmpeg(
     args: Vec<String>,
     processes: Arc<Mutex<HashMap<String, Child>>>,
 ) -> Result<String> {
+    #[cfg(debug_assertions)]
     println!("🎬 FFmpeg args: {:?}", args);
 
     let app_handle = window.app_handle();
     let ffmpeg_path = crate::get_ffmpeg_path(&app_handle)
         .map_err(|e| anyhow::anyhow!("FFmpeg not found: {}", e))?;
 
-    let mut cmd = Command::new(&ffmpeg_path);
-    cmd.args(&args)
-       .stdout(Stdio::piped())
-       .stderr(Stdio::piped());
+    let ffmpeg_str = ffmpeg_path.to_str()
+        .ok_or_else(|| anyhow::anyhow!("Invalid FFmpeg path encoding"))?;
 
+    let mut cmd = tokio::process::Command::new(ffmpeg_str);
+    
     #[cfg(target_os = "windows")]
     {
         const CREATE_NO_WINDOW: u32 = 0x08000000;
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
+
+    cmd.args(&args)
+       .stdout(Stdio::piped())
+       .stderr(Stdio::piped());
 
     let mut child = cmd.spawn().context("Failed to spawn ffmpeg")?;
 
@@ -65,21 +71,34 @@ pub async fn spawn_ffmpeg(
     tokio::spawn(async move {
         while let Ok(Some(line)) = stderr_reader.next_line().await {
             if line.contains("Error") || line.contains("Invalid") {
+                #[cfg(debug_assertions)]
                 eprintln!("⚠️ FFmpeg stderr ({}): {}", task_id_clone, line);
             }
         }
     });
 
-    while let Ok(Some(line)) = stdout_reader.next_line().await {
-        if let Some(progress) = parser.parse_line(&line) {
-            let _ = window.emit("conversion-progress", &progress);
+    let conversion_future = async {
+        while let Ok(Some(line)) = stdout_reader.next_line().await {
+            if let Some(progress) = parser.parse_line(&line) {
+                let _ = window.emit("conversion-progress", &progress);
+            }
         }
-    }
 
-    let status = if let Some(mut child) = processes.lock().await.remove(&task_id) {
-        child.wait().await?
-    } else {
-        anyhow::bail!("Process was cancelled")
+        if let Some(mut child) = processes.lock().await.remove(&task_id) {
+            child.wait().await
+        } else {
+            Err(std::io::Error::new(std::io::ErrorKind::Interrupted, "Process was cancelled"))
+        }
+    };
+
+    let status = match timeout(Duration::from_secs(3600), conversion_future).await {
+        Ok(result) => result?,
+        Err(_) => {
+            if let Some(mut child) = processes.lock().await.remove(&task_id) {
+                let _ = child.kill().await;
+            }
+            anyhow::bail!("Conversion timed out after 60 minutes");
+        }
     };
 
     if status.success() {
