@@ -16,7 +16,7 @@ export const getFormatByExtension = (
   formats: (AudioFormat | VideoFormat)[],
   extension: string
 ): AudioFormat | VideoFormat | undefined => {
-  return formats.find((f) => f.extension === extension);
+  return formats.find(f => f.extension === extension);
 };
 
 export const truncatePath = (path: string, maxLength: number = 25): string => {

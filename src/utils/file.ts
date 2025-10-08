@@ -8,7 +8,7 @@ export const generateFileId = () => {
 
 export const generateOutputPath = (file: FileItem, folder: string): string => {
   const inputName = file.name.substring(0, file.name.lastIndexOf('.'));
-  return `${folder}/${inputName}_converted.${file.outputFormat}`;
+  return `${folder}/${inputName}.${file.outputFormat}`;
 };
 
 export const getDefaultSettings = (gpuAvailable: boolean): FileSettings => ({

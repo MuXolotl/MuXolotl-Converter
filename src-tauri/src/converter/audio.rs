@@ -34,23 +34,15 @@ fn add_quality_params(
 }
 
 fn get_bitrate(format_info: &audio::AudioFormat, quality: &str, settings: &serde_json::Value) -> u32 {
-    settings
-        .get("bitrate")
-        .and_then(|b| b.as_u64())
-        .map(|br| br as u32)
-        .filter(|&br| format_info.validate_bitrate(br).is_ok())
-        .or_else(|| {
-            settings
-                .get("bitrate")
-                .and_then(|b| b.as_u64())
-                .map(|br| {
-                    #[cfg(debug_assertions)]
-                    println!("⚠️ Invalid bitrate {}, using default", br);
-                    br
-                });
-            None
-        })
-        .unwrap_or_else(|| format_info.get_bitrate_for_quality(quality).unwrap_or(192))
+    if let Some(br) = settings.get("bitrate").and_then(|b| b.as_u64()).map(|br| br as u32) {
+        if format_info.validate_bitrate(br).is_ok() {
+            return br;
+        }
+        #[cfg(debug_assertions)]
+        println!("⚠️ Invalid bitrate {}, using default", br);
+    }
+    
+    format_info.get_bitrate_for_quality(quality).unwrap_or(192)
 }
 
 fn add_audio_params(

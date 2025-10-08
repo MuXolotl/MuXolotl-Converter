@@ -9,13 +9,16 @@ import FileList from '@/components/FileList';
 import ConvertButton from '@/components/ConvertButton';
 import { useGpu } from '@/hooks/useGpu';
 import { useConversion } from '@/hooks/useConversion';
+import { useNotifications } from '@/hooks/useNotifications';
 import { truncatePath, generateOutputPath, sortFilesByStatus } from '@/utils';
+import { saveQueue, loadQueue, clearQueue, saveOutputFolder, loadOutputFolder } from '@/utils/storage';
 import type { FileItem, ConversionContextType } from '@/types';
 
 export const ConversionContext = React.createContext<ConversionContextType | null>(null);
 
-// Maximum parallel conversions
 const MAX_PARALLEL_CONVERSIONS = 4;
+const MAX_FILES_IN_QUEUE = 50;
+const AUTOSAVE_INTERVAL_MS = 2000;
 
 const App: React.FC = () => {
   const [files, setFiles] = useState<FileItem[]>([]);
@@ -23,18 +26,81 @@ const App: React.FC = () => {
   const [parallelConversion, setParallelConversion] = useState(false);
   const [outputFolder, setOutputFolder] = useState<string>('');
   const [expandedAdvanced, setExpandedAdvanced] = useState<Set<string>>(new Set());
+  const [expandedCompactCard, setExpandedCompactCard] = useState<string | null>(null);
 
   const { gpuInfo, isLoading: gpuLoading } = useGpu();
+  const { notifyFileCompleted, notifyFileFailed, notifyQueueCompleted } = useNotifications();
+
+  // Load queue and output folder on mount
+  useEffect(() => {
+    const savedFiles = loadQueue();
+    if (savedFiles.length > 0) {
+      setFiles(savedFiles);
+      console.log(`✅ Restored ${savedFiles.length} files from previous session`);
+    }
+
+    const savedFolder = loadOutputFolder();
+    if (savedFolder) {
+      setOutputFolder(savedFolder);
+      console.log(`✅ Restored output folder: ${savedFolder}`);
+    }
+  }, []);
+
+  // Auto-save output folder when changed
+  useEffect(() => {
+    if (outputFolder) {
+      saveOutputFolder(outputFolder);
+    }
+  }, [outputFolder]);
+
+  // Auto-save queue
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (files.length > 0) {
+        saveQueue(files);
+      }
+    }, AUTOSAVE_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [files]);
+
+  // Track queue completion for notifications
+  const prevFilesRef = React.useRef<FileItem[]>([]);
+  useEffect(() => {
+    const prevFiles = prevFilesRef.current;
+    prevFilesRef.current = files;
+
+    files.forEach(file => {
+      const prevFile = prevFiles.find(f => f.id === file.id);
+      if (prevFile && prevFile.status !== file.status) {
+        if (file.status === 'completed') {
+          notifyFileCompleted(file);
+        } else if (file.status === 'failed') {
+          notifyFileFailed(file);
+        }
+      }
+    });
+
+    const wasProcessing = prevFiles.some(f => f.status === 'processing');
+    const isProcessing = files.some(f => f.status === 'processing');
+    const hasPending = files.some(f => f.status === 'pending');
+
+    if (wasProcessing && !isProcessing && !hasPending && files.length > 0) {
+      const completed = files.filter(f => f.status === 'completed').length;
+      const failed = files.filter(f => f.status === 'failed').length;
+      notifyQueueCompleted(completed, failed);
+    }
+  }, [files, notifyFileCompleted, notifyFileFailed, notifyQueueCompleted]);
 
   const updateFile = useCallback(
     (fileId: string, updates: Partial<FileItem>) => {
-      setFiles((prev) =>
-        prev.map((f) => {
+      setFiles(prev =>
+        prev.map(f => {
           if (f.id !== fileId) return f;
           const updated = { ...f, ...updates };
 
-          if (outputFolder && updated.status === 'pending') {
-            if (updates.outputFormat !== undefined || updated.outputPath === undefined) {
+          if (outputFolder && updated.status === 'pending' && !updated.outputPath) {
+            if (updates.outputFormat !== undefined) {
               updated.outputPath = generateOutputPath(updated, outputFolder);
             }
           }
@@ -51,7 +117,7 @@ const App: React.FC = () => {
   useEffect(() => {
     invoke<boolean>('check_ffmpeg')
       .then(setFfmpegAvailable)
-      .catch((error) => {
+      .catch(error => {
         console.error('FFmpeg check failed:', error);
         setFfmpegAvailable(false);
         alert(
@@ -62,9 +128,11 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (outputFolder) {
-      setFiles((prev) =>
-        prev.map((file) =>
-          file.status === 'pending' ? { ...file, outputPath: generateOutputPath(file, outputFolder) } : file
+      setFiles(prev =>
+        prev.map(file =>
+          file.status === 'pending' && !file.outputPath
+            ? { ...file, outputPath: generateOutputPath(file, outputFolder) }
+            : file
         )
       );
     }
@@ -74,24 +142,55 @@ const App: React.FC = () => {
 
   const handleFilesAdded = useCallback(
     (newFiles: FileItem[]) => {
+      const currentCount = files.length;
+      const availableSlots = MAX_FILES_IN_QUEUE - currentCount;
+
+      if (availableSlots <= 0) {
+        alert(`⚠️ Queue is full! Maximum ${MAX_FILES_IN_QUEUE} files allowed.\n\nPlease remove some files first.`);
+        return;
+      }
+
+      const existingPaths = new Set(files.map(f => f.path));
+      const uniqueFiles = newFiles.filter(f => !existingPaths.has(f.path));
+      const duplicateCount = newFiles.length - uniqueFiles.length;
+
+      if (duplicateCount > 0) {
+        alert(
+          `⚠️ ${duplicateCount} file${duplicateCount > 1 ? 's are' : ' is'} already in the queue and will be skipped.`
+        );
+      }
+
+      const filesToAdd = uniqueFiles.slice(0, availableSlots);
+      const exceededCount = uniqueFiles.length - filesToAdd.length;
+
+      if (exceededCount > 0) {
+        alert(
+          `⚠️ Only ${filesToAdd.length} files added.\n\n${exceededCount} files exceeded the ${MAX_FILES_IN_QUEUE} file limit.`
+        );
+      }
+
+      if (filesToAdd.length === 0) return;
+
       const filesWithPath = outputFolder
-        ? newFiles.map((file) => ({
+        ? filesToAdd.map(file => ({
             ...file,
             outputPath: generateOutputPath(file, outputFolder),
           }))
-        : newFiles;
-      setFiles((prev) => [...filesWithPath, ...prev]);
+        : filesToAdd;
+
+      setFiles(prev => [...filesWithPath, ...prev]);
     },
-    [outputFolder]
+    [files, outputFolder]
   );
 
   const handleFileRemove = useCallback((fileId: string) => {
-    setFiles((prev) => prev.filter((f) => f.id !== fileId));
-    setExpandedAdvanced((prev) => {
+    setFiles(prev => prev.filter(f => f.id !== fileId));
+    setExpandedAdvanced(prev => {
       const next = new Set(prev);
       next.delete(fileId);
       return next;
     });
+    setExpandedCompactCard(prev => (prev === fileId ? null : prev));
   }, []);
 
   const handleRetry = useCallback(
@@ -128,7 +227,7 @@ const App: React.FC = () => {
   }, [outputFolder]);
 
   const handleConvertAll = useCallback(async () => {
-    const pendingFiles = files.filter((f) => f.status === 'pending');
+    const pendingFiles = files.filter(f => f.status === 'pending');
     if (pendingFiles.length === 0) return;
 
     console.log(
@@ -143,10 +242,8 @@ const App: React.FC = () => {
 
       for (const chunk of chunks) {
         await Promise.allSettled(
-          chunk.map((file) =>
-            conversionContext
-              .startConversion(file)
-              .catch((err) => console.error(`Failed to convert ${file.name}:`, err))
+          chunk.map(file =>
+            conversionContext.startConversion(file).catch(err => console.error(`Failed to convert ${file.name}:`, err))
           )
         );
       }
@@ -162,17 +259,57 @@ const App: React.FC = () => {
   }, [files, parallelConversion, conversionContext]);
 
   const handleToggleAdvanced = useCallback((fileId: string) => {
-    setExpandedAdvanced((prev) => {
+    setExpandedAdvanced(prev => {
       const next = new Set(prev);
       next.has(fileId) ? next.delete(fileId) : next.add(fileId);
       return next;
     });
   }, []);
 
-  const canConvert =
-    files.some((f) => f.status === 'pending') && !conversionContext.isConverting && ffmpegAvailable === true;
+  const handleToggleCompactCard = useCallback((fileId: string | null) => {
+    setExpandedCompactCard(prev => (prev === fileId ? null : fileId));
+  }, []);
 
-  const pendingCount = files.filter((f) => f.status === 'pending').length;
+  // Batch actions
+  const handleApplyToAll = useCallback(() => {
+    const firstPending = files.find(f => f.status === 'pending');
+    if (!firstPending) return;
+
+    setFiles(prev =>
+      prev.map(file =>
+        file.status === 'pending'
+          ? {
+              ...file,
+              outputFormat: firstPending.outputFormat,
+              settings: { ...firstPending.settings },
+              outputPath: outputFolder
+                ? generateOutputPath({ ...file, outputFormat: firstPending.outputFormat }, outputFolder)
+                : undefined,
+            }
+          : file
+      )
+    );
+  }, [files, outputFolder]);
+
+  const handleClearCompleted = useCallback(() => {
+    setFiles(prev => prev.filter(f => f.status !== 'completed'));
+  }, []);
+
+  const handleClearAll = useCallback(() => {
+    setFiles([]);
+    clearQueue();
+  }, []);
+
+  const handleCancelAll = useCallback(async () => {
+    const processingFiles = files.filter(f => f.status === 'processing');
+    await Promise.all(processingFiles.map(file => conversionContext.cancelConversion(file.id)));
+  }, [files, conversionContext]);
+
+  const canConvert =
+    files.some(f => f.status === 'pending') && !conversionContext.isConverting && ffmpegAvailable === true;
+
+  const pendingCount = files.filter(f => f.status === 'pending').length;
+  const fileCountDisplay = `${files.length}/${MAX_FILES_IN_QUEUE}`;
 
   if (ffmpegAvailable === null) {
     return (
@@ -193,7 +330,7 @@ const App: React.FC = () => {
 
           <div className="flex-shrink-0 flex gap-3">
             <div className="flex-1">
-              <DropZone onFilesAdded={handleFilesAdded} />
+              <DropZone onFilesAdded={handleFilesAdded} currentCount={files.length} maxCount={MAX_FILES_IN_QUEUE} />
             </div>
 
             <div className="w-64 flex flex-col gap-2">
@@ -243,7 +380,7 @@ const App: React.FC = () => {
                 <input
                   type="checkbox"
                   checked={parallelConversion}
-                  onChange={(e) => setParallelConversion(e.target.checked)}
+                  onChange={e => setParallelConversion(e.target.checked)}
                   className="w-4 h-4 rounded bg-white/10 border-white/20 checked:bg-primary-purple cursor-pointer"
                   title={`Enable parallel processing (max ${MAX_PARALLEL_CONVERSIONS} files at once)`}
                 />
@@ -259,6 +396,13 @@ const App: React.FC = () => {
               gpuAvailable={gpuInfo?.available || true}
               expandedAdvanced={expandedAdvanced}
               onToggleAdvanced={handleToggleAdvanced}
+              expandedCompactCard={expandedCompactCard}
+              onToggleCompactCard={handleToggleCompactCard}
+              fileCountDisplay={fileCountDisplay}
+              onApplyToAll={handleApplyToAll}
+              onClearCompleted={handleClearCompleted}
+              onClearAll={handleClearAll}
+              onCancelAll={handleCancelAll}
             />
           </div>
         </div>

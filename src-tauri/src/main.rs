@@ -107,18 +107,28 @@ fn main() {
             let window = app.get_window("main").unwrap();
             let state = app.state::<AppState>();
             let processes = state.active_processes.clone();
+            let window_for_cleanup = window.clone();
 
             // Cleanup FFmpeg processes on window close
             window.on_window_event(move |event| {
                 if let tauri::WindowEvent::CloseRequested { .. } = event {
                     let processes = processes.clone();
-                    tauri::async_runtime::block_on(async move {
-                        let mut procs = processes.lock().await;
-                        for (task_id, mut child) in procs.drain() {
-                            #[cfg(debug_assertions)]
-                            println!("🛑 Killing FFmpeg process on shutdown: {}", task_id);
-                            let _ = child.kill().await;
-                        }
+                    let window = window_for_cleanup.clone();
+
+                    std::thread::spawn(move || {
+                        tauri::async_runtime::block_on(async move {
+                            let mut procs = processes.lock().await;
+                            for (task_id, mut child) in procs.drain() {
+                                #[cfg(debug_assertions)]
+                                println!("🛑 Killing FFmpeg process on shutdown: {}", task_id);
+
+                                let _ = child.kill().await;
+                                let _ = window.emit("conversion-error", serde_json::json!({
+                                    "task_id": task_id,
+                                    "error": "Application is closing"
+                                }));
+                            }
+                        });
                     });
                 }
             });
@@ -160,42 +170,52 @@ async fn check_ffmpeg(app_handle: tauri::AppHandle) -> Result<bool, String> {
         )
     })?;
 
+    let ffmpeg_path_clone = ffmpeg_path.clone();
     let ffmpeg_result = tokio::task::spawn_blocking(move || {
-        let mut cmd = utils::create_hidden_command(
-            ffmpeg_path.to_str()
-                .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid FFmpeg path"))?
-        );
+        let path_str = ffmpeg_path_clone.to_str()
+            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid FFmpeg path"))?;
+        let mut cmd = utils::create_hidden_command(path_str);
         cmd.arg("-version");
         cmd.output()
     })
-    .await;
+    .await
+    .map_err(|e| format!("Failed to spawn FFmpeg check task: {}", e))?;
 
+    let ffprobe_path_clone = ffprobe_path.clone();
     let ffprobe_result = tokio::task::spawn_blocking(move || {
-        let mut cmd = utils::create_hidden_command(
-            ffprobe_path.to_str()
-                .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid FFprobe path"))?
-        );
+        let path_str = ffprobe_path_clone.to_str()
+            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid FFprobe path"))?;
+        let mut cmd = utils::create_hidden_command(path_str);
         cmd.arg("-version");
         cmd.output()
     })
-    .await;
+    .await
+    .map_err(|e| format!("Failed to spawn FFprobe check task: {}", e))?;
 
     match (ffmpeg_result, ffprobe_result) {
-        (Ok(Ok(ff)), Ok(Ok(fp))) if ff.status.success() && fp.status.success() => {
+        (Ok(ff), Ok(fp)) if ff.status.success() && fp.status.success() => {
             #[cfg(debug_assertions)]
             println!("✅ Bundled FFmpeg and FFprobe are working correctly");
             Ok(true)
         }
-        (Ok(Ok(ff)), _) if !ff.status.success() => Err(format!(
+        (Ok(ff), _) if !ff.status.success() => Err(format!(
             "FFmpeg binary is corrupted or incompatible.\n\nError: {}\n\n📦 Please re-download FFmpeg binaries.",
             String::from_utf8_lossy(&ff.stderr)
         )),
-        (_, Ok(Ok(fp))) if !fp.status.success() => Err(format!(
+        (_, Ok(fp)) if !fp.status.success() => Err(format!(
             "FFprobe binary is corrupted or incompatible.\n\nError: {}\n\n📦 Please re-download FFprobe binaries.",
             String::from_utf8_lossy(&fp.stderr)
         )),
+        (Err(e), _) => Err(format!(
+            "Failed to execute FFmpeg: {}\n\n📦 Please re-download FFmpeg binaries.",
+            e
+        )),
+        (_, Err(e)) => Err(format!(
+            "Failed to execute FFprobe: {}\n\n📦 Please re-download FFprobe binaries.",
+            e
+        )),
         _ => Err(
-            "Failed to execute FFmpeg/FFprobe binaries. They may be corrupted.\n\n📦 Please re-download the binaries."
+            "FFmpeg/FFprobe binaries may be corrupted.\n\n📦 Please re-download the binaries."
                 .to_string(),
         ),
     }

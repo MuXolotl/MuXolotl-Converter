@@ -18,6 +18,9 @@
         "open": true,
         "save": true
       },
+      "notification": {
+        "all": true
+      },
       "fs": {
         "all": false,
         "readFile": true,

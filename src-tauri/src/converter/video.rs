@@ -209,6 +209,40 @@ fn add_resolution_params(
     }
 }
 
+fn can_copy_audio_codec(input_codec: &str, format_info: &video::VideoFormat) -> bool {
+    if format_info.audio_codecs.is_empty() {
+        return false;
+    }
+
+    // Check if input codec is compatible with container
+    let normalized_input = input_codec.to_lowercase();
+    
+    for supported in &format_info.audio_codecs {
+        let normalized_supported = supported.to_lowercase();
+        
+        // Direct match
+        if normalized_input == normalized_supported {
+            return true;
+        }
+        
+        // Codec family matches
+        if normalized_input.contains(&normalized_supported) || normalized_supported.contains(&normalized_input) {
+            return true;
+        }
+        
+        // Special cases
+        if (supported == "aac" && normalized_input.starts_with("aac")) ||
+           (supported == "mp3" && normalized_input.contains("mp3")) ||
+           (supported == "opus" && normalized_input.contains("opus")) ||
+           (supported == "vorbis" && normalized_input.contains("vorbis")) ||
+           (supported == "ac3" && normalized_input.contains("ac3")) {
+            return true;
+        }
+    }
+    
+    false
+}
+
 fn handle_audio_codec(
     args: &mut Vec<String>,
     format_info: &video::VideoFormat,
@@ -231,8 +265,11 @@ fn handle_audio_codec(
 
     let input_audio_codec = media_info.audio_streams.get(0).map(|s| s.codec.as_str()).unwrap_or("");
 
-    if format_info.supports_audio_codec(input_audio_codec) {
+    // Only copy if truly compatible with container
+    if can_copy_audio_codec(input_audio_codec, format_info) {
         args.extend_from_slice(&["-c:a".to_string(), "copy".to_string()]);
+        #[cfg(debug_assertions)]
+        println!("✅ Copying audio codec: {}", input_audio_codec);
     } else if let Some(default_codec) = format_info.get_recommended_audio_codec() {
         args.extend_from_slice(&["-c:a".to_string(), default_codec.clone()]);
         
@@ -245,6 +282,9 @@ fn handle_audio_codec(
             };
             args.extend_from_slice(&["-b:a".to_string(), bitrate.to_string()]);
         }
+        
+        #[cfg(debug_assertions)]
+        println!("🔄 Re-encoding audio: {} -> {}", input_audio_codec, default_codec);
     }
 }
 

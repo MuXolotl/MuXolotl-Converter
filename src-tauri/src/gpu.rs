@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use crate::utils::create_hidden_command;
+use tokio::time::{timeout, Duration};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -34,6 +35,8 @@ impl Default for GpuInfo {
     }
 }
 
+const COMMAND_TIMEOUT_SECS: u64 = 5;
+
 fn check_ffmpeg_encoder(encoder: &str) -> bool {
     create_hidden_command("ffmpeg")
         .args(&["-hide_banner", "-encoders"])
@@ -44,13 +47,43 @@ fn check_ffmpeg_encoder(encoder: &str) -> bool {
         .unwrap_or(false)
 }
 
-fn detect_gpu_by_keywords(keywords: &[&str]) -> Option<String> {
+async fn run_command_with_timeout(program: &str, args: &[&str]) -> Option<std::process::Output> {
+    let program = program.to_string();
+    let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+    
+    let future = tokio::task::spawn_blocking(move || {
+        create_hidden_command(&program)
+            .args(&args)
+            .output()
+    });
+    
+    match timeout(Duration::from_secs(COMMAND_TIMEOUT_SECS), future).await {
+        Ok(Ok(Ok(output))) => Some(output),
+        Ok(Ok(Err(e))) => {
+            #[cfg(debug_assertions)]
+            eprintln!("Command execution error: {}", e);
+            None
+        }
+        Ok(Err(e)) => {
+            #[cfg(debug_assertions)]
+            eprintln!("Task join error: {}", e);
+            None
+        }
+        Err(_) => {
+            #[cfg(debug_assertions)]
+            eprintln!("Command timed out after {} seconds", COMMAND_TIMEOUT_SECS);
+            None
+        }
+    }
+}
+
+async fn detect_gpu_by_keywords(keywords: &[&str]) -> Option<String> {
     #[cfg(target_os = "windows")]
     {
-        let output = create_hidden_command("wmic")
-            .args(&["path", "win32_VideoController", "get", "name"])
-            .output()
-            .ok()?;
+        let output = run_command_with_timeout(
+            "wmic",
+            &["path", "win32_VideoController", "get", "name"]
+        ).await?;
         
         String::from_utf8_lossy(&output.stdout)
             .lines()
@@ -60,7 +93,7 @@ fn detect_gpu_by_keywords(keywords: &[&str]) -> Option<String> {
 
     #[cfg(target_os = "linux")]
     {
-        let output = create_hidden_command("lspci").output().ok()?;
+        let output = run_command_with_timeout("lspci", &[]).await?;
         String::from_utf8_lossy(&output.stdout)
             .lines()
             .find(|line| {
@@ -74,10 +107,7 @@ fn detect_gpu_by_keywords(keywords: &[&str]) -> Option<String> {
 
     #[cfg(target_os = "macos")]
     {
-        let output = create_hidden_command("system_profiler")
-            .arg("SPDisplaysDataType")
-            .output()
-            .ok()?;
+        let output = run_command_with_timeout("system_profiler", &["SPDisplaysDataType"]).await?;
         
         let info = String::from_utf8_lossy(&output.stdout);
         if keywords.iter().any(|kw| info.to_lowercase().contains(kw)) {
@@ -129,17 +159,31 @@ const GPU_DETECTORS: &[GpuDetector] = &[
 
 pub async fn detect_gpu() -> GpuInfo {
     // NVIDIA (nvidia-smi)
-    if let Some(gpu_name) = create_hidden_command("nvidia-smi")
-        .args(&["--query-gpu=name", "--format=csv,noheader"])
-        .output()
-        .ok()
-        .filter(|out| out.status.success())
-        .and_then(|out| {
-            let name = String::from_utf8_lossy(&out.stdout).trim().to_string();
-            if name.is_empty() { None } else { Some(name) }
-        })
-        .or_else(|| detect_gpu_by_keywords(&["nvidia"]))
-    {
+    let nvidia_check = run_command_with_timeout(
+        "nvidia-smi",
+        &["--query-gpu=name", "--format=csv,noheader"]
+    ).await;
+
+    if let Some(output) = nvidia_check {
+        if output.status.success() {
+            let name = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !name.is_empty() {
+                if check_ffmpeg_encoder("h264_nvenc") || check_ffmpeg_encoder("nvenc_h264") {
+                    return GpuInfo {
+                        vendor: GpuVendor::Nvidia,
+                        name,
+                        encoder_h264: Some("h264_nvenc".to_string()),
+                        encoder_h265: Some("hevc_nvenc".to_string()),
+                        decoder: Some("h264_cuvid".to_string()),
+                        available: true,
+                    };
+                }
+            }
+        }
+    }
+
+    // Fallback to keyword detection
+    if let Some(gpu_name) = detect_gpu_by_keywords(&["nvidia"]).await {
         if check_ffmpeg_encoder("h264_nvenc") || check_ffmpeg_encoder("nvenc_h264") {
             return GpuInfo {
                 vendor: GpuVendor::Nvidia,
@@ -152,9 +196,9 @@ pub async fn detect_gpu() -> GpuInfo {
         }
     }
 
-    // Other GPU
+    // Other GPU vendors
     for detector in GPU_DETECTORS {
-        if let Some(gpu_name) = detect_gpu_by_keywords(detector.keywords) {
+        if let Some(gpu_name) = detect_gpu_by_keywords(detector.keywords).await {
             if check_ffmpeg_encoder(detector.h264_encoder) {
                 return GpuInfo {
                     vendor: detector.vendor.clone(),
@@ -172,10 +216,8 @@ pub async fn detect_gpu() -> GpuInfo {
     #[cfg(target_os = "macos")]
     {
         if check_ffmpeg_encoder("h264_videotoolbox") {
-            let gpu_name = create_hidden_command("system_profiler")
-                .arg("SPDisplaysDataType")
-                .output()
-                .ok()
+            let gpu_name = run_command_with_timeout("system_profiler", &["SPDisplaysDataType"])
+                .await
                 .and_then(|output| {
                     String::from_utf8_lossy(&output.stdout)
                         .lines()

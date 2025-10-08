@@ -27,13 +27,14 @@ const FormatSelector: React.FC<FormatSelectorProps> = ({
   const [position, setPosition] = useState({ top: 0, left: 0, width: 0, maxHeight: 400 });
   const buttonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const updateTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const updateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const updatePosition = useCallback(() => {
     if (!buttonRef.current) return;
 
     if (updateTimeoutRef.current) {
       clearTimeout(updateTimeoutRef.current);
+      updateTimeoutRef.current = null;
     }
 
     updateTimeoutRef.current = setTimeout(() => {
@@ -46,8 +47,19 @@ const FormatSelector: React.FC<FormatSelectorProps> = ({
   }, []);
 
   useEffect(() => {
-    if (isOpen) updatePosition();
+    if (isOpen) {
+      const timer = setTimeout(() => {
+        updatePosition();
+      }, 10);
+      return () => clearTimeout(timer);
+    }
   }, [isOpen, updatePosition]);
+
+  useEffect(() => {
+    if (isOpen) {
+      updatePosition();
+    }
+  }, [formats, recommendedFormats, isOpen, updatePosition]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -81,11 +93,12 @@ const FormatSelector: React.FC<FormatSelectorProps> = ({
 
       if (updateTimeoutRef.current) {
         clearTimeout(updateTimeoutRef.current);
+        updateTimeoutRef.current = null;
       }
     };
   }, [isOpen, updatePosition]);
 
-  const selectedFormat = useMemo(() => formats.find((f) => f.extension === selected), [formats, selected]);
+  const selectedFormat = useMemo(() => formats.find(f => f.extension === selected), [formats, selected]);
 
   const hasRecommended = useMemo(
     () =>
@@ -97,7 +110,7 @@ const FormatSelector: React.FC<FormatSelectorProps> = ({
   const filteredFormats = useMemo(() => {
     if (!hasRecommended || showAllFormats) return formats;
 
-    return formats.filter((f) => {
+    return formats.filter(f => {
       if (!recommendedFormats) return true;
       return (
         recommendedFormats.fast.includes(f.extension) ||
@@ -134,23 +147,23 @@ const FormatSelector: React.FC<FormatSelectorProps> = ({
         ref={buttonRef}
         onClick={handleToggle}
         disabled={disabled}
-        className="w-full px-2 py-1.5 bg-white/5 border border-white/10 rounded hover:bg-white/10 transition-colors flex items-center justify-between text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full h-8 px-2 bg-white/5 border border-white/10 rounded hover:bg-white/10 transition-colors flex items-center justify-between text-white text-xs disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        <div className="flex items-center gap-2">
-          <span className="w-4 text-center flex-shrink-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="w-3 text-center flex-shrink-0 text-sm">
             {STABILITY_ICONS[selectedFormat?.stability || 'stable']}
           </span>
-          <span className="uppercase font-mono">{selectedFormat?.extension || selected}</span>
+          <span className="uppercase font-mono truncate text-[11px]">{selectedFormat?.extension || selected}</span>
           {selectedBadge && (
             <span
-              className={`text-[8px] px-1 py-0.5 rounded font-semibold flex items-center gap-0.5 ${selectedBadge.className}`}
+              className={`text-[7px] px-1 py-0.5 rounded font-semibold flex items-center gap-0.5 flex-shrink-0 ${selectedBadge.className}`}
             >
               {selectedBadge.icon} {selectedBadge.label}
             </span>
           )}
         </div>
         <ChevronDown
-          size={14}
+          size={12}
           className={`text-white/60 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`}
         />
       </button>
@@ -172,7 +185,7 @@ const FormatSelector: React.FC<FormatSelectorProps> = ({
               overflow: 'hidden',
               willChange: 'transform',
             }}
-            onClick={(e) => e.stopPropagation()}
+            onClick={e => e.stopPropagation()}
           >
             {hasRecommended && (
               <FilterPanel
@@ -191,7 +204,7 @@ const FormatSelector: React.FC<FormatSelectorProps> = ({
                       {CATEGORY_LABELS[category as Category]}
                     </span>
                   </div>
-                  {categoryFormats.map((format) => (
+                  {categoryFormats.map(format => (
                     <FormatItem
                       key={format.extension}
                       format={format}

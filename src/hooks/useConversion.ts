@@ -19,7 +19,7 @@ export const useConversion = (
   useEffect(() => {
     const setupListeners = async () => {
       const listeners = await Promise.all([
-        listen<ConversionProgress>('conversion-progress', (event) => {
+        listen<ConversionProgress>('conversion-progress', event => {
           const progress = event.payload;
           const existing = progressTimeouts.current.get(progress.task_id);
 
@@ -33,7 +33,7 @@ export const useConversion = (
           progressTimeouts.current.set(progress.task_id, timeout);
         }),
 
-        listen<string>('conversion-completed', (event) => {
+        listen<string>('conversion-completed', event => {
           const taskId = event.payload;
           console.log('✅ Conversion completed:', taskId);
 
@@ -49,14 +49,14 @@ export const useConversion = (
             completedAt: Date.now(),
           });
 
-          setActiveConversions((prev) => {
+          setActiveConversions(prev => {
             const next = new Set(prev);
             next.delete(taskId);
             return next;
           });
         }),
 
-        listen<{ task_id: string; error: string }>('conversion-error', (event) => {
+        listen<{ task_id: string; error: string }>('conversion-error', event => {
           console.error('❌ Conversion error:', event.payload);
 
           const timeout = progressTimeouts.current.get(event.payload.task_id);
@@ -71,7 +71,7 @@ export const useConversion = (
             completedAt: Date.now(),
           });
 
-          setActiveConversions((prev) => {
+          setActiveConversions(prev => {
             const next = new Set(prev);
             next.delete(event.payload.task_id);
             return next;
@@ -85,16 +85,17 @@ export const useConversion = (
     setupListeners();
 
     return () => {
-      progressTimeouts.current.forEach((timeout) => clearTimeout(timeout));
+      progressTimeouts.current.forEach(timeout => clearTimeout(timeout));
       progressTimeouts.current.clear();
-      unlistenFns.current.forEach((fn) => fn());
+      unlistenFns.current.forEach(fn => fn());
       unlistenFns.current = [];
     };
   }, [updateFile]);
 
   const selectOutputPath = async (file: FileItem, outputFormat: string): Promise<string | null> => {
-    const inputName = file.name.substring(0, file.name.lastIndexOf('.'));
-    const defaultFileName = `${inputName}_converted.${outputFormat}`;
+    const lastDotIndex = file.name.lastIndexOf('.');
+    const inputName = lastDotIndex !== -1 ? file.name.substring(0, lastDotIndex) : file.name;
+    const defaultFileName = `${inputName}.${outputFormat}`;
 
     return await save({
       defaultPath: defaultFileName,
@@ -104,7 +105,7 @@ export const useConversion = (
 
   const startConversion = useCallback(
     async (file: FileItem) => {
-      setActiveConversions((prev) => new Set(prev).add(file.id));
+      setActiveConversions(prev => new Set(prev).add(file.id));
 
       try {
         const outputFormat = file.outputFormat;
@@ -114,7 +115,7 @@ export const useConversion = (
           const selected = await selectOutputPath(file, outputFormat);
           if (!selected) {
             console.log('❌ User cancelled output path selection');
-            setActiveConversions((prev) => {
+            setActiveConversions(prev => {
               const next = new Set(prev);
               next.delete(file.id);
               return next;
@@ -186,7 +187,7 @@ export const useConversion = (
           error: String(error),
           completedAt: Date.now(),
         });
-        setActiveConversions((prev) => {
+        setActiveConversions(prev => {
           const next = new Set(prev);
           next.delete(file.id);
           return next;
@@ -214,7 +215,7 @@ export const useConversion = (
           completedAt: Date.now(),
         });
 
-        setActiveConversions((prev) => {
+        setActiveConversions(prev => {
           const next = new Set(prev);
           next.delete(fileId);
           return next;

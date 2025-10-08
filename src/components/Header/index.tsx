@@ -8,4 +8,4 @@ const Header: React.FC = () => (
   </div>
 );
 
-export default React.memo(Header);
+export default Header;

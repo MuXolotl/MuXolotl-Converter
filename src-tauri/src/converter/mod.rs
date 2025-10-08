@@ -83,21 +83,23 @@ pub async fn spawn_ffmpeg(
                 let _ = window.emit("conversion-progress", &progress);
             }
         }
-
-        if let Some(mut child) = processes.lock().await.remove(&task_id) {
-            child.wait().await
-        } else {
-            Err(std::io::Error::new(std::io::ErrorKind::Interrupted, "Process was cancelled"))
-        }
+        processes.lock().await.remove(&task_id)
     };
 
-    let status = match timeout(Duration::from_secs(3600), conversion_future).await {
-        Ok(result) => result?,
+    let child_result = match timeout(Duration::from_secs(3600), conversion_future).await {
+        Ok(child_opt) => child_opt,
         Err(_) => {
             if let Some(mut child) = processes.lock().await.remove(&task_id) {
                 let _ = child.kill().await;
             }
-            anyhow::bail!("Conversion timed out after 60 minutes");
+            anyhow::bail!("Conversion timed out after 1 hour");
+        }
+    };
+
+    let status = match child_result {
+        Some(mut child) => child.wait().await?,
+        None => {
+            return Err(anyhow::anyhow!("Conversion was cancelled"));
         }
     };
 

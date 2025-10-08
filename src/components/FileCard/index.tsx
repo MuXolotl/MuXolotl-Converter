@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useContext, useCallback } from 'react';
-import { X, Music } from 'lucide-react';
+import React, { useState, useEffect, useContext, useCallback, useRef } from 'react';
+import { X, Music, Minimize2 } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { ConversionContext } from '@/App';
 import FileInfo from './FileInfo';
@@ -18,9 +18,19 @@ interface FileCardProps {
   gpuAvailable: boolean;
   isAdvancedOpen: boolean;
   onToggleAdvanced: () => void;
+  onCollapse?: () => void;
 }
 
-const FileCard: React.FC<FileCardProps> = ({ file, onRemove, onRetry, isAdvancedOpen, onToggleAdvanced }) => {
+const VALIDATION_DEBOUNCE_MS = 200;
+
+const FileCard: React.FC<FileCardProps> = ({
+  file,
+  onRemove,
+  onRetry,
+  isAdvancedOpen,
+  onToggleAdvanced,
+  onCollapse,
+}) => {
   const conversionContext = useContext(ConversionContext);
   if (!conversionContext) throw new Error('FileCard must be used within ConversionContext');
 
@@ -29,6 +39,7 @@ const FileCard: React.FC<FileCardProps> = ({ file, onRemove, onRetry, isAdvanced
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
   const [recommendedFormats, setRecommendedFormats] = useState<RecommendedFormats | undefined>(undefined);
+  const validationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isVideo = file.mediaInfo?.media_type === 'video';
   const isAudio = file.mediaInfo?.media_type === 'audio';
@@ -57,29 +68,45 @@ const FileCard: React.FC<FileCardProps> = ({ file, onRemove, onRetry, isAdvanced
       const width = file.mediaInfo.video_streams[0]?.width;
       const height = file.mediaInfo.video_streams[0]?.height;
 
+      const mediaType = file.settings.extractAudioOnly ? 'audio' : file.mediaInfo.media_type;
+
       invoke<RecommendedFormats>('get_recommended_formats', {
         videoCodec,
         audioCodec,
-        mediaType: file.mediaInfo.media_type,
+        mediaType: mediaType,
         width: width || null,
         height: height || null,
       })
         .then(setRecommendedFormats)
-        .catch((error) => console.error('Failed to get recommended formats:', error));
+        .catch(error => console.error('Failed to get recommended formats:', error));
     }
-  }, [file.mediaInfo, file.status]);
+  }, [file.mediaInfo, file.status, file.settings.extractAudioOnly]);
 
   useEffect(() => {
     if (file.status === 'pending' && file.mediaInfo) {
-      invoke<ValidationResult>('validate_conversion', {
-        inputFormat: file.mediaInfo.format_name || '',
-        outputFormat: file.outputFormat,
-        mediaType: file.mediaInfo.media_type || 'unknown',
-        settings: file.settings,
-      })
-        .then(setValidation)
-        .catch((error) => console.error('Validation failed:', error));
+      if (validationTimeoutRef.current) {
+        clearTimeout(validationTimeoutRef.current);
+      }
+
+      validationTimeoutRef.current = setTimeout(() => {
+        const mediaType = file.settings.extractAudioOnly ? 'audio' : file.mediaInfo.media_type || 'unknown';
+
+        invoke<ValidationResult>('validate_conversion', {
+          inputFormat: file.mediaInfo.format_name || '',
+          outputFormat: file.outputFormat,
+          mediaType: mediaType,
+          settings: file.settings,
+        })
+          .then(setValidation)
+          .catch(error => console.error('Validation failed:', error));
+      }, VALIDATION_DEBOUNCE_MS);
     }
+
+    return () => {
+      if (validationTimeoutRef.current) {
+        clearTimeout(validationTimeoutRef.current);
+      }
+    };
   }, [file.outputFormat, file.settings, file.status, file.mediaInfo]);
 
   const handleFormatChange = useCallback(
@@ -126,12 +153,24 @@ const FileCard: React.FC<FileCardProps> = ({ file, onRemove, onRetry, isAdvanced
       {file.status === 'processing' && file.progress && <ProgressBar progress={file.progress.percent} />}
 
       {file.status === 'pending' && (
-        <button
-          onClick={onRemove}
-          className="absolute top-3 right-3 p-1.5 rounded-full bg-red-500/20 hover:bg-red-500/40 transition-colors opacity-0 group-hover:opacity-100 z-10"
-        >
-          <X size={16} className="text-red-400" />
-        </button>
+        <div className="absolute top-3 right-3 flex items-center gap-2 z-10">
+          {onCollapse && (
+            <button
+              onClick={onCollapse}
+              className="p-1.5 rounded-full bg-blue-500/20 hover:bg-blue-500/40 transition-colors"
+              title="Collapse card"
+            >
+              <Minimize2 size={16} className="text-blue-400" />
+            </button>
+          )}
+          <button
+            onClick={onRemove}
+            className="p-1.5 rounded-full bg-red-500/20 hover:bg-red-500/40 transition-colors"
+            title="Remove from queue"
+          >
+            <X size={16} className="text-red-400" />
+          </button>
+        </div>
       )}
 
       {file.status === 'pending' && <ValidationMessages validation={validation} />}
@@ -151,26 +190,12 @@ const FileCard: React.FC<FileCardProps> = ({ file, onRemove, onRetry, isAdvanced
             recommendedFormats={recommendedFormats}
             onFormatChange={handleFormatChange}
             onQualityChange={handleQualityChange}
+            isAdvancedOpen={isAdvancedOpen}
+            onToggleAdvanced={onToggleAdvanced}
+            isVideo={isVideo}
+            extractAudioOnly={file.settings.extractAudioOnly}
+            onToggleExtractAudio={handleExtractAudioToggle}
           />
-
-          {isVideo && file.status === 'pending' && (
-            <div className="mt-3 flex items-center gap-2 p-2 bg-white/5 rounded">
-              <input
-                type="checkbox"
-                id={`extract-${file.id}`}
-                checked={file.settings.extractAudioOnly}
-                onChange={(e) => handleExtractAudioToggle(e.target.checked)}
-                className="w-4 h-4 rounded bg-white/10 border-white/20 checked:bg-primary-purple cursor-pointer"
-              />
-              <label
-                htmlFor={`extract-${file.id}`}
-                className="flex items-center gap-2 text-white/80 text-sm cursor-pointer"
-              >
-                <Music size={14} />
-                <span>Extract audio only (Video → Audio)</span>
-              </label>
-            </div>
-          )}
 
           <AdvancedSettings
             isOpen={isAdvancedOpen}
@@ -178,7 +203,6 @@ const FileCard: React.FC<FileCardProps> = ({ file, onRemove, onRetry, isAdvanced
             extractAudioOnly={file.settings.extractAudioOnly}
             settings={file.settings}
             disabled={isDisabled}
-            onToggle={onToggleAdvanced}
             onSettingChange={handleSettingChange}
           />
         </div>

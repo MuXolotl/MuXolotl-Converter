@@ -32,7 +32,7 @@ export const useGpu = () => {
       }
     };
 
-    const unlisten = listen<GpuInfo>('gpu-detected', (event) => {
+    const unlisten = listen<GpuInfo>('gpu-detected', event => {
       if (isMounted) {
         setGpuInfo(event.payload);
         setIsLoading(false);
@@ -43,7 +43,7 @@ export const useGpu = () => {
 
     return () => {
       isMounted = false;
-      unlisten.then((fn) => fn());
+      unlisten.then(fn => fn());
     };
   }, []);
 

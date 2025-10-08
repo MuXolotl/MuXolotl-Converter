@@ -42,7 +42,7 @@ export const getBadgeInfo = (format: AudioFormat | VideoFormat, recommended?: Re
     },
   ];
 
-  const badge = badges.find((b) => b.condition);
+  const badge = badges.find(b => b.condition);
   if (!badge) return null;
 
   const icons = {

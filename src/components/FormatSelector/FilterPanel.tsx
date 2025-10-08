@@ -15,7 +15,7 @@ const FilterPanel: React.FC<FilterPanelProps> = ({ showAllFormats, hiddenCount, 
       <input
         type="checkbox"
         checked={showAllFormats}
-        onChange={(e) => onToggle(e.target.checked)}
+        onChange={e => onToggle(e.target.checked)}
         className="w-3.5 h-3.5 rounded bg-white/10 border-white/20 checked:bg-primary-purple cursor-pointer"
       />
       <Filter size={12} className="text-white/60" />
