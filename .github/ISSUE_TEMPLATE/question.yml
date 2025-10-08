@@ -1,0 +1,53 @@
+name: ❓ Question / Support
+description: Ask a question or get help using MuXolotl-Converter
+title: "[Question]: "
+labels: ["question"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        👋 Hello! Before asking a question, please check:
+        - [Documentation](https://github.com/MuXolotl/MuXolotl-Converter#readme)
+        - [Closed Issues](https://github.com/MuXolotl/MuXolotl-Converter/issues?q=is%3Aissue+is%3Aclosed)
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Your Question
+      description: What would you like to know?
+      placeholder: How do I...? / Why does...? / Is it possible to...?
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Any relevant information that helps understand your question
+      placeholder: |
+        - What are you trying to achieve?
+        - What have you tried so far?
+        - Environment details (OS, version, etc.)
+    validations:
+      required: false
+
+  - type: dropdown
+    id: topic
+    attributes:
+      label: Topic
+      description: What is your question about?
+      options:
+        - Installation / Setup
+        - Conversion Process
+        - Format Support
+        - GPU Acceleration
+        - Performance / Optimization
+        - Troubleshooting
+        - Configuration
+        - Building from Source
+        - Contributing
+        - Other
+    validations:
+      required: true

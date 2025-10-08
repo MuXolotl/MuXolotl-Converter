@@ -1,0 +1,186 @@
+name: 🐛 Bug Report
+description: Report a bug or unexpected behavior
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the sections below to help us fix it.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-flight Checklist
+      description: Please ensure you've completed the following before submitting
+      options:
+        - label: I have searched existing issues to ensure this bug hasn't been reported
+          required: true
+        - label: I am using the latest version of MuXolotl-Converter
+          required: true
+        - label: I have read the [documentation](https://github.com/MuXolotl/MuXolotl-Converter#readme)
+          required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is
+      placeholder: When I try to convert a video file...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Detailed steps to reproduce the behavior
+      placeholder: |
+        1. Open the app
+        2. Add a file '...'
+        3. Select format '...'
+        4. Click 'Convert All'
+        5. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What you expected to happen
+      placeholder: The file should convert successfully to MP4
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened
+      placeholder: The conversion fails with error "..."
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      description: Which OS are you using?
+      options:
+        - Windows 10
+        - Windows 11
+        - macOS (Intel x64)
+        - macOS (Apple Silicon ARM64)
+        - Linux (Ubuntu/Debian)
+        - Linux (Arch)
+        - Linux (Fedora/RHEL)
+        - Linux (Other)
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: os-version
+    attributes:
+      label: OS Version / Build
+      description: "Example: Windows 10 Build 19045, macOS 13.2, Ubuntu 22.04"
+      placeholder: "Windows 10 Build 19045"
+    validations:
+      required: true
+
+  - type: input
+    id: app-version
+    attributes:
+      label: App Version
+      description: "Check in the app or release filename (e.g., 1.0.0)"
+      placeholder: "1.0.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: gpu
+    attributes:
+      label: GPU (if applicable)
+      description: Select your GPU vendor if the issue is GPU-related
+      options:
+        - No GPU / CPU Only
+        - NVIDIA GeForce/Quadro
+        - Intel HD/UHD Graphics
+        - AMD Radeon
+        - Apple M1/M2/M3
+        - Not applicable
+    validations:
+      required: false
+
+  - type: input
+    id: gpu-model
+    attributes:
+      label: GPU Model
+      description: "Example: NVIDIA RTX 3060, Intel UHD 630"
+      placeholder: "NVIDIA RTX 3060"
+    validations:
+      required: false
+
+  - type: textarea
+    id: input-file
+    attributes:
+      label: Input File Details
+      description: Information about the file you're trying to convert
+      placeholder: |
+        Format: MKV
+        Size: 1.5 GB
+        Duration: 1h 30m
+        Video Codec: H.264
+        Audio Codec: AAC
+        Resolution: 1920x1080
+    validations:
+      required: false
+
+  - type: textarea
+    id: settings
+    attributes:
+      label: Conversion Settings
+      description: What format and settings did you use?
+      placeholder: |
+        Output Format: MP4
+        Quality: High
+        Advanced Settings: Default
+        GPU Acceleration: Enabled
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error Messages / Logs
+      description: |
+        Copy any error messages or logs here.
+        On Windows: Check Windows Event Viewer or console output
+        On macOS/Linux: Check terminal output or system logs
+      placeholder: |
+        Error: FFmpeg conversion failed with status: exit code 1
+        stderr: Unknown encoder 'h264_nvenc'
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: If applicable, add screenshots to help explain the problem
+      placeholder: Drag and drop images here
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other information that might help us fix the issue
+      placeholder: This only happens when converting files larger than 2GB...
+    validations:
+      required: false
