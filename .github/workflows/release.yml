@@ -3,25 +3,22 @@ name: Release Application
 on:
   push:
     paths:
-      - 'VERSION'  # Trigger on VERSION file changes
+      - 'VERSION'
     branches:
       - main
-  workflow_dispatch:  # Manual trigger
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  # ========================================
-  # Prepare release info
-  # ========================================
   prepare:
     name: Prepare Release
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.read_version.outputs.version }}
       tag_name: ${{ steps.read_version.outputs.tag_name }}
-
+    
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
@@ -42,13 +39,12 @@ jobs:
       - name: 🔄 Sync version to all files
         run: node scripts/update-version.cjs
 
-      - name: 🔒 Sync package-lock.json with package.json
+      - name: 💾 Commit synchronized files
         run: |
-          npm install --package-lock-only
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add package.json package-lock.json src-tauri/Cargo.toml src-tauri/tauri.conf.json README.md
-          git diff --staged --quiet || git commit -m "chore: sync version ${{ steps.read_version.outputs.version }} and lockfile"
+          git add package.json src-tauri/Cargo.toml src-tauri/tauri.conf.json README.md
+          git diff --staged --quiet || git commit -m "chore: sync version ${{ steps.read_version.outputs.version }} to all files"
           git push
 
       - name: 🏷️ Create Git tag
@@ -56,13 +52,10 @@ jobs:
           git tag ${{ steps.read_version.outputs.tag_name }} || echo "Tag already exists"
           git push origin ${{ steps.read_version.outputs.tag_name }} || echo "Tag already pushed"
 
-  # ========================================
-  # Build and release for all platforms
-  # ========================================
   build-and-release:
     name: Build ${{ matrix.name }}
     needs: prepare
-
+    
     strategy:
       fail-fast: false
       matrix:
@@ -70,77 +63,28 @@ jobs:
           - platform: windows-latest
             target: x86_64-pc-windows-msvc
             name: Windows x64
-            ffmpeg_extract_cmd: |
-              curl.exe -L -o ffmpeg.zip "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip"
-              7z x -y ffmpeg.zip | Out-Null
-              New-Item -ItemType Directory -Path "src-tauri\binaries" -Force | Out-Null
-              Move-Item "ffmpeg-master-latest-win64-gpl\bin\ffmpeg.exe" "src-tauri\binaries\ffmpeg-x86_64-pc-windows-msvc.exe" -Force
-              Move-Item "ffmpeg-master-latest-win64-gpl\bin\ffprobe.exe" "src-tauri\binaries\ffprobe-x86_64-pc-windows-msvc.exe" -Force
-              New-Item -ItemType Directory -Path "ffmpeg-standalone" -Force | Out-Null
-              Copy-Item "src-tauri\binaries\ffmpeg-x86_64-pc-windows-msvc.exe" "ffmpeg-standalone\ffmpeg.exe" -Force
-              Copy-Item "src-tauri\binaries\ffprobe-x86_64-pc-windows-msvc.exe" "ffmpeg-standalone\ffprobe.exe" -Force
-              Copy-Item "ffmpeg-master-latest-win64-gpl\LICENSE.txt" "ffmpeg-standalone\LICENSE-FFmpeg.txt" -Force
-              Push-Location "ffmpeg-standalone"; 7z a -tzip "..\ffmpeg-windows-x64.zip" * | Out-Null; Pop-Location
-            bundle_pattern: "src-tauri/target/$target/release/bundle/**/*.{msi,exe}"
+            bundles: "msi,nsis"
+            installer_suffix: "setup.msi"
+            portable_suffix: "portable.exe"
 
           - platform: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             name: Linux x64
-            ffmpeg_extract_cmd: |
-              curl -L -o ffmpeg-release-amd64-static.tar.xz "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
-              tar -xf ffmpeg-release-amd64-static.tar.xz
-              FFMPEG_DIR=$(find . -maxdepth 1 -type d -name "ffmpeg-*-amd64-static" | head -n 1)
-              mkdir -p src-tauri/binaries
-              mv "$FFMPEG_DIR/ffmpeg" src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu
-              mv "$FFMPEG_DIR/ffprobe" src-tauri/binaries/ffprobe-x86_64-unknown-linux-gnu
-              chmod +x src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu
-              chmod +x src-tauri/binaries/ffprobe-x86_64-unknown-linux-gnu
-              mkdir -p ffmpeg-standalone
-              cp src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu ffmpeg-standalone/ffmpeg
-              cp src-tauri/binaries/ffprobe-x86_64-unknown-linux-gnu ffmpeg-standalone/ffprobe
-              cp "$FFMPEG_DIR/GPLv3.txt" ffmpeg-standalone/LICENSE-FFmpeg.txt
-              tar -czf ffmpeg-linux-x64.tar.gz -C ffmpeg-standalone .
-            bundle_pattern: "src-tauri/target/$target/release/bundle/**/*.{AppImage,deb,rpm}"
+            bundles: "appimage,deb"
+            appimage_suffix: ".AppImage"
+            deb_suffix: ".deb"
 
           - platform: macos-latest
             target: x86_64-apple-darwin
             name: macOS Intel
-            ffmpeg_extract_cmd: |
-              curl -L -o ffmpeg-macos.zip https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip
-              curl -L -o ffprobe-macos.zip https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip
-              unzip -q ffmpeg-macos.zip
-              unzip -q ffprobe-macos.zip
-              mkdir -p src-tauri/binaries
-              mv ffmpeg src-tauri/binaries/ffmpeg-x86_64-apple-darwin
-              mv ffprobe src-tauri/binaries/ffprobe-x86_64-apple-darwin
-              chmod +x src-tauri/binaries/ffmpeg-x86_64-apple-darwin
-              chmod +x src-tauri/binaries/ffprobe-x86_64-apple-darwin
-              mkdir -p ffmpeg-standalone
-              cp src-tauri/binaries/ffmpeg-x86_64-apple-darwin ffmpeg-standalone/ffmpeg
-              cp src-tauri/binaries/ffprobe-x86_64-apple-darwin ffmpeg-standalone/ffprobe
-              echo "FFmpeg GPL v2 / LGPL v2.1. Source: https://evermeet.cx/ffmpeg/" > ffmpeg-standalone/LICENSE-FFmpeg.txt
-              zip -r -q ffmpeg-macos-intel-x64.zip ffmpeg-standalone/
-            bundle_pattern: "src-tauri/target/$target/release/bundle/dmg/*.dmg"
+            bundles: "dmg"
+            dmg_suffix: "intel.dmg"
 
           - platform: macos-latest
             target: aarch64-apple-darwin
             name: macOS Apple Silicon
-            ffmpeg_extract_cmd: |
-              curl -L -o ffmpeg-macos-arm.zip "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip?arch=arm64"
-              curl -L -o ffprobe-macos-arm.zip "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip?arch=arm64"
-              unzip -q ffmpeg-macos-arm.zip
-              unzip -q ffprobe-macos-arm.zip
-              mkdir -p src-tauri/binaries
-              mv ffmpeg src-tauri/binaries/ffmpeg-aarch64-apple-darwin
-              mv ffprobe src-tauri/binaries/ffprobe-aarch64-apple-darwin
-              chmod +x src-tauri/binaries/ffmpeg-aarch64-apple-darwin
-              chmod +x src-tauri/binaries/ffprobe-aarch64-apple-darwin
-              mkdir -p ffmpeg-standalone
-              cp src-tauri/binaries/ffmpeg-aarch64-apple-darwin ffmpeg-standalone/ffmpeg
-              cp src-tauri/binaries/ffprobe-aarch64-apple-darwin ffmpeg-standalone/ffprobe
-              echo "FFmpeg GPL v2 / LGPL v2.1. Source: https://evermeet.cx/ffmpeg/" > ffmpeg-standalone/LICENSE-FFmpeg.txt
-              zip -r -q ffmpeg-macos-arm64.zip ffmpeg-standalone/
-            bundle_pattern: "src-tauri/target/$target/release/bundle/dmg/*.dmg"
+            bundles: "dmg"
+            dmg_suffix: "apple-silicon.dmg"
 
     runs-on: ${{ matrix.platform }}
 
@@ -148,7 +92,7 @@ jobs:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: main  # Ensure we have latest commit with synced versions
+          ref: main
 
       - name: 🦀 Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -159,8 +103,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-          cache-dependency-path: package-lock.json
+          cache: 'npm'
 
       - name: 🔧 Install dependencies (Ubuntu)
         if: matrix.platform == 'ubuntu-22.04'
@@ -168,22 +111,95 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libayatana-appindicator3-dev librsvg2-dev
 
-      - name: 📁 Create binaries directory (Windows)
-        if: matrix.platform == 'windows-latest'
-        run: |
-          New-Item -ItemType Directory -Path "src-tauri\binaries" -Force | Out-Null
-        shell: pwsh
-
-      - name: 📁 Create binaries directory (Unix)
-        if: matrix.platform != 'windows-latest'
+      - name: 📁 Create binaries directory
         run: mkdir -p src-tauri/binaries
 
-      - name: 📥 Download and extract FFmpeg
-        run: ${{ matrix.ffmpeg_extract_cmd }}
+      - name: 📥 Download and setup FFmpeg (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: bash
+        run: |
+          curl -L -o ffmpeg-temp.zip https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip
+          unzip -q ffmpeg-temp.zip
+          mv ffmpeg-master-latest-win64-gpl/bin/ffmpeg.exe src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe
+          mv ffmpeg-master-latest-win64-gpl/bin/ffprobe.exe src-tauri/binaries/ffprobe-x86_64-pc-windows-msvc.exe
+          
+          # Standalone package
+          mkdir -p ffmpeg-standalone
+          cp src-tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe ffmpeg-standalone/ffmpeg.exe
+          cp src-tauri/binaries/ffprobe-x86_64-pc-windows-msvc.exe ffmpeg-standalone/ffprobe.exe
+          cp ffmpeg-master-latest-win64-gpl/LICENSE.txt ffmpeg-standalone/LICENSE-FFmpeg.txt
+          cd ffmpeg-standalone && 7z a -tzip ../ffmpeg-windows-x64.zip * && cd ..
+          
+          # Cleanup
+          rm -rf ffmpeg-master-latest-win64-gpl ffmpeg-temp.zip
 
-      - name: 🔐 Set executable permissions (Unix)
-        if: matrix.platform != 'windows-latest'
-        run: chmod +x src-tauri/binaries/*
+      - name: 📥 Download and setup FFmpeg (Linux)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          curl -L -o ffmpeg-temp.tar.xz https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz
+          tar -xf ffmpeg-temp.tar.xz
+          FFMPEG_DIR=$(find . -maxdepth 1 -type d -name "ffmpeg-*-amd64-static" | head -n 1)
+          
+          mv "$FFMPEG_DIR/ffmpeg" src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu
+          mv "$FFMPEG_DIR/ffprobe" src-tauri/binaries/ffprobe-x86_64-unknown-linux-gnu
+          chmod +x src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu
+          chmod +x src-tauri/binaries/ffprobe-x86_64-unknown-linux-gnu
+          
+          # Standalone package
+          mkdir -p ffmpeg-standalone
+          cp src-tauri/binaries/ffmpeg-x86_64-unknown-linux-gnu ffmpeg-standalone/ffmpeg
+          cp src-tauri/binaries/ffprobe-x86_64-unknown-linux-gnu ffmpeg-standalone/ffprobe
+          cp "$FFMPEG_DIR/GPLv3.txt" ffmpeg-standalone/LICENSE-FFmpeg.txt
+          tar -czf ffmpeg-linux-x64.tar.gz -C ffmpeg-standalone .
+          
+          # Cleanup
+          rm -rf "$FFMPEG_DIR" ffmpeg-temp.tar.xz
+
+      - name: 📥 Download and setup FFmpeg (macOS Intel)
+        if: matrix.platform == 'macos-latest' && matrix.target == 'x86_64-apple-darwin'
+        run: |
+          curl -L -o ffmpeg-temp.zip https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip
+          curl -L -o ffprobe-temp.zip https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip
+          unzip -q ffmpeg-temp.zip
+          unzip -q ffprobe-temp.zip
+          
+          mv ffmpeg src-tauri/binaries/ffmpeg-x86_64-apple-darwin
+          mv ffprobe src-tauri/binaries/ffprobe-x86_64-apple-darwin
+          chmod +x src-tauri/binaries/ffmpeg-x86_64-apple-darwin
+          chmod +x src-tauri/binaries/ffprobe-x86_64-apple-darwin
+          
+          # Standalone package
+          mkdir -p ffmpeg-standalone
+          cp src-tauri/binaries/ffmpeg-x86_64-apple-darwin ffmpeg-standalone/ffmpeg
+          cp src-tauri/binaries/ffprobe-x86_64-apple-darwin ffmpeg-standalone/ffprobe
+          echo "FFmpeg GPL v2 / LGPL v2.1 - https://evermeet.cx/ffmpeg/" > ffmpeg-standalone/LICENSE-FFmpeg.txt
+          cd ffmpeg-standalone && zip -r -q ../ffmpeg-macos-intel.zip . && cd ..
+          
+          # Cleanup
+          rm -f ffmpeg-temp.zip ffprobe-temp.zip
+
+      - name: 📥 Download and setup FFmpeg (macOS ARM)
+        if: matrix.platform == 'macos-latest' && matrix.target == 'aarch64-apple-darwin'
+        run: |
+          curl -L -o ffmpeg-temp.zip "https://evermeet.cx/ffmpeg/getrelease/ffmpeg/zip?arch=arm64"
+          curl -L -o ffprobe-temp.zip "https://evermeet.cx/ffmpeg/getrelease/ffprobe/zip?arch=arm64"
+          unzip -q ffmpeg-temp.zip
+          unzip -q ffprobe-temp.zip
+          
+          mv ffmpeg src-tauri/binaries/ffmpeg-aarch64-apple-darwin
+          mv ffprobe src-tauri/binaries/ffprobe-aarch64-apple-darwin
+          chmod +x src-tauri/binaries/ffmpeg-aarch64-apple-darwin
+          chmod +x src-tauri/binaries/ffprobe-aarch64-apple-darwin
+          
+          # Standalone package
+          mkdir -p ffmpeg-standalone
+          cp src-tauri/binaries/ffmpeg-aarch64-apple-darwin ffmpeg-standalone/ffmpeg
+          cp src-tauri/binaries/ffprobe-aarch64-apple-darwin ffmpeg-standalone/ffprobe
+          echo "FFmpeg GPL v2 / LGPL v2.1 - https://evermeet.cx/ffmpeg/" > ffmpeg-standalone/LICENSE-FFmpeg.txt
+          cd ffmpeg-standalone && zip -r -q ../ffmpeg-macos-arm64.zip . && cd ..
+          
+          # Cleanup
+          rm -f ffmpeg-temp.zip ffprobe-temp.zip
 
       - name: 📦 Install npm dependencies
         run: npm ci
@@ -194,47 +210,375 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ needs.prepare.outputs.tag_name }}
-          releaseName: "MuXolotl-Converter v${{ needs.prepare.outputs.version }}"
+          releaseName: "MuXolotl Converter v${{ needs.prepare.outputs.version }}"
           releaseBody: |
-            ## 🦎 MuXolotl-Converter v${{ needs.prepare.outputs.version }}
-
-            **High-Performance Cross-Platform Audio & Video Converter**
-
-            ### 📦 Installation
-
-            Download the appropriate installer for your platform:
-
-            #### Windows
-            - **Recommended**: `MuXolotl-Converter_${{ needs.prepare.outputs.version }}_x64_en-US.msi`
-            - **Portable**: `MuXolotl-Converter_${{ needs.prepare.outputs.version }}_x64.exe`
-
-            #### macOS
-            - **Intel (x64)**: `MuXolotl-Converter_${{ needs.prepare.outputs.version }}_x64.dmg`
-            - **Apple Silicon**: `MuXolotl-Converter_${{ needs.prepare.outputs.version }}_aarch64.dmg`
-
-            #### Linux
-            - **AppImage**: `muxolotl-converter_${{ needs.prepare.outputs.version }}_amd64.AppImage`
-            - **Debian/Ubuntu**: `muxolotl-converter_${{ needs.prepare.outputs.version }}_amd64.deb`
-            - **Fedora/RHEL**: `muxolotl-converter-${{ needs.prepare.outputs.version }}-1.x86_64.rpm`
-
-            ### 🛠️ FFmpeg Binaries (Standalone)
-            - `ffmpeg-windows-x64.zip` (Windows)
-            - `ffmpeg-macos-intel-x64.zip` (macOS Intel)
-            - `ffmpeg-macos-arm64.zip` (macOS Apple Silicon)
-            - `ffmpeg-linux-x64.tar.gz` (Linux)
-
-            License: FFmpeg is licensed under GPL v2 / LGPL v2.1
+            <div align="center">
+            
+            # 🦎 MuXolotl Converter v${{ needs.prepare.outputs.version }}
+            
+            ### *Professional Audio & Video Conversion Made Simple*
+            
+            ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue?style=flat-square)
+            ![License](https://img.shields.io/badge/license-GPL%20v2%20%2F%20LGPL%20v2.1-green?style=flat-square)
+            ![Version](https://img.shields.io/badge/version-${{ needs.prepare.outputs.version }}-orange?style=flat-square)
+            
+            </div>
+            
+            ---
+            
+            ## ✨ What Makes MuXolotl Special?
+            
+            <table>
+            <tr>
+            <td width="50%">
+            
+            ### 🚀 **Lightning Fast**
+            - ⚡ Hardware GPU acceleration
+            - 🔄 Convert 4 files simultaneously  
+            - 📊 Real-time progress tracking
+            - ⏱️ Optimized encoding pipelines
+            
+            </td>
+            <td width="50%">
+            
+            ### 🎯 **Universal Support**
+            - 🎵 **Audio**: MP3, FLAC, AAC, Opus, WAV, OGG, M4A...
+            - 🎬 **Video**: MP4, MKV, WebM, AVI, MOV, FLV...
+            - 📦 **40+ formats** total
+            - 🔧 Custom codec selection
+            
+            </td>
+            </tr>
+            <tr>
+            <td>
+            
+            ### 🎨 **Beautiful Interface**
+            - 🪟 Modern glass-morphism design
+            - 🖱️ Intuitive drag & drop
+            - 💾 Persistent queue (resume anytime)
+            - 🌙 Clean, distraction-free UI
+            
+            </td>
+            <td>
+            
+            ### 🔧 **Professional Tools**
+            - 🎛️ Bitrate & quality control
+            - 📐 Resolution & FPS adjustment
+            - 🔊 Audio channels & sample rate
+            - ⚙️ Advanced FFmpeg options
+            
+            </td>
+            </tr>
+            </table>
+            
+            ---
+            
+            ## 📦 Download & Installation
+            
+            ### 🪟 **Windows**
+            
+            | File | Description | Best For |
+            |------|-------------|----------|
+            | [`MuXolotl-Converter-${{ needs.prepare.outputs.version }}-windows-x64-setup.msi`](#) | **MSI Installer** | ✅ **Recommended** - Full installation with shortcuts |
+            | [`MuXolotl-Converter-${{ needs.prepare.outputs.version }}-windows-x64-portable.exe`](#) | **Portable EXE** | 💼 Run without installation |
+            
+            <details>
+            <summary>📝 Installation Steps</summary>
+            
+            1. Download the MSI installer
+            2. Double-click to run
+            3. Follow the setup wizard
+            4. Launch from Start Menu
+            
+            </details>
+            
+            ---
+            
+            ### 🍎 **macOS**
+            
+            | File | Architecture | Compatibility |
+            |------|--------------|---------------|
+            | [`MuXolotl-Converter-${{ needs.prepare.outputs.version }}-macos-intel.dmg`](#) | **Intel (x64)** | Mac with Intel processors |
+            | [`MuXolotl-Converter-${{ needs.prepare.outputs.version }}-macos-apple-silicon.dmg`](#) | **Apple Silicon (ARM64)** | M1 / M2 / M3 / M4 Macs |
+            
+            <details>
+            <summary>📝 Installation Steps</summary>
+            
+            1. Download the appropriate DMG for your Mac
+            2. Open the DMG file
+            3. Drag **MuXolotl Converter** to Applications folder
+            4. **First launch**: Right-click → "Open" → Confirm (bypass Gatekeeper)
+            
+            </details>
+            
+            > ⚠️ **Security Note**: macOS may block unsigned apps. Use Right-click → Open on first launch.
+            
+            ---
+            
+            ### 🐧 **Linux**
+            
+            | File | Format | Distribution |
+            |------|--------|--------------|
+            | [`MuXolotl-Converter-${{ needs.prepare.outputs.version }}-linux-x64.AppImage`](#) | **AppImage** | ✅ **Universal** (any distro) |
+            | [`MuXolotl-Converter-${{ needs.prepare.outputs.version }}-linux-x64.deb`](#) | **DEB Package** | Debian, Ubuntu, Mint, Pop!_OS |
+            
+            <details>
+            <summary>📝 AppImage Installation</summary>
+            
+            ```bash
+            # Download the AppImage
+            chmod +x MuXolotl-Converter-${{ needs.prepare.outputs.version }}-linux-x64.AppImage
+            ./MuXolotl-Converter-${{ needs.prepare.outputs.version }}-linux-x64.AppImage
+            ```
+            
+            </details>
+            
+            <details>
+            <summary>📝 DEB Installation</summary>
+            
+            ```bash
+            sudo dpkg -i MuXolotl-Converter-${{ needs.prepare.outputs.version }}-linux-x64.deb
+            # If dependencies are missing:
+            sudo apt-get install -f
+            ```
+            
+            </details>
+            
+            ---
+            
+            ## 🛠️ Standalone FFmpeg Binaries
+            
+            Pre-compiled FFmpeg static builds included for all platforms:
+            
+            | Platform | File | Features |
+            |----------|------|----------|
+            | **Windows x64** | `ffmpeg-windows-x64.zip` | Full GPL build, all codecs, static linking |
+            | **Linux x64** | `ffmpeg-linux-x64.tar.gz` | Static build, zero dependencies |
+            | **macOS Intel** | `ffmpeg-macos-intel.zip` | Optimized for x86_64 architecture |
+            | **macOS ARM64** | `ffmpeg-macos-arm64.zip` | Native Apple Silicon binaries |
+            
+            **What's inside**: `ffmpeg`, `ffprobe`, license files  
+            **License**: GPL v2 / LGPL v2.1  
+            **Sources**: [FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds) • [evermeet.cx](https://evermeet.cx/ffmpeg/)
+            
+            ---
+            
+            ## ⚙️ System Requirements
+            
+            <table>
+            <tr>
+            <td width="50%">
+            
+            **Minimum**
+            - Windows 10 / macOS 10.15 / Linux (64-bit)
+            - 4 GB RAM
+            - 200 MB disk space
+            - Any CPU (2+ cores recommended)
+            
+            </td>
+            <td width="50%">
+            
+            **Recommended for Best Performance**
+            - Windows 11 / macOS 12+ / Ubuntu 22.04+
+            - 8 GB+ RAM
+            - SSD storage
+            - GPU: NVIDIA GTX 600+ / Intel HD 4000+ / AMD 7000+ / Apple M1+
+            
+            </td>
+            </tr>
+            </table>
+            
+            ---
+            
+            ## 🚀 Quick Start
+            
+            ```
+            1️⃣  Launch MuXolotl Converter
+            2️⃣  Drag & drop your media files (or click to browse)
+            3️⃣  Select output format from the dropdown
+            4️⃣  Adjust quality settings (optional)
+            5️⃣  Click "Start Conversion"
+            6️⃣  Find converted files in your output folder! 🎉
+            ```
+            
+            **Pro Tips**:
+            - 💡 Use GPU acceleration for video (auto-detected)
+            - 💡 Queue up to 50 files for batch processing
+            - 💡 Your queue is saved - resume anytime!
+            
+            ---
+            
+            ## 🎯 Key Features Breakdown
+            
+            ### Hardware Acceleration
+            - **NVIDIA NVENC** - GTX/RTX series GPUs
+            - **Intel QSV** - Quick Sync Video (HD Graphics 4000+)
+            - **AMD AMF** - Radeon 7000 series and newer
+            - **Apple VideoToolbox** - Native on M1/M2/M3 chips
+            
+            ### Supported Formats
+            
+            <details>
+            <summary>🎵 <b>Audio Formats (25+)</b></summary>
+            
+            **Lossless**: FLAC, WAV, ALAC, APE, WV  
+            **Lossy**: MP3, AAC, Opus, Vorbis (OGG), M4A, WMA  
+            **Special**: DSD, AIFF, AMR, AC3, DTS
+            
+            </details>
+            
+            <details>
+            <summary>🎬 <b>Video Formats (20+)</b></summary>
+            
+            **Modern**: MP4 (H.264/H.265), MKV, WebM (VP9/AV1)  
+            **Legacy**: AVI, MOV, FLV, WMV, MPG, VOB  
+            **Professional**: ProRes, DNxHD, MPEG-2
+            
+            </details>
+            
+            ---
+            
+            ## 🐛 Known Limitations
+            
+            - ⚠️ Maximum 50 files per queue
+            - ⚠️ 1-hour timeout per file conversion
+            - ⚠️ Some rare formats (SHN, RA, RM) may fail
+            - ⚠️ DRM-protected files are not supported
+            
+            ---
+            
+            ## 💡 Need Help?
+            
+            <table>
+            <tr>
+            <td align="center" width="25%">
+            
+            ### 📖
+            **[Documentation](https://github.com/${{ github.repository }}#readme)**  
+            Complete guide & FAQ
+            
+            </td>
+            <td align="center" width="25%">
+            
+            ### 🐛
+            **[Report Bug](https://github.com/${{ github.repository }}/issues/new?labels=bug)**  
+            Found an issue?
+            
+            </td>
+            <td align="center" width="25%">
+            
+            ### 💡
+            **[Request Feature](https://github.com/${{ github.repository }}/issues/new?labels=enhancement)**  
+            Share your ideas
+            
+            </td>
+            <td align="center" width="25%">
+            
+            ### 💬
+            **[Discussions](https://github.com/${{ github.repository }}/discussions)**  
+            Community chat
+            
+            </td>
+            </tr>
+            </table>
+            
+            ---
+            
+            ## 🌟 Support the Project
+            
+            If you find MuXolotl useful:
+            
+            - ⭐ **Star this repository** (it really helps!)
+            - 🐛 **Report bugs** to make it better
+            - 📢 **Share** with friends and colleagues
+            - 💻 **Contribute** code or translations
+            - 💝 **Sponsor** development (if you're feeling generous!)
+            
+            ---
+            
+            ## 📜 Changelog
+            
+            See what's new in this release: [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)
+            
+            ---
+            
+            <div align="center">
+            
+            ### Built with ❤️ using
+            
+            [Tauri](https://tauri.app) • [React](https://react.dev) • [FFmpeg](https://ffmpeg.org) • [Rust](https://rust-lang.org)
+            
+            ---
+            
+            **License**: [GPL v2](https://github.com/${{ github.repository }}/blob/main/LICENSE.GPL) / [LGPL v2.1](https://github.com/${{ github.repository }}/blob/main/LICENSE.LGPL)
+            
+            **Copyright © 2024** • Made with 🦎 by the MuXolotl team
+            
+            </div>
           releaseDraft: false
           prerelease: false
-          args: --target ${{ matrix.target }}
+          args: --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
 
-      - name: 📤 Upload FFmpeg standalone package to release
+      - name: 🏷️ Rename artifacts
+        shell: bash
+        run: |
+          VERSION="${{ needs.prepare.outputs.version }}"
+          TARGET="${{ matrix.target }}"
+          BUNDLE_DIR="src-tauri/target/$TARGET/release/bundle"
+          
+          # Windows
+          if [ "${{ matrix.platform }}" == "windows-latest" ]; then
+            if [ -d "$BUNDLE_DIR/msi" ]; then
+              for file in "$BUNDLE_DIR/msi"/*.msi; do
+                [ -f "$file" ] && mv "$file" "$BUNDLE_DIR/msi/MuXolotl-Converter-${VERSION}-windows-x64-setup.msi"
+              done
+            fi
+            if [ -d "$BUNDLE_DIR/nsis" ]; then
+              for file in "$BUNDLE_DIR/nsis"/*.exe; do
+                [ -f "$file" ] && mv "$file" "$BUNDLE_DIR/nsis/MuXolotl-Converter-${VERSION}-windows-x64-portable.exe"
+              done
+            fi
+          fi
+          
+          # Linux
+          if [ "${{ matrix.platform }}" == "ubuntu-22.04" ]; then
+            if [ -d "$BUNDLE_DIR/appimage" ]; then
+              for file in "$BUNDLE_DIR/appimage"/*.AppImage; do
+                [ -f "$file" ] && mv "$file" "$BUNDLE_DIR/appimage/MuXolotl-Converter-${VERSION}-linux-x64.AppImage"
+              done
+            fi
+            if [ -d "$BUNDLE_DIR/deb" ]; then
+              for file in "$BUNDLE_DIR/deb"/*.deb; do
+                [ -f "$file" ] && mv "$file" "$BUNDLE_DIR/deb/MuXolotl-Converter-${VERSION}-linux-x64.deb"
+              done
+            fi
+          fi
+          
+          # macOS Intel
+          if [ "${{ matrix.platform }}" == "macos-latest" ] && [ "$TARGET" == "x86_64-apple-darwin" ]; then
+            if [ -d "$BUNDLE_DIR/dmg" ]; then
+              for file in "$BUNDLE_DIR/dmg"/*.dmg; do
+                [ -f "$file" ] && mv "$file" "$BUNDLE_DIR/dmg/MuXolotl-Converter-${VERSION}-macos-intel.dmg"
+              done
+            fi
+          fi
+          
+          # macOS ARM
+          if [ "${{ matrix.platform }}" == "macos-latest" ] && [ "$TARGET" == "aarch64-apple-darwin" ]; then
+            if [ -d "$BUNDLE_DIR/dmg" ]; then
+              for file in "$BUNDLE_DIR/dmg"/*.dmg; do
+                [ -f "$file" ] && mv "$file" "$BUNDLE_DIR/dmg/MuXolotl-Converter-${VERSION}-macos-apple-silicon.dmg"
+              done
+            fi
+          fi
+
+      - name: 📤 Upload release artifacts
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.prepare.outputs.tag_name }}
           files: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.{msi,exe,AppImage,deb,dmg}
             ffmpeg-*.zip
             ffmpeg-*.tar.gz
-          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
