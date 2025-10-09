@@ -1,7 +1,6 @@
 use anyhow::{Context, Result};
 use std::sync::Arc;
 use std::collections::HashMap;
-use std::path::PathBuf;
 use tokio::process::Child;
 use tokio::sync::Mutex;
 use tauri::Manager;
@@ -9,29 +8,31 @@ use crate::formats::video;
 use crate::media;
 use crate::gpu::{GpuInfo, GpuVendor};
 use crate::types::ConversionSettings;
-
-fn normalize_path(path: &str) -> String {
-    PathBuf::from(path)
-        .to_str()
-        .unwrap_or(path)
-        .to_string()
-}
+use super::common::*;
 
 fn add_gpu_params(args: &mut Vec<String>, vendor: &GpuVendor) {
     match vendor {
         GpuVendor::Nvidia => {
             args.extend_from_slice(&[
-                "-hwaccel".to_string(),
-                "cuda".to_string(),
-                "-hwaccel_output_format".to_string(),
-                "cuda".to_string(),
+                "-hwaccel".to_string(), "cuda".to_string(),
+                "-hwaccel_output_format".to_string(), "cuda".to_string(),
             ]);
         }
         GpuVendor::Intel => {
-            args.extend_from_slice(&["-hwaccel".to_string(), "qsv".to_string()]);
+            args.extend_from_slice(&[
+                "-hwaccel".to_string(), "qsv".to_string(),
+                "-hwaccel_output_format".to_string(), "qsv".to_string(),
+            ]);
         }
         GpuVendor::Amd => {
-            args.extend_from_slice(&["-hwaccel".to_string(), "auto".to_string()]);
+            #[cfg(target_os = "windows")]
+            {
+                args.extend_from_slice(&["-hwaccel".to_string(), "d3d11va".to_string()]);
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                args.extend_from_slice(&["-hwaccel".to_string(), "auto".to_string()]);
+            }
         }
         GpuVendor::Apple => {
             args.extend_from_slice(&["-hwaccel".to_string(), "videotoolbox".to_string()]);
@@ -46,21 +47,18 @@ fn get_video_codec(
     use_gpu: bool,
     settings: &ConversionSettings,
 ) -> String {
-    settings
-        .video_codec
-        .clone()
-        .unwrap_or_else(|| {
-            let vendor = match gpu_info.vendor {
-                GpuVendor::Nvidia => "nvidia",
-                GpuVendor::Intel => "intel",
-                GpuVendor::Amd => "amd",
-                GpuVendor::Apple => "apple",
-                _ => "none",
-            };
-            format_info
-                .get_recommended_video_codec(vendor, use_gpu)
-                .unwrap_or_else(|| "libx264".to_string())
-        })
+    settings.video_codec.clone().unwrap_or_else(|| {
+        let vendor = match gpu_info.vendor {
+            GpuVendor::Nvidia => "nvidia",
+            GpuVendor::Intel => "intel",
+            GpuVendor::Amd => "amd",
+            GpuVendor::Apple => "apple",
+            _ => "none",
+        };
+        format_info
+            .get_recommended_video_codec(vendor, use_gpu)
+            .unwrap_or_else(|| "libx264".to_string())
+    })
 }
 
 fn add_codec_params(args: &mut Vec<String>, codec: &str, quality: &str) {
@@ -118,7 +116,7 @@ fn add_codec_params(args: &mut Vec<String>, codec: &str, quality: &str) {
                 "ultra" => "15",
                 _ => "31",
             };
-            let cpu_used = match quality {
+            let cpu = match quality {
                 "low" => "5",
                 "high" => "1",
                 "ultra" => "0",
@@ -127,7 +125,7 @@ fn add_codec_params(args: &mut Vec<String>, codec: &str, quality: &str) {
             args.extend_from_slice(&[
                 "-crf".to_string(), crf.to_string(),
                 "-b:v".to_string(), "0".to_string(),
-                "-cpu-used".to_string(), cpu_used.to_string(),
+                "-cpu-used".to_string(), cpu.to_string(),
             ]);
             if c == "libvpx-vp9" {
                 args.extend_from_slice(&[
@@ -182,99 +180,82 @@ fn add_codec_params(args: &mut Vec<String>, codec: &str, quality: &str) {
 
 fn add_resolution_params(
     args: &mut Vec<String>,
-    filter_chain: &mut Vec<String>,
+    filter: &mut Vec<String>,
     format: &str,
     settings: &ConversionSettings,
     media_info: &media::MediaInfo,
 ) {
-    let (target_width, target_height) = match format {
+    let (width, height) = match format {
         "dv" | "vob" => {
-            let input_height = media_info.video_streams.get(0).map(|s| s.height).unwrap_or(576);
-            if input_height <= 480 {
-                (Some(720u32), Some(480u32))
-            } else {
-                (Some(720u32), Some(576u32))
-            }
+            let h = media_info.video_streams.get(0).map(|s| s.height).unwrap_or(576);
+            (Some(720u32), Some(if h <= 480 { 480 } else { 576 }))
         }
-        "3gp" => (Some(352u32), Some(288u32)),
+        "3gp" => (Some(352), Some(288)),
         _ => (settings.width, settings.height),
     };
 
-    if let (Some(width), Some(height)) = (target_width, target_height) {
-        let even_width = width & !1;
-        let even_height = height & !1;
-        filter_chain.push(format!("scale={}:{}", even_width, even_height));
+    if let (Some(w), Some(h)) = (width, height) {
+        let even_w = w & !1;
+        let even_h = h & !1;
+        filter.push(format!("scale={}:{}", even_w, even_h));
     }
 
     if matches!(format, "dv" | "vob") {
-        let target_fps = if target_height == Some(480) { "30000/1001" } else { "25" };
-        args.extend_from_slice(&["-r".to_string(), target_fps.to_string()]);
+        let fps = if height == Some(480) { "30000/1001" } else { "25" };
+        args.extend_from_slice(&["-r".to_string(), fps.to_string()]);
     } else if let Some(fps) = settings.fps {
         args.extend_from_slice(&["-r".to_string(), fps.to_string()]);
     }
 }
 
-fn can_copy_audio_codec(input_codec: &str, format_info: &video::VideoFormat) -> bool {
-    if format_info.audio_codecs.is_empty() {
+fn can_copy_audio(input: &str, format: &video::VideoFormat) -> bool {
+    if format.audio_codecs.is_empty() {
         return false;
     }
 
-    let normalized_input = input_codec.to_lowercase();
-    
-    for supported in &format_info.audio_codecs {
-        let normalized_supported = supported.to_lowercase();
-        
-        if normalized_input == normalized_supported {
-            return true;
-        }
-        
-        if normalized_input.contains(&normalized_supported) || normalized_supported.contains(&normalized_input) {
-            return true;
-        }
-        
-        if (supported == "aac" && normalized_input.starts_with("aac")) ||
-           (supported == "mp3" && normalized_input.contains("mp3")) ||
-           (supported == "opus" && normalized_input.contains("opus")) ||
-           (supported == "vorbis" && normalized_input.contains("vorbis")) ||
-           (supported == "ac3" && normalized_input.contains("ac3")) {
-            return true;
-        }
-    }
-    
-    false
+    let normalized = input.to_lowercase();
+    format.audio_codecs.iter().any(|supported| {
+        let s = supported.to_lowercase();
+        normalized == s || normalized.contains(&s) || s.contains(&normalized) ||
+        (supported == "aac" && normalized.starts_with("aac")) ||
+        (supported == "mp3" && normalized.contains("mp3")) ||
+        (supported == "opus" && normalized.contains("opus")) ||
+        (supported == "vorbis" && normalized.contains("vorbis")) ||
+        (supported == "ac3" && normalized.contains("ac3"))
+    })
 }
 
-fn handle_audio_codec(
+fn handle_audio(
     args: &mut Vec<String>,
-    format_info: &video::VideoFormat,
+    format: &video::VideoFormat,
     settings: &ConversionSettings,
-    media_info: &media::MediaInfo,
+    media: &media::MediaInfo,
 ) {
-    if media_info.audio_streams.is_empty() || format_info.audio_codecs.is_empty() {
+    if media.audio_streams.is_empty() || format.audio_codecs.is_empty() {
         args.extend_from_slice(&["-an".to_string()]);
         return;
     }
 
-    if let Some(ref audio_codec) = settings.audio_codec {
-        if format_info.supports_audio_codec(audio_codec) {
-            args.extend_from_slice(&["-c:a".to_string(), audio_codec.to_string()]);
+    if let Some(ref codec) = settings.audio_codec {
+        if format.supports_audio_codec(codec) {
+            args.extend_from_slice(&["-c:a".to_string(), codec.to_string()]);
             return;
         }
         #[cfg(debug_assertions)]
-        println!("⚠️ Audio codec '{}' not compatible, using default", audio_codec);
+        println!("⚠️ Audio codec '{}' not compatible, using default", codec);
     }
 
-    let input_audio_codec = media_info.audio_streams.get(0).map(|s| s.codec.as_str()).unwrap_or("");
+    let input_codec = media.audio_streams.get(0).map(|s| s.codec.as_str()).unwrap_or("");
 
-    if can_copy_audio_codec(input_audio_codec, format_info) {
+    if can_copy_audio(input_codec, format) {
         args.extend_from_slice(&["-c:a".to_string(), "copy".to_string()]);
         #[cfg(debug_assertions)]
-        println!("✅ Copying audio codec: {}", input_audio_codec);
-    } else if let Some(default_codec) = format_info.get_recommended_audio_codec() {
-        args.extend_from_slice(&["-c:a".to_string(), default_codec.clone()]);
+        println!("✅ Copying audio: {}", input_codec);
+    } else if let Some(default) = format.get_recommended_audio_codec() {
+        args.extend_from_slice(&["-c:a".to_string(), default.clone()]);
         
-        if !default_codec.starts_with("pcm_") && default_codec != "copy" {
-            let bitrate = match default_codec.as_str() {
+        if !default.starts_with("pcm_") && default != "copy" {
+            let bitrate = match default.as_str() {
                 "libopus" => "128k",
                 "libvorbis" | "aac" | "mp2" => "192k",
                 "ac3" => "448k",
@@ -284,14 +265,16 @@ fn handle_audio_codec(
         }
         
         #[cfg(debug_assertions)]
-        println!("🔄 Re-encoding audio: {} -> {}", input_audio_codec, default_codec);
+        println!("🔄 Re-encoding audio: {} -> {}", input_codec, default);
     }
 }
 
-fn add_compatibility_flags(args: &mut Vec<String>, format: &str, codec: &str) {
+fn add_compat_flags(args: &mut Vec<String>, format: &str, codec: &str) {
     match format {
         "mp4" | "m4v" | "mov" => {
-            args.extend_from_slice(&["-movflags".to_string(), "+faststart".to_string()]);
+            if !args.contains(&"-movflags".to_string()) {
+                args.extend_from_slice(&["-movflags".to_string(), "+faststart".to_string()]);
+            }
             if codec.contains("libx264") || codec.contains("h264") {
                 args.extend_from_slice(&[
                     "-profile:v".to_string(), "high".to_string(),
@@ -330,49 +313,49 @@ pub async fn convert(
     let quality = settings.quality_str();
 
     let mut args = Vec::new();
-    let mut filter_chain = Vec::new();
+    let mut filter = Vec::new();
 
     if use_gpu {
         add_gpu_params(&mut args, &gpu_info.vendor);
+        
+        #[cfg(debug_assertions)]
+        println!("✅ GPU acceleration enabled: {:?} (decode + encode)", gpu_info.vendor);
     }
 
-    let normalized_input = normalize_path(input);
-    let normalized_output = normalize_path(output);
+    args.extend_from_slice(&["-i".to_string(), normalize_path(input)]);
 
-    args.extend_from_slice(&["-i".to_string(), normalized_input]);
-
-    let video_codec = get_video_codec(&format_info, &gpu_info, use_gpu, &settings);
+    let codec = get_video_codec(&format_info, &gpu_info, use_gpu, &settings);
     
-    if !format_info.supports_video_codec(&video_codec) {
+    if !format_info.supports_video_codec(&codec) {
         anyhow::bail!(
-            "Codec '{}' is not compatible with {} format. Supported: {:?}",
-            video_codec, format_info.extension, format_info.video_codecs
+            "Codec '{}' not compatible with {}. Supported: {:?}",
+            codec, format_info.extension, format_info.video_codecs
         );
     }
 
-    args.extend_from_slice(&["-c:v".to_string(), video_codec.clone()]);
-    add_codec_params(&mut args, &video_codec, quality);
-    add_resolution_params(&mut args, &mut filter_chain, format, &settings, &media_info);
+    args.extend_from_slice(&["-c:v".to_string(), codec.clone()]);
+    add_codec_params(&mut args, &codec, quality);
+    add_resolution_params(&mut args, &mut filter, format, &settings, &media_info);
 
-    if video_codec.contains("h264") || video_codec.contains("h265") || 
-       video_codec.contains("hevc") || video_codec == "mpeg4" || video_codec == "flv" {
-        filter_chain.push("format=yuv420p".to_string());
+    if codec.contains("h264") || codec.contains("h265") || 
+       codec.contains("hevc") || codec == "mpeg4" || codec == "flv" {
+        filter.push("format=yuv420p".to_string());
     }
 
-    if !filter_chain.is_empty() {
-        args.extend_from_slice(&["-vf".to_string(), filter_chain.join(",")]);
+    if !filter.is_empty() {
+        args.extend_from_slice(&["-vf".to_string(), filter.join(",")]);
     }
 
-    handle_audio_codec(&mut args, &format_info, &settings, &media_info);
+    handle_audio(&mut args, &format_info, &settings, &media_info);
     args.extend_from_slice(&["-f".to_string(), format_info.container.clone()]);
     args.extend(format_info.special_params.clone());
-    add_compatibility_flags(&mut args, format, &video_codec);
+    add_compat_flags(&mut args, format, &codec);
 
     args.extend_from_slice(&[
         "-progress".to_string(),
         "pipe:1".to_string(),
         "-y".to_string(),
-        normalized_output,
+        normalize_path(output),
     ]);
 
     super::spawn_ffmpeg(window, task_id, media_info.duration, args, processes).await

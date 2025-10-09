@@ -13,10 +13,8 @@ interface FormatSettingsProps {
   recommendedFormats?: RecommendedFormats;
   onFormatChange: (format: string) => void;
   onQualityChange: (quality: string) => void;
-  // Advanced Settings
   isAdvancedOpen?: boolean;
   onToggleAdvanced?: () => void;
-  // Extract Audio
   isVideo?: boolean;
   extractAudioOnly?: boolean;
   onToggleExtractAudio?: (value: boolean) => void;
@@ -40,11 +38,11 @@ const FormatSettings: React.FC<FormatSettingsProps> = ({
   return (
     <div>
       <div className="flex items-end gap-2">
-        {/* Input Format + Arrow */}
+        {/* Input Format */}
         <div className="flex-shrink-0">
           <div className="h-[14px] mb-1" />
           <div className="flex items-center gap-2 h-8">
-            <div className="px-2 py-1 rounded bg-white/5 text-white/60 uppercase font-mono text-[10px] border border-white/5 cursor-default">
+            <div className="px-2 py-1 rounded bg-white/5 text-white/60 uppercase font-mono text-[10px] border border-white/5">
               {inputFormat.split(',')[0]}
             </div>
             <ArrowRight size={14} className="text-white/30" />
@@ -52,7 +50,7 @@ const FormatSettings: React.FC<FormatSettingsProps> = ({
         </div>
 
         {/* Output Format */}
-        <div className="w-32 flex-shrink-0">
+        <div className="w-32">
           <label className="block text-white/60 text-[10px] mb-1">Output Format</label>
           <FormatSelector
             formats={formats}
@@ -64,7 +62,7 @@ const FormatSettings: React.FC<FormatSettingsProps> = ({
         </div>
 
         {/* Quality */}
-        <div className="w-28 flex-shrink-0">
+        <div className="w-28">
           <label className="block text-white/60 text-[10px] mb-1">Quality</label>
           <select
             value={quality}

@@ -75,11 +75,6 @@ impl AudioFormat {
     }
 
     #[inline]
-    pub fn is_suitable_for_extraction(&self) -> bool {
-        !matches!(self.extension.as_str(), "shn" | "ra" | "tak")
-    }
-
-    #[inline]
     pub fn get_container_format(&self) -> Option<String> {
         self.container.clone()
     }

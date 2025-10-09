@@ -8,17 +8,14 @@ import ConvertButton from '@/components/ConvertButton';
 import OutputFolderSelector from '@/components/OutputFolderSelector';
 import { useGpu } from '@/hooks/useGpu';
 import { useConversion } from '@/hooks/useConversion';
-import { useNotifications } from '@/hooks/useNotifications';
-import { useFileManager } from '@/components/FileManager';
-import { generateOutputPath, sortFilesByStatus } from '@/utils';
-import { saveQueue, loadQueue, clearQueue, saveOutputFolder, loadOutputFolder } from '@/utils/storage';
+import { generateOutputPath, sortFilesByStatus, saveQueue, loadQueue, clearQueue, saveOutputFolder, loadOutputFolder } from '@/utils';
 import type { FileItem, ConversionContextType } from '@/types';
 
 export const ConversionContext = React.createContext<ConversionContextType | null>(null);
 
 const MAX_PARALLEL_CONVERSIONS = 4;
 const MAX_FILES_IN_QUEUE = 50;
-const AUTOSAVE_INTERVAL_MS = 5000;
+const AUTOSAVE_INTERVAL_MS = 10000;
 
 const App: React.FC = () => {
   const [files, setFiles] = useState<FileItem[]>([]);
@@ -29,20 +26,65 @@ const App: React.FC = () => {
   const [expandedCompactCard, setExpandedCompactCard] = useState<string | null>(null);
 
   const { gpuInfo, isLoading: gpuLoading } = useGpu();
-  const { notifyFileCompleted, notifyFileFailed, notifyQueueCompleted } = useNotifications();
 
-  const { handleFilesAdded, handleFileRemove, handleApplyToAll, handleClearCompleted, handleClearAll } = useFileManager(
-    {
-      files,
-      setFiles,
-      outputFolder,
-      maxFiles: MAX_FILES_IN_QUEUE,
-      setExpandedAdvanced,
-      setExpandedCompactCard,
-    }
+  // ============================================================================
+  // FILE MANAGEMENT
+  // ============================================================================
+
+  const handleFilesAdded = useCallback(
+    (newFiles: FileItem[]) => {
+      const availableSlots = MAX_FILES_IN_QUEUE - files.length;
+
+      if (availableSlots <= 0) {
+        alert(`⚠️ Queue is full! Maximum ${MAX_FILES_IN_QUEUE} files allowed.`);
+        return;
+      }
+
+      const existingPaths = new Set(files.map(f => f.path));
+      const uniqueFiles = newFiles.filter(f => !existingPaths.has(f.path));
+      const duplicateCount = newFiles.length - uniqueFiles.length;
+
+      if (duplicateCount > 0) {
+        alert(`⚠️ ${duplicateCount} duplicate file${duplicateCount > 1 ? 's' : ''} skipped.`);
+      }
+
+      const filesToAdd = uniqueFiles.slice(0, availableSlots);
+      const exceededCount = uniqueFiles.length - filesToAdd.length;
+
+      if (exceededCount > 0) {
+        alert(`⚠️ Only ${filesToAdd.length} files added. ${exceededCount} exceeded limit.`);
+      }
+
+      if (filesToAdd.length === 0) return;
+
+      const filesWithPath = outputFolder
+        ? filesToAdd.map(file => ({ ...file, outputPath: generateOutputPath(file, outputFolder) }))
+        : filesToAdd;
+
+      setFiles(prev => [...filesWithPath, ...prev]);
+    },
+    [files, outputFolder]
   );
 
-  // Load saved state
+  const handleFileRemove = useCallback((fileId: string) => {
+    setFiles(prev => prev.filter(f => f.id !== fileId));
+    setExpandedAdvanced(prev => {
+      const next = new Set(prev);
+      next.delete(fileId);
+      return next;
+    });
+    setExpandedCompactCard(prev => (prev === fileId ? null : prev));
+  }, []);
+
+  const handleClearAll = useCallback(() => {
+    setFiles([]);
+    clearQueue();
+  }, []);
+
+  // ============================================================================
+  // STORAGE
+  // ============================================================================
+
   useEffect(() => {
     const savedFiles = loadQueue();
     if (savedFiles.length > 0) {
@@ -57,12 +99,10 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Auto-save output folder
   useEffect(() => {
     if (outputFolder) saveOutputFolder(outputFolder);
   }, [outputFolder]);
 
-  // Auto-save queue
   const prevFilesForSave = useRef<string>('');
   useEffect(() => {
     const interval = setInterval(() => {
@@ -79,45 +119,9 @@ const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [files]);
 
-  // Track notifications
-  const prevFilesRef = useRef<FileItem[]>([]);
-  const notificationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    // Debounce notifications
-    if (notificationTimeoutRef.current) {
-      clearTimeout(notificationTimeoutRef.current);
-    }
-
-    notificationTimeoutRef.current = setTimeout(() => {
-      const prevFiles = prevFilesRef.current;
-      prevFilesRef.current = files;
-
-      files.forEach(file => {
-        const prevFile = prevFiles.find(f => f.id === file.id);
-        if (prevFile && prevFile.status !== file.status) {
-          if (file.status === 'completed') notifyFileCompleted(file);
-          else if (file.status === 'failed') notifyFileFailed(file);
-        }
-      });
-
-      const wasProcessing = prevFiles.some(f => f.status === 'processing');
-      const isProcessing = files.some(f => f.status === 'processing');
-      const hasPending = files.some(f => f.status === 'pending');
-
-      if (wasProcessing && !isProcessing && !hasPending && files.length > 0) {
-        const completed = files.filter(f => f.status === 'completed').length;
-        const failed = files.filter(f => f.status === 'failed').length;
-        notifyQueueCompleted(completed, failed);
-      }
-    }, 100); // 100ms debounce
-
-    return () => {
-      if (notificationTimeoutRef.current) {
-        clearTimeout(notificationTimeoutRef.current);
-      }
-    };
-  }, [files, notifyFileCompleted, notifyFileFailed, notifyQueueCompleted]);
+  // ============================================================================
+  // CONVERSION
+  // ============================================================================
 
   const updateFile = useCallback(
     (fileId: string, updates: Partial<FileItem>) => {
@@ -213,11 +217,6 @@ const App: React.FC = () => {
     setExpandedCompactCard(prev => (prev === fileId ? null : fileId));
   }, []);
 
-  const handleCancelAll = useCallback(async () => {
-    const processingFiles = files.filter(f => f.status === 'processing');
-    await Promise.all(processingFiles.map(file => conversionContext.cancelConversion(file.id)));
-  }, [files, conversionContext]);
-
   const canConvert =
     files.some(f => f.status === 'pending') && !conversionContext.isConverting && ffmpegAvailable === true;
   const pendingCount = files.filter(f => f.status === 'pending').length;
@@ -279,13 +278,7 @@ const App: React.FC = () => {
               expandedCompactCard={expandedCompactCard}
               onToggleCompactCard={handleToggleCompactCard}
               fileCountDisplay={fileCountDisplay}
-              onApplyToAll={handleApplyToAll}
-              onClearCompleted={handleClearCompleted}
-              onClearAll={() => {
-                handleClearAll();
-                clearQueue();
-              }}
-              onCancelAll={handleCancelAll}
+              onClearAll={handleClearAll}
             />
           </div>
         </div>

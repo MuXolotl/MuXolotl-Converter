@@ -64,11 +64,6 @@ impl VideoFormat {
         self.video_codecs.first().map(|s| s.as_str())
     }
 
-    #[inline]
-    pub fn get_default_audio_codec(&self) -> Option<&str> {
-        self.audio_codecs.first().map(|s| s.as_str())
-    }
-
     pub fn get_recommended_video_codec(&self, gpu_vendor: &str, use_gpu: bool) -> Option<String> {
         if use_gpu {
             for codec in &self.video_codecs {

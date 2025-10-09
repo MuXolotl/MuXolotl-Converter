@@ -4,8 +4,7 @@ import { open } from '@tauri-apps/api/dialog';
 import { invoke } from '@tauri-apps/api/tauri';
 import { listen } from '@tauri-apps/api/event';
 import { MEDIA_EXTENSIONS } from '@/constants';
-import { getDefaultFormat, generateFileId } from '@/utils';
-import { getDefaultSettings } from '@/utils/file';
+import { getDefaultFormat, generateFileId, getDefaultSettings } from '@/utils';
 import type { FileItem, MediaInfo } from '@/types';
 
 interface DropZoneProps {

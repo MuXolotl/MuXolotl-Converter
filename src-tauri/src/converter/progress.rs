@@ -24,7 +24,7 @@ impl ProgressParser {
             total_duration,
             task_id,
             last_update: Instant::now(),
-            update_interval_ms: 200,
+            update_interval_ms: 500,
             start_time: Instant::now(),
             last_progress: None,
         }

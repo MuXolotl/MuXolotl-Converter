@@ -73,24 +73,17 @@ export const groupFormatsByCategory = <T extends { category: string }>(formats: 
 
 export const calculateDropdownPosition = (buttonRect: DOMRect, dropdownWidth: number, maxHeight: number) => {
   const viewportHeight = window.innerHeight;
-  const viewportWidth = window.innerWidth;
   const spaceBelow = viewportHeight - buttonRect.bottom - 10;
   const spaceAbove = buttonRect.top - 10;
 
-  let height = maxHeight;
-  let top = buttonRect.bottom + 4;
-
-  if (spaceBelow < 300 && spaceAbove > spaceBelow) {
-    height = Math.min(spaceAbove, maxHeight);
-    top = buttonRect.top - height - 4;
-  } else {
-    height = Math.min(spaceBelow, maxHeight);
-  }
+  const shouldOpenUpward = spaceBelow < 300 && spaceAbove > spaceBelow;
+  const availableSpace = shouldOpenUpward ? spaceAbove : spaceBelow;
+  const height = Math.min(availableSpace, maxHeight);
+  const top = shouldOpenUpward ? buttonRect.top - height - 4 : buttonRect.bottom + 4;
 
   let left = buttonRect.left;
-  if (left + dropdownWidth > viewportWidth - 10) {
-    left = viewportWidth - dropdownWidth - 10;
-  }
+  const maxLeft = window.innerWidth - dropdownWidth - 10;
+  if (left > maxLeft) left = maxLeft;
   if (left < 10) left = 10;
 
   return { top, left, width: dropdownWidth, maxHeight: height };

@@ -9,24 +9,20 @@
 }
 
 body {
-  font-family:
-    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans',
-    'Helvetica Neue', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
-}
-
-/* Отключаем анимации когда окно неактивно */
-body:not(:focus-within) * {
-  animation-play-state: paused !important;
-  transition: none !important;
 }
 
 #root {
   width: 100vw;
   height: 100vh;
 }
+
+/* ============================================================================
+   SCROLLBAR
+   ========================================================================= */
 
 ::-webkit-scrollbar {
   width: 6px;
@@ -41,22 +37,28 @@ body:not(:focus-within) * {
 ::-webkit-scrollbar-thumb {
   background: rgba(139, 92, 246, 0.4);
   border-radius: 3px;
-  transition: background 0.2s;
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(139, 92, 246, 0.6);
 }
 
+/* ============================================================================
+   GLASS EFFECT
+   ========================================================================= */
+
 .glass {
   background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 0.75rem;
   position: relative;
-  isolation: isolate;
+  -webkit-user-select: none;
+  user-select: none;
 }
+
+/* ============================================================================
+   UTILITIES
+   ========================================================================= */
 
 .gradient-text {
   background: linear-gradient(90deg, #8b5cf6 0%, #ec4899 100%);
@@ -72,23 +74,9 @@ body:not(:focus-within) * {
   overflow: hidden;
 }
 
-button,
-select,
-input {
-  transition: all 0.2s ease;
-}
-
-button,
-.glass {
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-.glass,
-button {
-  transform: translateZ(0);
-  backface-visibility: hidden;
-}
+/* ============================================================================
+   SELECT DROPDOWN
+   ========================================================================= */
 
 select option {
   background-color: #1e293b !important;
@@ -118,40 +106,18 @@ select:focus {
   }
 }
 
-[data-dropdown-portal] {
-  position: fixed;
-  z-index: 999999 !important;
-  pointer-events: auto;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
+/* ============================================================================
+   ANIMATIONS
+   ========================================================================= */
 
 @keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 @keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .animate-pulse {
@@ -162,47 +128,14 @@ select:focus {
   animation: spin 1s linear infinite;
 }
 
-[data-dropdown-scroll]::-webkit-scrollbar {
-  width: 8px;
+/* ============================================================================
+   TRANSITIONS
+   ========================================================================= */
+
+button {
+  transition: background-color 0.15s ease, opacity 0.15s ease;
 }
 
-[data-dropdown-scroll]::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 4px;
-}
-
-[data-dropdown-scroll]::-webkit-scrollbar-thumb {
-  background: rgba(139, 92, 246, 0.6);
-  border-radius: 4px;
-}
-
-[data-dropdown-scroll]::-webkit-scrollbar-thumb:hover {
-  background: rgba(139, 92, 246, 0.8);
-}
-
-.scrollbar-thin::-webkit-scrollbar {
-  width: 6px;
-}
-
-.scrollbar-thin::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 3px;
-}
-
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background: rgba(139, 92, 246, 0.4);
-  border-radius: 3px;
-}
-
-.scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: rgba(139, 92, 246, 0.6);
-}
-
-/* Уменьшаем частоту обновления анимаций */
-@media (prefers-reduced-motion: reduce) {
-  * {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
+select, input {
+  transition: border-color 0.15s ease;
 }

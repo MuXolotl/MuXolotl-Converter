@@ -35,9 +35,9 @@ impl Default for GpuInfo {
     }
 }
 
-const COMMAND_TIMEOUT_SECS: u64 = 5;
+const TIMEOUT_SECS: u64 = 10;
 
-fn check_ffmpeg_encoder(encoder: &str) -> bool {
+fn check_encoder(encoder: &str) -> bool {
     create_hidden_command("ffmpeg")
         .args(&["-hide_banner", "-encoders"])
         .output()
@@ -47,7 +47,7 @@ fn check_ffmpeg_encoder(encoder: &str) -> bool {
         .unwrap_or(false)
 }
 
-async fn run_command_with_timeout(program: &str, args: &[&str]) -> Option<std::process::Output> {
+async fn run_with_timeout(program: &str, args: &[&str]) -> Option<std::process::Output> {
     let program = program.to_string();
     let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
     
@@ -55,34 +55,17 @@ async fn run_command_with_timeout(program: &str, args: &[&str]) -> Option<std::p
         create_hidden_command(&program).args(&args).output()
     });
     
-    match timeout(Duration::from_secs(COMMAND_TIMEOUT_SECS), future).await {
-        Ok(Ok(Ok(output))) => Some(output),
-        Ok(Ok(Err(e))) => {
-            #[cfg(debug_assertions)]
-            eprintln!("Command execution error: {}", e);
-            None
-        }
-        Ok(Err(e)) => {
-            #[cfg(debug_assertions)]
-            eprintln!("Task join error: {}", e);
-            None
-        }
-        Err(_) => {
-            #[cfg(debug_assertions)]
-            eprintln!("Command timed out after {} seconds", COMMAND_TIMEOUT_SECS);
-            None
-        }
-    }
+    timeout(Duration::from_secs(TIMEOUT_SECS), future)
+        .await
+        .ok()?
+        .ok()?
+        .ok()
 }
 
-async fn detect_gpu_by_keywords(keywords: &[&str]) -> Option<String> {
+async fn get_gpu_name(keywords: &[&str]) -> Option<String> {
     #[cfg(target_os = "windows")]
     {
-        let output = run_command_with_timeout(
-            "wmic",
-            &["path", "win32_VideoController", "get", "name"]
-        ).await?;
-        
+        let output = run_with_timeout("wmic", &["path", "win32_VideoController", "get", "name"]).await?;
         String::from_utf8_lossy(&output.stdout)
             .lines()
             .find(|line| keywords.iter().any(|kw| line.to_lowercase().contains(kw)))
@@ -91,7 +74,7 @@ async fn detect_gpu_by_keywords(keywords: &[&str]) -> Option<String> {
 
     #[cfg(target_os = "linux")]
     {
-        let output = run_command_with_timeout("lspci", &[]).await?;
+        let output = run_with_timeout("lspci", &[]).await?;
         String::from_utf8_lossy(&output.stdout)
             .lines()
             .find(|line| {
@@ -103,60 +86,26 @@ async fn detect_gpu_by_keywords(keywords: &[&str]) -> Option<String> {
 
     #[cfg(target_os = "macos")]
     {
-        let output = run_command_with_timeout("system_profiler", &["SPDisplaysDataType"]).await?;
-        let info = String::from_utf8_lossy(&output.stdout);
-        
-        if keywords.iter().any(|kw| info.to_lowercase().contains(kw)) {
-            info.lines()
-                .find(|line| line.contains("Chipset Model:"))
-                .and_then(|line| line.split(':').nth(1).map(|s| s.trim().to_string()))
-        } else {
-            None
-        }
+        let output = run_with_timeout("system_profiler", &["SPDisplaysDataType"]).await?;
+        String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .find(|line| line.contains("Chipset Model:"))
+            .and_then(|line| line.split(':').nth(1).map(|s| s.trim().to_string()))
     }
 
     #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
     None
 }
 
-struct GpuDetector {
-    vendor: GpuVendor,
-    keywords: &'static [&'static str],
-    h264_encoder: &'static str,
-    h265_encoder: &'static str,
-    decoder: &'static str,
-}
-
-const GPU_DETECTORS: &[GpuDetector] = &[
-    GpuDetector {
-        vendor: GpuVendor::Nvidia,
-        keywords: &["nvidia"],
-        h264_encoder: "h264_nvenc",
-        h265_encoder: "hevc_nvenc",
-        decoder: "h264_cuvid",
-    },
-    GpuDetector {
-        vendor: GpuVendor::Intel,
-        keywords: &["intel", "hd graphics", "uhd graphics", "iris"],
-        h264_encoder: "h264_qsv",
-        h265_encoder: "hevc_qsv",
-        decoder: "h264_qsv",
-    },
-    GpuDetector {
-        vendor: GpuVendor::Amd,
-        keywords: &["amd", "radeon"],
-        h264_encoder: "h264_amf",
-        h265_encoder: "hevc_amf",
-        decoder: "h264_amf",
-    },
-];
-
 pub async fn detect_gpu() -> GpuInfo {
     // NVIDIA via nvidia-smi
-    if let Some(output) = run_command_with_timeout("nvidia-smi", &["--query-gpu=name", "--format=csv,noheader"]).await {
+    if let Some(output) = run_with_timeout("nvidia-smi", &["--query-gpu=name", "--format=csv,noheader"]).await {
         if output.status.success() {
             let name = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if !name.is_empty() && (check_ffmpeg_encoder("h264_nvenc") || check_ffmpeg_encoder("nvenc_h264")) {
+            if !name.is_empty() && check_encoder("h264_nvenc") {
+                #[cfg(debug_assertions)]
+                println!("✅ Detected NVIDIA GPU: {}", name);
+                
                 return GpuInfo {
                     vendor: GpuVendor::Nvidia,
                     name,
@@ -169,54 +118,59 @@ pub async fn detect_gpu() -> GpuInfo {
         }
     }
 
-    // Fallback: keyword-based detection
-    if let Some(gpu_name) = detect_gpu_by_keywords(&["nvidia"]).await {
-        if check_ffmpeg_encoder("h264_nvenc") || check_ffmpeg_encoder("nvenc_h264") {
+    // AMD
+    if let Some(name) = get_gpu_name(&["amd", "radeon"]).await {
+        if check_encoder("h264_amf") {
+            #[cfg(debug_assertions)]
+            println!("✅ Detected AMD GPU: {}", name);
+            
             return GpuInfo {
-                vendor: GpuVendor::Nvidia,
-                name: gpu_name,
-                encoder_h264: Some("h264_nvenc".to_string()),
-                encoder_h265: Some("hevc_nvenc".to_string()),
-                decoder: Some("h264_cuvid".to_string()),
+                vendor: GpuVendor::Amd,
+                name,
+                encoder_h264: Some("h264_amf".to_string()),
+                encoder_h265: Some("hevc_amf".to_string()),
+                decoder: Some("h264_amf".to_string()),
                 available: true,
             };
+        } else {
+            #[cfg(debug_assertions)]
+            println!("⚠️ Found AMD GPU '{}' but h264_amf encoder not available in FFmpeg", name);
         }
     }
 
-    // Other vendors
-    for detector in GPU_DETECTORS {
-        if let Some(gpu_name) = detect_gpu_by_keywords(detector.keywords).await {
-            if check_ffmpeg_encoder(detector.h264_encoder) {
-                return GpuInfo {
-                    vendor: detector.vendor.clone(),
-                    name: gpu_name,
-                    encoder_h264: Some(detector.h264_encoder.to_string()),
-                    encoder_h265: Some(detector.h265_encoder.to_string()),
-                    decoder: Some(detector.decoder.to_string()),
-                    available: true,
-                };
-            }
+    // Intel
+    if let Some(name) = get_gpu_name(&["intel", "hd graphics", "uhd graphics", "iris"]).await {
+        if check_encoder("h264_qsv") {
+            #[cfg(debug_assertions)]
+            println!("✅ Detected Intel GPU: {}", name);
+            
+            return GpuInfo {
+                vendor: GpuVendor::Intel,
+                name,
+                encoder_h264: Some("h264_qsv".to_string()),
+                encoder_h265: Some("hevc_qsv".to_string()),
+                decoder: Some("h264_qsv".to_string()),
+                available: true,
+            };
+        } else {
+            #[cfg(debug_assertions)]
+            println!("⚠️ Found Intel GPU '{}' but h264_qsv encoder not available in FFmpeg", name);
         }
     }
 
-    // Apple Silicon (macOS)
+    // Apple VideoToolbox (macOS only)
     #[cfg(target_os = "macos")]
     {
-        if check_ffmpeg_encoder("h264_videotoolbox") {
-            let gpu_name = run_command_with_timeout("system_profiler", &["SPDisplaysDataType"])
-                .await
-                .and_then(|output| {
-                    String::from_utf8_lossy(&output.stdout)
-                        .lines()
-                        .find(|line| line.contains("Chipset Model:"))
-                        .and_then(|line| line.split(':').nth(1))
-                        .map(|s| s.trim().to_string())
-                })
+        if check_encoder("h264_videotoolbox") {
+            let name = get_gpu_name(&["apple"]).await
                 .unwrap_or_else(|| "Apple GPU".to_string());
-
+            
+            #[cfg(debug_assertions)]
+            println!("✅ Detected Apple GPU: {}", name);
+            
             return GpuInfo {
                 vendor: GpuVendor::Apple,
-                name: gpu_name,
+                name,
                 encoder_h264: Some("h264_videotoolbox".to_string()),
                 encoder_h265: Some("hevc_videotoolbox".to_string()),
                 decoder: Some("h264".to_string()),
@@ -224,6 +178,9 @@ pub async fn detect_gpu() -> GpuInfo {
             };
         }
     }
+
+    #[cfg(debug_assertions)]
+    println!("⚠️ No GPU with encoding support detected, using CPU");
 
     GpuInfo::default()
 }

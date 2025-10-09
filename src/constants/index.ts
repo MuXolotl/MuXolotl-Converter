@@ -31,49 +31,10 @@ export const VIDEO_FPS = [
 ] as const;
 
 export const MEDIA_EXTENSIONS = [
-  'mp3',
-  'aac',
-  'flac',
-  'wav',
-  'ogg',
-  'opus',
-  'm4a',
-  'wma',
-  'alac',
-  'aiff',
-  'wv',
-  'ape',
-  'tta',
-  'ac3',
-  'dts',
-  'amr',
-  'au',
-  'ra',
-  'shn',
-  'mka',
-  'spx',
-  'tak',
-  'mp4',
-  'mkv',
-  'avi',
-  'mov',
-  'webm',
-  'flv',
-  'wmv',
-  'mpg',
-  'mpeg',
-  'ts',
-  'm4v',
-  'ogv',
-  '3gp',
-  'mxf',
-  'f4v',
-  'vob',
-  'rm',
-  'divx',
-  'nut',
-  'y4m',
-  'dv',
+  'mp3', 'aac', 'flac', 'wav', 'ogg', 'opus', 'm4a', 'wma', 'alac', 'aiff', 'wv', 'ape', 'tta',
+  'ac3', 'dts', 'amr', 'au', 'ra', 'shn', 'mka', 'spx', 'tak', 'mp4', 'mkv', 'avi', 'mov',
+  'webm', 'flv', 'wmv', 'mpg', 'mpeg', 'ts', 'm4v', 'ogv', '3gp', 'mxf', 'f4v', 'vob', 'rm',
+  'divx', 'nut', 'y4m', 'dv',
 ] as const;
 
 export const STABILITY_ICONS = {
@@ -90,30 +51,3 @@ export const CATEGORY_LABELS = {
   legacy: 'Legacy',
   exotic: 'Exotic',
 } as const;
-
-export const formatFileSize = (bytes: number): string => {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
-};
-
-export const formatDuration = (seconds: number): string => {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  return h > 0
-    ? `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-    : `${m}:${s.toString().padStart(2, '0')}`;
-};
-
-export const formatETA = (seconds: number | null | undefined): string => {
-  if (seconds == null || seconds <= 0) return '—';
-  if (seconds < 60) return `${Math.floor(seconds)}s`;
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  if (m < 60) return `${m}m ${s}s`;
-  const h = Math.floor(m / 60);
-  return `${h}h ${m % 60}m`;
-};
