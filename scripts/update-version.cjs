@@ -30,10 +30,6 @@ function logWarn(msg) {
   console.warn(`⚠️  ${msg}`);
 }
 
-function logStep(title) {
-  console.log(`\n${title}`);
-}
-
 const versionFilePath = path.join(rootDir, 'VERSION');
 if (!fileExists(versionFilePath)) {
   console.error(`❌ VERSION file not found at: ${versionFilePath}`);
@@ -68,13 +64,12 @@ console.log(`\n📦 Synchronizing version: ${version}\n`);
     return;
   }
   let cargoToml = readUtf8(cargoTomlPath);
-  const replaced = cargoToml.replace(
-    /(\[package\][\s\S]*?\nversion\s*=\s*")([^"]+)(")/,
-    `$1${version}$3`
-  );
+  const inPackageRegex = /(\[package\][\s\S]*?^version\s*=\s*")([^"]+)(")/m;
+  let replaced = cargoToml.replace(inPackageRegex, `$1${version}$3`);
 
   if (replaced === cargoToml) {
-    const fallback = cargoToml.replace(/(?m)^(version\s*=\s*").*(")\s*$/, `$1${version}$2`);
+    const fallbackRegex = /^(\s*version\s*=\s*")[^"]+(")\s*$/m;
+    const fallback = cargoToml.replace(fallbackRegex, `$1${version}$2`);
     if (fallback === cargoToml) {
       logWarn('Could not find version field to update in src-tauri/Cargo.toml');
     } else {
@@ -129,14 +124,14 @@ console.log(`\n📦 Synchronizing version: ${version}\n`);
     return;
   }
 
-  let readme = readUtf8(readmePath);
+  const readme = readUtf8(readmePath);
   const badgeRegex = /(https:\/\/img\.shields\.io\/badge\/version-)(\d+\.\d+\.\d+)(-[a-z0-9._-]+\.svg)/gi;
+  const updatedReadme = readme.replace(badgeRegex, `$1${version}$3`);
 
-  if (!badgeRegex.test(readme)) {
+  if (updatedReadme === readme) {
     logWarn('No shields.io version badge found in README.md — skipping badge update');
   } else {
-    readme = readme.replace(badgeRegex, `$1${version}$3`);
-    writeUtf8(readmePath, readme);
+    writeUtf8(readmePath, updatedReadme);
     logOk('Updated README.md version badge');
   }
 })();
