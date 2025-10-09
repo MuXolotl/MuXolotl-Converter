@@ -222,8 +222,6 @@ jobs:
             ![License](https://img.shields.io/badge/license-GPL%20v2%20%2F%20LGPL%20v2.1-green?style=flat-square)
             ![Version](https://img.shields.io/badge/version-${{ needs.prepare.outputs.version }}-orange?style=flat-square)
             
-            </div>
-            
             ---
             
             ## ✨ What Makes MuXolotl Special?
@@ -271,7 +269,11 @@ jobs:
             </tr>
             </table>
             
+            </div>
+            
             ---
+            
+            <div align="center">
             
             ## 📦 Download & Installation
             
@@ -281,6 +283,8 @@ jobs:
             |------|-------------|----------|
             | [`MuXolotl-Converter-${{ needs.prepare.outputs.version }}-windows-x64-setup.msi`](#) | **MSI Installer** | ✅ **Recommended** - Full installation with shortcuts |
             | [`MuXolotl-Converter-${{ needs.prepare.outputs.version }}-windows-x64-portable.exe`](#) | **Portable EXE** | 💼 Run without installation |
+            
+            </div>
             
             <details>
             <summary>📝 Installation Steps</summary>
@@ -294,12 +298,16 @@ jobs:
             
             ---
             
+            <div align="center">
+            
             ### 🍎 **macOS**
             
             | File | Architecture | Compatibility |
             |------|--------------|---------------|
             | [`MuXolotl-Converter-${{ needs.prepare.outputs.version }}-macos-intel.dmg`](#) | **Intel (x64)** | Mac with Intel processors |
             | [`MuXolotl-Converter-${{ needs.prepare.outputs.version }}-macos-apple-silicon.dmg`](#) | **Apple Silicon (ARM64)** | M1 / M2 / M3 / M4 Macs |
+            
+            </div>
             
             <details>
             <summary>📝 Installation Steps</summary>
@@ -315,12 +323,16 @@ jobs:
             
             ---
             
+            <div align="center">
+            
             ### 🐧 **Linux**
             
             | File | Format | Distribution |
             |------|--------|--------------|
             | [`MuXolotl-Converter-${{ needs.prepare.outputs.version }}-linux-x64.AppImage`](#) | **AppImage** | ✅ **Universal** (any distro) |
             | [`MuXolotl-Converter-${{ needs.prepare.outputs.version }}-linux-x64.deb`](#) | **DEB Package** | Debian, Ubuntu, Mint, Pop!_OS |
+            
+            </div>
             
             <details>
             <summary>📝 AppImage Installation</summary>
@@ -345,6 +357,8 @@ jobs:
             </details>
             
             ---
+            
+            <div align="center">
             
             ## 🛠️ Standalone FFmpeg Binaries
             
@@ -387,6 +401,8 @@ jobs:
             </td>
             </tr>
             </table>
+            
+            </div>
             
             ---
             
@@ -447,6 +463,20 @@ jobs:
             
             ---
             
+            ## 🌟 Support the Project
+            
+            If you find MuXolotl useful:
+            
+            - ⭐ **Star this repository** (it really helps!)
+            - 🐛 **Report bugs** to make it better
+            - 📢 **Share** with friends and colleagues
+            - 💻 **Contribute** code or translations
+            - 💝 **Sponsor** development (if you're feeling generous!)
+            
+            ---
+            
+            <div align="center">
+            
             ## 💡 Need Help?
             
             <table>
@@ -461,48 +491,35 @@ jobs:
             <td align="center" width="25%">
             
             ### 🐛
-            **[Report Bug](https://github.com/${{ github.repository }}/issues/new?labels=bug)**  
+            **[Report Bug](https://github.com/${{ github.repository }}/issues/new?template=bug_report.yml)**  
             Found an issue?
             
             </td>
             <td align="center" width="25%">
             
             ### 💡
-            **[Request Feature](https://github.com/${{ github.repository }}/issues/new?labels=enhancement)**  
+            **[Request Feature](https://github.com/${{ github.repository }}/issues/new?template=feature_request.yml)**  
             Share your ideas
-            
+
             </td>
             <td align="center" width="25%">
-            
+
+            ### ❓
+            **[Question / Support](https://github.com/${{ github.repository }}/issues/new?template=question.yml)**  
+            Got questions?
+
+            </td>
+            <td align="center" width="25%">
+
             ### 💬
             **[Discussions](https://github.com/${{ github.repository }}/discussions)**  
             Community chat
-            
+
             </td>
             </tr>
             </table>
             
             ---
-            
-            ## 🌟 Support the Project
-            
-            If you find MuXolotl useful:
-            
-            - ⭐ **Star this repository** (it really helps!)
-            - 🐛 **Report bugs** to make it better
-            - 📢 **Share** with friends and colleagues
-            - 💻 **Contribute** code or translations
-            - 💝 **Sponsor** development (if you're feeling generous!)
-            
-            ---
-            
-            ## 📜 Changelog
-            
-            See what's new in this release: [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)
-            
-            ---
-            
-            <div align="center">
             
             ### Built with ❤️ using
             
@@ -512,7 +529,7 @@ jobs:
             
             **License**: [GPL v2](https://github.com/${{ github.repository }}/blob/main/LICENSE.GPL) / [LGPL v2.1](https://github.com/${{ github.repository }}/blob/main/LICENSE.LGPL)
             
-            **Copyright © 2024** • Made with 🦎 by the MuXolotl team
+            **Copyright © 2025** • Made with 🦎 by the MuXolotl team
             
             </div>
           releaseDraft: false
