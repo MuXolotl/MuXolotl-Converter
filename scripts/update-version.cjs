@@ -14,37 +14,30 @@ if (!/^\d+\.\d+\.\d+$/.test(version)) {
 
 console.log(`\n📦 Synchronizing version: ${version}\n`);
 
-// Update package.json
 const packageJsonPath = path.join(__dirname, '..', 'package.json');
 const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
 packageJson.version = version;
 fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2) + '\n');
 console.log('✅ Updated package.json');
 
-// Update Cargo.toml
 const cargoTomlPath = path.join(__dirname, '..', 'src-tauri', 'Cargo.toml');
 let cargoToml = fs.readFileSync(cargoTomlPath, 'utf8');
 cargoToml = cargoToml.replace(/^version = ".*"$/m, `version = "${version}"`);
 fs.writeFileSync(cargoTomlPath, cargoToml);
 console.log('✅ Updated src-tauri/Cargo.toml');
 
-// Update tauri.conf.json
 const tauriConfPath = path.join(__dirname, '..', 'src-tauri', 'tauri.conf.json');
 const tauriConf = JSON.parse(fs.readFileSync(tauriConfPath, 'utf8'));
 tauriConf.package.version = version;
 fs.writeFileSync(tauriConfPath, JSON.stringify(tauriConf, null, 2) + '\n');
 console.log('✅ Updated src-tauri/tauri.conf.json');
 
-// Update README.md badges
 const readmePath = path.join(__dirname, '..', 'README.md');
 let readme = fs.readFileSync(readmePath, 'utf8');
 
-const versionBadgeRegex = new RegExp(
-  '\```math
-!\```math
-Version\```\KATEX_INLINE_OPENhttps:\\/\\/img\\.shields\\.io\\/badge\\/version-[\\d.]+-green\\.svg\KATEX_INLINE_CLOSE\```',
-  'g'
-);
+const versionBadgeRegex = /```math
+\!```math
+Version```KATEX_INLINE_OPENhttps:\/\/img\.shields\.io\/badge\/version-[\d\.]+-green\.svgKATEX_INLINE_CLOSE```/g;
 readme = readme.replace(
   versionBadgeRegex,
   `[![Version](https://img.shields.io/badge/version-${version}-green.svg)]`
