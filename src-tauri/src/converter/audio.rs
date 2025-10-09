@@ -1,17 +1,26 @@
 use anyhow::{Context, Result};
 use std::sync::Arc;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use tokio::process::Child;
 use tokio::sync::Mutex;
 use tauri::Manager;
 use crate::formats::audio;
 use crate::media;
+use crate::types::ConversionSettings;
+
+fn normalize_path(path: &str) -> String {
+    PathBuf::from(path)
+        .to_str()
+        .unwrap_or(path)
+        .to_string()
+}
 
 fn add_quality_params(
     args: &mut Vec<String>,
     format_info: &audio::AudioFormat,
     quality: &str,
-    settings: &serde_json::Value,
+    settings: &ConversionSettings,
 ) {
     if format_info.lossy {
         match format_info.codec.as_str() {
@@ -33,8 +42,8 @@ fn add_quality_params(
     }
 }
 
-fn get_bitrate(format_info: &audio::AudioFormat, quality: &str, settings: &serde_json::Value) -> u32 {
-    if let Some(br) = settings.get("bitrate").and_then(|b| b.as_u64()).map(|br| br as u32) {
+fn get_bitrate(format_info: &audio::AudioFormat, quality: &str, settings: &ConversionSettings) -> u32 {
+    if let Some(br) = settings.get_bitrate() {
         if format_info.validate_bitrate(br).is_ok() {
             return br;
         }
@@ -48,13 +57,9 @@ fn get_bitrate(format_info: &audio::AudioFormat, quality: &str, settings: &serde
 fn add_audio_params(
     args: &mut Vec<String>,
     format_info: &audio::AudioFormat,
-    settings: &serde_json::Value,
+    settings: &ConversionSettings,
 ) {
-    let sample_rate = settings
-        .get("sampleRate")
-        .and_then(|sr| sr.as_u64())
-        .map(|sr| sr as u32)
-        .unwrap_or(format_info.recommended_sample_rate);
+    let sample_rate = settings.get_sample_rate();
 
     let final_sample_rate = if format_info.supports_sample_rate(sample_rate) {
         sample_rate
@@ -69,11 +74,7 @@ fn add_audio_params(
 
     args.extend_from_slice(&["-ar".to_string(), final_sample_rate.to_string()]);
 
-    let channels = settings
-        .get("channels")
-        .and_then(|ch| ch.as_u64())
-        .map(|ch| ch as u32)
-        .unwrap_or(2);
+    let channels = settings.get_channels();
 
     let final_channels = if format_info.supports_channels(channels) {
         channels
@@ -101,11 +102,14 @@ fn build_base_args(
     output: &str,
     format_info: &audio::AudioFormat,
     quality: &str,
-    settings: &serde_json::Value,
+    settings: &ConversionSettings,
 ) -> Vec<String> {
+    let normalized_input = normalize_path(input);
+    let normalized_output = normalize_path(output);
+
     let mut args = vec![
         "-i".to_string(),
-        input.to_string(),
+        normalized_input,
         "-vn".to_string(),
         "-c:a".to_string(),
         format_info.get_ffmpeg_codec(),
@@ -126,7 +130,7 @@ fn build_base_args(
         "-progress".to_string(),
         "pipe:1".to_string(),
         "-y".to_string(),
-        output.to_string(),
+        normalized_output,
     ]);
 
     args
@@ -137,14 +141,10 @@ pub async fn convert(
     input: &str,
     output: &str,
     format: &str,
-    settings: serde_json::Value,
+    settings: ConversionSettings,
     processes: Arc<Mutex<HashMap<String, Child>>>,
 ) -> Result<String> {
-    let task_id = settings
-        .get("taskId")
-        .and_then(|v| v.as_str())
-        .unwrap_or("unknown")
-        .to_string();
+    let task_id = settings.task_id();
 
     #[cfg(debug_assertions)]
     println!("🎵 Converting audio: {} -> {} (task: {})", input, output, task_id);
@@ -155,7 +155,7 @@ pub async fn convert(
     let app_handle = window.app_handle();
     let media_info = media::detect_media_type(&app_handle, input).await?;
 
-    let quality = settings.get("quality").and_then(|q| q.as_str()).unwrap_or("medium");
+    let quality = settings.quality_str();
     let args = build_base_args(input, output, &format_info, quality, &settings);
 
     super::spawn_ffmpeg(window, task_id, media_info.duration, args, processes).await
@@ -166,14 +166,10 @@ pub async fn extract_from_video(
     input: &str,
     output: &str,
     format: &str,
-    settings: serde_json::Value,
+    settings: ConversionSettings,
     processes: Arc<Mutex<HashMap<String, Child>>>,
 ) -> Result<String> {
-    let task_id = settings
-        .get("taskId")
-        .and_then(|v| v.as_str())
-        .unwrap_or("unknown")
-        .to_string();
+    let task_id = settings.task_id();
 
     #[cfg(debug_assertions)]
     println!("🎵 Extracting audio from video: {} -> {} (task: {})", input, output, task_id);
@@ -193,9 +189,12 @@ pub async fn extract_from_video(
         println!("⚠️ Format '{}' may not be ideal for audio extraction", format_info.extension);
     }
 
-    let mut args = vec!["-i".to_string(), input.to_string(), "-vn".to_string()];
+    let normalized_input = normalize_path(input);
+    let normalized_output = normalize_path(output);
 
-    let copy_audio = settings.get("copyAudio").and_then(|c| c.as_bool()).unwrap_or(false);
+    let mut args = vec!["-i".to_string(), normalized_input, "-vn".to_string()];
+
+    let copy_audio = settings.copy_audio;
     let source_codec = &media_info.audio_streams[0].codec;
 
     if copy_audio && format_info.can_copy_codec(source_codec) {
@@ -214,7 +213,7 @@ pub async fn extract_from_video(
             args.extend_from_slice(&["-f".to_string(), container]);
         }
 
-        let quality = settings.get("quality").and_then(|q| q.as_str()).unwrap_or("medium");
+        let quality = settings.quality_str();
         add_quality_params(&mut args, &format_info, quality, &settings);
         add_audio_params(&mut args, &format_info, &settings);
 
@@ -227,7 +226,7 @@ pub async fn extract_from_video(
         "-progress".to_string(),
         "pipe:1".to_string(),
         "-y".to_string(),
-        output.to_string(),
+        normalized_output,
     ]);
 
     super::spawn_ffmpeg(window, task_id, media_info.duration, args, processes).await

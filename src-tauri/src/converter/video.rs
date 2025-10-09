@@ -1,12 +1,21 @@
 use anyhow::{Context, Result};
 use std::sync::Arc;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use tokio::process::Child;
 use tokio::sync::Mutex;
 use tauri::Manager;
 use crate::formats::video;
 use crate::media;
 use crate::gpu::{GpuInfo, GpuVendor};
+use crate::types::ConversionSettings;
+
+fn normalize_path(path: &str) -> String {
+    PathBuf::from(path)
+        .to_str()
+        .unwrap_or(path)
+        .to_string()
+}
 
 fn add_gpu_params(args: &mut Vec<String>, vendor: &GpuVendor) {
     match vendor {
@@ -35,12 +44,11 @@ fn get_video_codec(
     format_info: &video::VideoFormat,
     gpu_info: &GpuInfo,
     use_gpu: bool,
-    settings: &serde_json::Value,
+    settings: &ConversionSettings,
 ) -> String {
     settings
-        .get("videoCodec")
-        .and_then(|c| c.as_str())
-        .map(|s| s.to_string())
+        .video_codec
+        .clone()
         .unwrap_or_else(|| {
             let vendor = match gpu_info.vendor {
                 GpuVendor::Nvidia => "nvidia",
@@ -176,23 +184,20 @@ fn add_resolution_params(
     args: &mut Vec<String>,
     filter_chain: &mut Vec<String>,
     format: &str,
-    settings: &serde_json::Value,
+    settings: &ConversionSettings,
     media_info: &media::MediaInfo,
 ) {
     let (target_width, target_height) = match format {
         "dv" | "vob" => {
             let input_height = media_info.video_streams.get(0).map(|s| s.height).unwrap_or(576);
             if input_height <= 480 {
-                (Some(720u64), Some(480u64))
+                (Some(720u32), Some(480u32))
             } else {
-                (Some(720u64), Some(576u64))
+                (Some(720u32), Some(576u32))
             }
         }
-        "3gp" => (Some(352u64), Some(288u64)),
-        _ => (
-            settings.get("width").and_then(|w| w.as_u64()),
-            settings.get("height").and_then(|h| h.as_u64()),
-        ),
+        "3gp" => (Some(352u32), Some(288u32)),
+        _ => (settings.width, settings.height),
     };
 
     if let (Some(width), Some(height)) = (target_width, target_height) {
@@ -204,7 +209,7 @@ fn add_resolution_params(
     if matches!(format, "dv" | "vob") {
         let target_fps = if target_height == Some(480) { "30000/1001" } else { "25" };
         args.extend_from_slice(&["-r".to_string(), target_fps.to_string()]);
-    } else if let Some(fps) = settings.get("fps").and_then(|f| f.as_u64()) {
+    } else if let Some(fps) = settings.fps {
         args.extend_from_slice(&["-r".to_string(), fps.to_string()]);
     }
 }
@@ -214,23 +219,19 @@ fn can_copy_audio_codec(input_codec: &str, format_info: &video::VideoFormat) -> 
         return false;
     }
 
-    // Check if input codec is compatible with container
     let normalized_input = input_codec.to_lowercase();
     
     for supported in &format_info.audio_codecs {
         let normalized_supported = supported.to_lowercase();
         
-        // Direct match
         if normalized_input == normalized_supported {
             return true;
         }
         
-        // Codec family matches
         if normalized_input.contains(&normalized_supported) || normalized_supported.contains(&normalized_input) {
             return true;
         }
         
-        // Special cases
         if (supported == "aac" && normalized_input.starts_with("aac")) ||
            (supported == "mp3" && normalized_input.contains("mp3")) ||
            (supported == "opus" && normalized_input.contains("opus")) ||
@@ -246,7 +247,7 @@ fn can_copy_audio_codec(input_codec: &str, format_info: &video::VideoFormat) -> 
 fn handle_audio_codec(
     args: &mut Vec<String>,
     format_info: &video::VideoFormat,
-    settings: &serde_json::Value,
+    settings: &ConversionSettings,
     media_info: &media::MediaInfo,
 ) {
     if media_info.audio_streams.is_empty() || format_info.audio_codecs.is_empty() {
@@ -254,7 +255,7 @@ fn handle_audio_codec(
         return;
     }
 
-    if let Some(audio_codec) = settings.get("audioCodec").and_then(|c| c.as_str()) {
+    if let Some(ref audio_codec) = settings.audio_codec {
         if format_info.supports_audio_codec(audio_codec) {
             args.extend_from_slice(&["-c:a".to_string(), audio_codec.to_string()]);
             return;
@@ -265,7 +266,6 @@ fn handle_audio_codec(
 
     let input_audio_codec = media_info.audio_streams.get(0).map(|s| s.codec.as_str()).unwrap_or("");
 
-    // Only copy if truly compatible with container
     if can_copy_audio_codec(input_audio_codec, format_info) {
         args.extend_from_slice(&["-c:a".to_string(), "copy".to_string()]);
         #[cfg(debug_assertions)]
@@ -312,14 +312,10 @@ pub async fn convert(
     output: &str,
     format: &str,
     gpu_info: GpuInfo,
-    settings: serde_json::Value,
+    settings: ConversionSettings,
     processes: Arc<Mutex<HashMap<String, Child>>>,
 ) -> Result<String> {
-    let task_id = settings
-        .get("taskId")
-        .and_then(|v| v.as_str())
-        .unwrap_or("unknown")
-        .to_string();
+    let task_id = settings.task_id();
 
     #[cfg(debug_assertions)]
     println!("🎬 Converting video: {} -> {} (task: {})", input, output, task_id);
@@ -331,7 +327,7 @@ pub async fn convert(
     let media_info = media::detect_media_type(&app_handle, input).await?;
 
     let use_gpu = gpu_info.available && !matches!(format, "dv" | "vob");
-    let quality = settings.get("quality").and_then(|q| q.as_str()).unwrap_or("medium");
+    let quality = settings.quality_str();
 
     let mut args = Vec::new();
     let mut filter_chain = Vec::new();
@@ -340,7 +336,10 @@ pub async fn convert(
         add_gpu_params(&mut args, &gpu_info.vendor);
     }
 
-    args.extend_from_slice(&["-i".to_string(), input.to_string()]);
+    let normalized_input = normalize_path(input);
+    let normalized_output = normalize_path(output);
+
+    args.extend_from_slice(&["-i".to_string(), normalized_input]);
 
     let video_codec = get_video_codec(&format_info, &gpu_info, use_gpu, &settings);
     
@@ -373,7 +372,7 @@ pub async fn convert(
         "-progress".to_string(),
         "pipe:1".to_string(),
         "-y".to_string(),
-        output.to_string(),
+        normalized_output,
     ]);
 
     super::spawn_ffmpeg(window, task_id, media_info.duration, args, processes).await

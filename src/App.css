@@ -17,6 +17,12 @@ body {
   overflow: hidden;
 }
 
+/* Отключаем анимации когда окно неактивно */
+body:not(:focus-within) * {
+  animation-play-state: paused !important;
+  transition: none !important;
+}
+
 #root {
   width: 100vw;
   height: 100vh;
@@ -172,4 +178,31 @@ select:focus {
 
 [data-dropdown-scroll]::-webkit-scrollbar-thumb:hover {
   background: rgba(139, 92, 246, 0.8);
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.4);
+  border-radius: 3px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.6);
+}
+
+/* Уменьшаем частоту обновления анимаций */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

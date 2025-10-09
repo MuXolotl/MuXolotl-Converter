@@ -3,6 +3,7 @@ import type { FileItem } from '@/types';
 const STORAGE_KEY = 'muxolotl_queue';
 const OUTPUT_FOLDER_KEY = 'muxolotl_output_folder';
 const STORAGE_VERSION = 1;
+const MAX_QUEUE_AGE_DAYS = 7;
 
 interface StorageData {
   version: number;
@@ -12,7 +13,6 @@ interface StorageData {
 
 export const saveQueue = (files: FileItem[]): void => {
   try {
-    // Don't save processing files (they will be reset to pending)
     const filesToSave = files.map(file =>
       file.status === 'processing' ? { ...file, status: 'pending' as const, progress: null } : file
     );
@@ -36,17 +36,15 @@ export const loadQueue = (): FileItem[] => {
 
     const data: StorageData = JSON.parse(saved);
 
-    // Version check
     if (data.version !== STORAGE_VERSION) {
       console.warn('Queue version mismatch, clearing...');
       clearQueue();
       return [];
     }
 
-    // Don't load if older than 7 days
-    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-    if (data.timestamp < weekAgo) {
-      console.info('Queue is older than 7 days, clearing...');
+    const maxAge = Date.now() - MAX_QUEUE_AGE_DAYS * 24 * 60 * 60 * 1000;
+    if (data.timestamp < maxAge) {
+      console.info(`Queue older than ${MAX_QUEUE_AGE_DAYS} days, clearing...`);
       clearQueue();
       return [];
     }
@@ -61,6 +59,7 @@ export const loadQueue = (): FileItem[] => {
 export const clearQueue = (): void => {
   try {
     localStorage.removeItem(STORAGE_KEY);
+    console.log('🗑️ Cleared queue from storage');
   } catch (error) {
     console.error('Failed to clear queue:', error);
   }
@@ -83,21 +82,11 @@ export const loadOutputFolder = (): string => {
   try {
     const saved = localStorage.getItem(OUTPUT_FOLDER_KEY);
     if (saved) {
-      console.log('✅ Restored output folder:', saved);
-      return saved;
+      console.log('✅ Loaded output folder:', saved);
     }
-    return '';
+    return saved || '';
   } catch (error) {
     console.error('Failed to load output folder:', error);
     return '';
-  }
-};
-
-export const clearOutputFolder = (): void => {
-  try {
-    localStorage.removeItem(OUTPUT_FOLDER_KEY);
-    console.log('🗑️ Cleared output folder');
-  } catch (error) {
-    console.error('Failed to clear output folder:', error);
   }
 };

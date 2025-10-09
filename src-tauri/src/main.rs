@@ -9,6 +9,7 @@ mod formats;
 mod converter;
 mod validator;
 mod utils;
+mod types;
 
 use tauri::Manager;
 use std::sync::Arc;
@@ -41,7 +42,6 @@ fn get_binary_path(app_handle: &tauri::AppHandle, binary_name: &str) -> Result<P
     let full_name = format!("{}{}", binary_name, BINARY_SUFFIX);
     let resource_path = format!("binaries/{}", full_name);
 
-    // Checking bundled binary
     if let Some(sidecar_path) = app_handle.path_resolver().resolve_resource(&resource_path) {
         if sidecar_path.exists() {
             #[cfg(debug_assertions)]
@@ -50,7 +50,6 @@ fn get_binary_path(app_handle: &tauri::AppHandle, binary_name: &str) -> Result<P
         }
     }
 
-    // Dev mode
     #[cfg(debug_assertions)]
     {
         let dev_path = std::env::current_dir()
@@ -71,7 +70,7 @@ fn get_binary_path(app_handle: &tauri::AppHandle, binary_name: &str) -> Result<P
     }
 
     Err(format!(
-        "{} binary '{}' not found. Please ensure binaries are in 'src-tauri/binaries/' directory.",
+        "{} binary not found. Please place '{}' in 'src-tauri/binaries/' directory.",
         binary_name, full_name
     ))
 }
@@ -109,7 +108,6 @@ fn main() {
             let processes = state.active_processes.clone();
             let window_for_cleanup = window.clone();
 
-            // Cleanup FFmpeg processes on window close
             window.on_window_event(move |event| {
                 if let tauri::WindowEvent::CloseRequested { .. } = event {
                     let processes = processes.clone();
@@ -133,13 +131,11 @@ fn main() {
                 }
             });
 
-            // Asynchronous GPU initialization
             tauri::async_runtime::spawn(async move {
                 let gpu_info = GPU_CACHE.get_or_init(|| async { gpu::detect_gpu().await }).await;
                 let _ = window.emit("gpu-detected", &gpu_info);
             });
 
-            // Preloading formats
             tauri::async_runtime::spawn(async {
                 let _ = AUDIO_FORMATS_CACHE.get_or_init(|| async { formats::audio::get_all_formats() }).await;
                 let _ = VIDEO_FORMATS_CACHE.get_or_init(|| async { formats::video::get_all_formats() }).await;
@@ -156,19 +152,8 @@ async fn check_ffmpeg(app_handle: tauri::AppHandle) -> Result<bool, String> {
     #[cfg(debug_assertions)]
     println!("🔍 Checking for bundled FFmpeg and FFprobe...");
 
-    let ffmpeg_path = get_ffmpeg_path(&app_handle).map_err(|e| {
-        format!(
-            "FFmpeg not found: {}\n\n📦 Please download FFmpeg binaries and place them in 'src-tauri/binaries/' directory.",
-            e
-        )
-    })?;
-
-    let ffprobe_path = get_ffprobe_path(&app_handle).map_err(|e| {
-        format!(
-            "FFprobe not found: {}\n\n📦 Please download FFprobe binaries and place them in 'src-tauri/binaries/' directory.",
-            e
-        )
-    })?;
+    let ffmpeg_path = get_ffmpeg_path(&app_handle)?;
+    let ffprobe_path = get_ffprobe_path(&app_handle)?;
 
     let ffmpeg_path_clone = ffmpeg_path.clone();
     let ffmpeg_result = tokio::task::spawn_blocking(move || {
@@ -179,7 +164,7 @@ async fn check_ffmpeg(app_handle: tauri::AppHandle) -> Result<bool, String> {
         cmd.output()
     })
     .await
-    .map_err(|e| format!("Failed to spawn FFmpeg check task: {}", e))?;
+    .map_err(|e| format!("Failed to check FFmpeg: {}", e))?;
 
     let ffprobe_path_clone = ffprobe_path.clone();
     let ffprobe_result = tokio::task::spawn_blocking(move || {
@@ -190,7 +175,7 @@ async fn check_ffmpeg(app_handle: tauri::AppHandle) -> Result<bool, String> {
         cmd.output()
     })
     .await
-    .map_err(|e| format!("Failed to spawn FFprobe check task: {}", e))?;
+    .map_err(|e| format!("Failed to check FFprobe: {}", e))?;
 
     match (ffmpeg_result, ffprobe_result) {
         (Ok(ff), Ok(fp)) if ff.status.success() && fp.status.success() => {
@@ -199,25 +184,16 @@ async fn check_ffmpeg(app_handle: tauri::AppHandle) -> Result<bool, String> {
             Ok(true)
         }
         (Ok(ff), _) if !ff.status.success() => Err(format!(
-            "FFmpeg binary is corrupted or incompatible.\n\nError: {}\n\n📦 Please re-download FFmpeg binaries.",
+            "FFmpeg binary is corrupted. Error: {}",
             String::from_utf8_lossy(&ff.stderr)
         )),
         (_, Ok(fp)) if !fp.status.success() => Err(format!(
-            "FFprobe binary is corrupted or incompatible.\n\nError: {}\n\n📦 Please re-download FFprobe binaries.",
+            "FFprobe binary is corrupted. Error: {}",
             String::from_utf8_lossy(&fp.stderr)
         )),
-        (Err(e), _) => Err(format!(
-            "Failed to execute FFmpeg: {}\n\n📦 Please re-download FFmpeg binaries.",
-            e
-        )),
-        (_, Err(e)) => Err(format!(
-            "Failed to execute FFprobe: {}\n\n📦 Please re-download FFprobe binaries.",
-            e
-        )),
-        _ => Err(
-            "FFmpeg/FFprobe binaries may be corrupted.\n\n📦 Please re-download the binaries."
-                .to_string(),
-        ),
+        (Err(e), _) => Err(format!("Failed to execute FFmpeg: {}", e)),
+        (_, Err(e)) => Err(format!("Failed to execute FFprobe: {}", e)),
+        _ => Err("FFmpeg/FFprobe binaries may be corrupted.".to_string()),
     }
 }
 
@@ -354,6 +330,9 @@ async fn convert_audio(
     format: String,
     settings: serde_json::Value,
 ) -> Result<String, String> {
+    let settings: types::ConversionSettings = serde_json::from_value(settings)
+        .map_err(|e| format!("Invalid settings: {}", e))?;
+
     converter::audio::convert(window, &input, &output, &format, settings, state.active_processes.clone())
         .await
         .map_err(|e| e.to_string())
@@ -369,6 +348,9 @@ async fn convert_video(
     gpu_info: gpu::GpuInfo,
     settings: serde_json::Value,
 ) -> Result<String, String> {
+    let settings: types::ConversionSettings = serde_json::from_value(settings)
+        .map_err(|e| format!("Invalid settings: {}", e))?;
+
     converter::video::convert(window, &input, &output, &format, gpu_info, settings, state.active_processes.clone())
         .await
         .map_err(|e| e.to_string())
@@ -383,6 +365,9 @@ async fn extract_audio(
     format: String,
     settings: serde_json::Value,
 ) -> Result<String, String> {
+    let settings: types::ConversionSettings = serde_json::from_value(settings)
+        .map_err(|e| format!("Invalid settings: {}", e))?;
+
     converter::audio::extract_from_video(window, &input, &output, &format, settings, state.active_processes.clone())
         .await
         .map_err(|e| e.to_string())

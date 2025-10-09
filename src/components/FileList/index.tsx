@@ -197,6 +197,7 @@ const FileList: React.FC<FileListProps> = ({
                 key={file.id}
                 file={file}
                 onRemove={() => onRemove(file.id)}
+                onRetry={() => onRetry(file.id)}
                 onExpand={() => onToggleCompactCard(file.id)}
               />
             )

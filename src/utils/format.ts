@@ -1,22 +1,7 @@
-import type { AudioFormat, VideoFormat } from '@/types';
+import type { MediaType } from '@/types';
 
-export const getDefaultFormat = (mediaType: string): string => {
+export const getDefaultFormat = (mediaType: MediaType | string): string => {
   return mediaType === 'audio' ? 'mp3' : 'mp4';
-};
-
-export const isAudioFormat = (format: AudioFormat | VideoFormat): format is AudioFormat => {
-  return 'lossy' in format;
-};
-
-export const isVideoFormat = (format: AudioFormat | VideoFormat): format is VideoFormat => {
-  return 'video_codecs' in format;
-};
-
-export const getFormatByExtension = (
-  formats: (AudioFormat | VideoFormat)[],
-  extension: string
-): AudioFormat | VideoFormat | undefined => {
-  return formats.find(f => f.extension === extension);
 };
 
 export const truncatePath = (path: string, maxLength: number = 25): string => {

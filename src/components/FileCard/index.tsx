@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext, useCallback, useRef } from 'react';
-import { X, Music, Minimize2 } from 'lucide-react';
+import { X } from 'lucide-react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { ConversionContext } from '@/App';
 import FileInfo from './FileInfo';
@@ -148,23 +148,39 @@ const FileCard: React.FC<FileCardProps> = ({
     setTimeout(() => setIsRetrying(false), 500);
   }, [isRetrying, onRetry]);
 
+  // Обработка клика по карточке для сворачивания
+  const handleCardClick = useCallback((e: React.MouseEvent) => {
+    // Игнорируем клики по интерактивным элементам
+    const target = e.target as HTMLElement;
+    const isInteractive = 
+      target.tagName === 'BUTTON' ||
+      target.tagName === 'SELECT' ||
+      target.tagName === 'INPUT' ||
+      target.closest('button') ||
+      target.closest('select') ||
+      target.closest('input');
+
+    if (!isInteractive && onCollapse) {
+      onCollapse();
+    }
+  }, [onCollapse]);
+
   return (
-    <div className="glass p-4 relative group overflow-visible" style={{ isolation: 'isolate' }}>
+    <div 
+      className="glass p-4 relative group overflow-visible cursor-pointer" 
+      style={{ isolation: 'isolate' }}
+      onClick={handleCardClick}
+    >
       {file.status === 'processing' && file.progress && <ProgressBar progress={file.progress.percent} />}
 
+      {/* Только кнопка Remove в углу для pending */}
       {file.status === 'pending' && (
-        <div className="absolute top-3 right-3 flex items-center gap-2 z-10">
-          {onCollapse && (
-            <button
-              onClick={onCollapse}
-              className="p-1.5 rounded-full bg-blue-500/20 hover:bg-blue-500/40 transition-colors"
-              title="Collapse card"
-            >
-              <Minimize2 size={16} className="text-blue-400" />
-            </button>
-          )}
+        <div className="absolute top-3 right-3 z-10">
           <button
-            onClick={onRemove}
+            onClick={e => {
+              e.stopPropagation();
+              onRemove();
+            }}
             className="p-1.5 rounded-full bg-red-500/20 hover:bg-red-500/40 transition-colors"
             title="Remove from queue"
           >
@@ -222,6 +238,13 @@ const FileCard: React.FC<FileCardProps> = ({
           )}
         </div>
       </div>
+
+      {/* Hint для пользователя */}
+      {onCollapse && (
+        <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-50 text-white/40 text-[10px] italic transition-opacity pointer-events-none">
+          Click to collapse
+        </div>
+      )}
     </div>
   );
 };
