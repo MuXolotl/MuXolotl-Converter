@@ -70,8 +70,7 @@ jobs:
           - platform: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             name: Linux x64
-            bundles: "appimage,deb"
-            appimage_suffix: ".AppImage"
+            bundles: "deb"
             deb_suffix: ".deb"
 
           - platform: macos-latest
@@ -329,7 +328,7 @@ jobs:
             
             | File | Format | Distribution |
             |------|--------|--------------|
-            | [`MuXolotl-Converter-${{ needs.prepare.outputs.version }}-linux-x64.AppImage`](#) | **AppImage** | ✅ **Universal** (any distro) |
+            | _`Not yet available`_ | **AppImage** | ✅ **Universal** (any distro) |
             | [`MuXolotl-Converter-${{ needs.prepare.outputs.version }}-linux-x64.deb`](#) | **DEB Package** | Debian, Ubuntu, Mint, Pop!_OS |
             
             </div>
@@ -559,11 +558,6 @@ jobs:
           
           # Linux
           if [ "${{ matrix.platform }}" == "ubuntu-22.04" ]; then
-            if [ -d "$BUNDLE_DIR/appimage" ]; then
-              for file in "$BUNDLE_DIR/appimage"/*.AppImage; do
-                [ -f "$file" ] && mv "$file" "$BUNDLE_DIR/appimage/MuXolotl-Converter-${VERSION}-linux-x64.AppImage"
-              done
-            fi
             if [ -d "$BUNDLE_DIR/deb" ]; then
               for file in "$BUNDLE_DIR/deb"/*.deb; do
                 [ -f "$file" ] && mv "$file" "$BUNDLE_DIR/deb/MuXolotl-Converter-${VERSION}-linux-x64.deb"
@@ -594,7 +588,7 @@ jobs:
         with:
           tag_name: ${{ needs.prepare.outputs.tag_name }}
           files: |
-            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.{msi,exe,AppImage,deb,dmg}
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.{msi,exe,deb,dmg}
             ffmpeg-*.zip
             ffmpeg-*.tar.gz
         env:
