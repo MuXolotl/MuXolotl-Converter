@@ -40,7 +40,7 @@ jobs:
           node-version: 20
 
       - name: 🔄 Sync version to all files
-        run: node scripts/update-version.js
+        run: node scripts/update-version.cjs
 
       - name: 💾 Commit synchronized files
         run: |

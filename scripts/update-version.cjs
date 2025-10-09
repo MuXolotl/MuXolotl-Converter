@@ -3,7 +3,6 @@
 const fs = require('fs');
 const path = require('path');
 
-// Read version from VERSION file (single source of truth)
 const versionFilePath = path.join(__dirname, '..', 'VERSION');
 const version = fs.readFileSync(versionFilePath, 'utf8').trim();
 
@@ -40,10 +39,12 @@ console.log('✅ Updated src-tauri/tauri.conf.json');
 const readmePath = path.join(__dirname, '..', 'README.md');
 let readme = fs.readFileSync(readmePath, 'utf8');
 
-// Replace version badge
-const versionBadgeRegex = /```math
-!```math
-Version```KATEX_INLINE_OPENhttps:\/\/img\.shields\.io\/badge\/version-[\d.]+-green\.svgKATEX_INLINE_CLOSE```/g;
+const versionBadgeRegex = new RegExp(
+  '\```math
+!\```math
+Version\```\KATEX_INLINE_OPENhttps:\\/\\/img\\.shields\\.io\\/badge\\/version-[\\d.]+-green\\.svg\KATEX_INLINE_CLOSE\```',
+  'g'
+);
 readme = readme.replace(
   versionBadgeRegex,
   `[![Version](https://img.shields.io/badge/version-${version}-green.svg)]`

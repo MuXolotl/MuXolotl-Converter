@@ -10,7 +10,7 @@
     "tauri": "tauri",
     "analyze": "vite build --mode analyze",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "version:sync": "node scripts/update-version.js"
+    "version:sync": "node scripts/update-version.cjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^1.5.6",
