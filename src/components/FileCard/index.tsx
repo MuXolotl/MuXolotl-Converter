@@ -78,24 +78,29 @@ const FileCard: React.FC<FileCardProps> = ({
   }, [file.mediaInfo, file.status, file.settings.extractAudioOnly]);
 
   useEffect(() => {
-    if (file.status === 'pending' && file.mediaInfo) {
-      if (validationTimeoutRef.current) {
-        clearTimeout(validationTimeoutRef.current);
-      }
-
-      validationTimeoutRef.current = setTimeout(() => {
-        const mediaType = file.settings.extractAudioOnly ? 'audio' : file.mediaInfo.media_type || 'unknown';
-
-        invoke<ValidationResult>('validate_conversion', {
-          inputFormat: file.mediaInfo.format_name || '',
-          outputFormat: file.outputFormat,
-          mediaType: mediaType,
-          settings: file.settings,
-        })
-          .then(setValidation)
-          .catch(error => console.error('Validation failed:', error));
-      }, VALIDATION_DEBOUNCE_MS);
+    if (file.status !== 'pending' || !file.mediaInfo) {
+      return;
     }
+
+    if (validationTimeoutRef.current) {
+      clearTimeout(validationTimeoutRef.current);
+    }
+
+    validationTimeoutRef.current = setTimeout(() => {
+      const mediaInfo = file.mediaInfo;
+      if (!mediaInfo) return;
+
+      const mediaType = file.settings.extractAudioOnly ? 'audio' : mediaInfo.media_type || 'unknown';
+
+      invoke<ValidationResult>('validate_conversion', {
+        inputFormat: mediaInfo.format_name || '',
+        outputFormat: file.outputFormat,
+        mediaType: mediaType,
+        settings: file.settings,
+      })
+        .then(setValidation)
+        .catch(error => console.error('Validation failed:', error));
+    }, VALIDATION_DEBOUNCE_MS);
 
     return () => {
       if (validationTimeoutRef.current) {
