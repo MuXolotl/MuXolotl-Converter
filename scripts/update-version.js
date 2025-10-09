@@ -39,12 +39,16 @@ console.log('✅ Updated src-tauri/tauri.conf.json');
 // Update README.md badges
 const readmePath = path.join(__dirname, '..', 'README.md');
 let readme = fs.readFileSync(readmePath, 'utf8');
-readme = readme.replace(
-  /```math
+
+// Replace version badge
+const versionBadgeRegex = /```math
 !```math
-Version```KATEX_INLINE_OPENhttps:\/\/img\.shields\.io\/badge\/version-[^-]+-green\.svgKATEX_INLINE_CLOSE```/,
+Version```KATEX_INLINE_OPENhttps:\/\/img\.shields\.io\/badge\/version-[\d.]+-green\.svgKATEX_INLINE_CLOSE```/g;
+readme = readme.replace(
+  versionBadgeRegex,
   `[![Version](https://img.shields.io/badge/version-${version}-green.svg)]`
 );
+
 fs.writeFileSync(readmePath, readme);
 console.log('✅ Updated README.md version badge');
 
