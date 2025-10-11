@@ -137,7 +137,7 @@ typical_use = "Apple ecosystem, iTunes"
 lossy = false
 bitrate_range = []
 recommended_bitrate = 0
-sample_rates = [8000, 16000, 22050, 24000, 32000, 44100, 48000, 96000]
+sample_rates = [8000, 16000, 22050, 24000, 32000, 44100, 48000, 96000, 192000]
 recommended_sample_rate = 44100
 channels_support = [1, 2, 6, 8]
 special_params = ["-f", "mp4"]
@@ -149,14 +149,14 @@ category = "standard"
 codec = "wmav2"
 container = "asf"
 stability = "requiressetup"
-description = "Microsoft's audio format"
+description = "Microsoft's audio format (stereo only, for multichannel use WMA Pro)"
 typical_use = "Windows applications, legacy systems"
 lossy = true
 bitrate_range = [64, 320]
 recommended_bitrate = 192
 sample_rates = [8000, 16000, 22050, 32000, 44100, 48000]
 recommended_sample_rate = 44100
-channels_support = [1, 2, 6]
+channels_support = [1, 2]
 special_params = ["-strict", "-2"]
 
 [[format]]
@@ -188,7 +188,7 @@ typical_use = "Flexible audio archiving"
 lossy = false
 bitrate_range = []
 recommended_bitrate = 0
-sample_rates = [8000, 16000, 22050, 24000, 32000, 44100, 48000, 96000]
+sample_rates = [8000, 16000, 22050, 24000, 32000, 44100, 48000, 96000, 192000]
 recommended_sample_rate = 44100
 channels_support = [1, 2, 6, 8]
 special_params = []
@@ -196,23 +196,6 @@ special_params = []
 # ========================================
 # SPECIALIZED FORMATS
 # ========================================
-
-[[format]]
-extension = "ape"
-name = "APE (Monkey's Audio)"
-category = "specialized"
-codec = "ape"
-container = ""
-stability = "requiressetup"
-description = "High-compression lossless format"
-typical_use = "Audio archiving"
-lossy = false
-bitrate_range = []
-recommended_bitrate = 0
-sample_rates = [8000, 16000, 22050, 24000, 32000, 44100, 48000, 96000]
-recommended_sample_rate = 44100
-channels_support = [1, 2]
-special_params = []
 
 [[format]]
 extension = "tta"
@@ -255,14 +238,14 @@ category = "specialized"
 codec = "dca"
 container = ""
 stability = "requiressetup"
-description = "High-quality multichannel audio"
+description = "High-quality multichannel audio (FFmpeg encoder supports up to 5.1 @ 48 kHz)"
 typical_use = "Blu-ray, home theater"
 lossy = true
 bitrate_range = [754, 1509]
 recommended_bitrate = 1509
-sample_rates = [44100, 48000, 96000]
+sample_rates = [8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000]
 recommended_sample_rate = 48000
-channels_support = [1, 2, 6, 8]
+channels_support = [1, 2, 4, 6]
 special_params = ["-strict", "-2"]
 
 [[format]]
@@ -272,10 +255,10 @@ category = "specialized"
 codec = "libopencore_amrnb"
 container = ""
 stability = "requiressetup"
-description = "Optimized for speech, mobile telephony"
+description = "Optimized for speech, mobile telephony (4.75-12.2 kbps)"
 typical_use = "Voice recordings, GSM"
 lossy = true
-bitrate_range = [5, 12]
+bitrate_range = [5, 13]
 recommended_bitrate = 12
 sample_rates = [8000]
 recommended_sample_rate = 8000
@@ -308,9 +291,9 @@ extension = "ra"
 name = "RealAudio"
 category = "legacy"
 codec = "real_144"
-container = ""
+container = "rm"
 stability = "experimental"
-description = "Legacy streaming audio"
+description = "Legacy streaming audio (mono 8 kHz only)"
 typical_use = "Old internet radio archives"
 lossy = true
 bitrate_range = [8, 14]
@@ -374,20 +357,3 @@ sample_rates = [8000, 16000, 32000]
 recommended_sample_rate = 16000
 channels_support = [1, 2]
 special_params = ["-ar", "16000"]
-
-[[format]]
-extension = "tak"
-name = "TAK (Tom's Audio Kompressor)"
-category = "exotic"
-codec = "tak"
-container = ""
-stability = "experimental"
-description = "High-compression lossless"
-typical_use = "Audio archiving"
-lossy = false
-bitrate_range = []
-recommended_bitrate = 0
-sample_rates = [44100, 48000, 96000]
-recommended_sample_rate = 44100
-channels_support = [1, 2]
-special_params = []

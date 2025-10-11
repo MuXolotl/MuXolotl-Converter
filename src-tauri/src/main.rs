@@ -39,19 +39,10 @@ const BINARY_SUFFIX: &str = "-aarch64-apple-darwin";
 const BINARY_SUFFIX: &str = "-x86_64-unknown-linux-gnu";
 
 fn get_binary_path(app_handle: &tauri::AppHandle, binary_name: &str) -> Result<PathBuf, String> {
-    let full_name = format!("{}{}", binary_name, BINARY_SUFFIX);
-    let resource_path = format!("binaries/{}", full_name);
-
-    if let Some(sidecar_path) = app_handle.path_resolver().resolve_resource(&resource_path) {
-        if sidecar_path.exists() {
-            #[cfg(debug_assertions)]
-            println!("✅ Found bundled {} at: {:?}", binary_name, sidecar_path);
-            return Ok(sidecar_path);
-        }
-    }
-
     #[cfg(debug_assertions)]
     {
+        // DEV MODE: search in src-tauri/binaries/ with suffix
+        let full_name = format!("{}{}", binary_name, BINARY_SUFFIX);
         let dev_path = std::env::current_dir()
             .ok()
             .and_then(|p| {
@@ -67,12 +58,47 @@ fn get_binary_path(app_handle: &tauri::AppHandle, binary_name: &str) -> Result<P
             println!("✅ Found dev {} at: {:?}", binary_name, path);
             return Ok(path);
         }
+
+        Err(format!(
+            "{} binary not found in development. Please place '{}' in 'src-tauri/binaries/' directory.",
+            binary_name, full_name
+        ))
     }
 
-    Err(format!(
-        "{} binary not found. Please place '{}' in 'src-tauri/binaries/' directory.",
-        binary_name, full_name
-    ))
+    #[cfg(not(debug_assertions))]
+    {
+        // PRODUCTION MODE: search next to exe without suffix
+        let exe_dir = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+            .ok_or_else(|| "Failed to get executable directory".to_string())?;
+
+        #[cfg(target_os = "windows")]
+        let binary_file = format!("{}.exe", binary_name);
+        #[cfg(not(target_os = "windows"))]
+        let binary_file = binary_name.to_string();
+
+        let binary_path = exe_dir.join(&binary_file);
+
+        if binary_path.exists() {
+            return Ok(binary_path);
+        }
+
+        // Fallback: try bundled resources (if Tauri bundled them)
+        let full_name = format!("{}{}", binary_name, BINARY_SUFFIX);
+        let resource_path = format!("binaries/{}", full_name);
+        
+        if let Some(sidecar_path) = app_handle.path_resolver().resolve_resource(&resource_path) {
+            if sidecar_path.exists() {
+                return Ok(sidecar_path);
+            }
+        }
+
+        Err(format!(
+            "{} binary not found. Expected at: {:?}",
+            binary_name, binary_path
+        ))
+    }
 }
 
 pub fn get_ffmpeg_path(app_handle: &tauri::AppHandle) -> Result<PathBuf, String> {

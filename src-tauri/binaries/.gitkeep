@@ -1,0 +1,19 @@
+# FFmpeg and FFprobe binaries directory
+
+Place platform-specific binaries here:
+
+Windows:
+  - ffmpeg-x86_64-pc-windows-msvc.exe
+  - ffprobe-x86_64-pc-windows-msvc.exe
+
+macOS Intel:
+  - ffmpeg-x86_64-apple-darwin
+  - ffprobe-x86_64-apple-darwin
+
+macOS ARM (Apple Silicon):
+  - ffmpeg-aarch64-apple-darwin
+  - ffprobe-aarch64-apple-darwin
+
+Linux:
+  - ffmpeg-x86_64-unknown-linux-gnu
+  - ffprobe-x86_64-unknown-linux-gnu
