@@ -112,6 +112,7 @@ jobs:
 
       - name: 📁 Create binaries directory
         run: mkdir -p src-tauri/binaries
+        shell: bash
 
       - name: 📥 Download and setup FFmpeg (Windows)
         if: matrix.platform == 'windows-latest'
