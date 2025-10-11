@@ -204,61 +204,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: ${{ needs.prepare.outputs.tag_name }}
-          releaseName: "MuXolotl Converter v${{ needs.prepare.outputs.version }}"
-          releaseBody: |
-            # 🦎 MuXolotl Converter v${{ needs.prepare.outputs.version }}
-
-            **High-Performance Audio & Video Converter**
-
-            ---
-
-            ## 📦 Downloads
-
-            ### 🪟 Windows
-            - [**MuXolotl-Converter-${{ needs.prepare.outputs.version }}-windows-x64-setup.msi**](https://github.com/${{ github.repository }}/releases/download/v${{ needs.prepare.outputs.version }}/MuXolotl-Converter-${{ needs.prepare.outputs.version }}-windows-x64-setup.msi) - Installer (Recommended)
-            - [**MuXolotl-Converter-${{ needs.prepare.outputs.version }}-windows-x64-portable.exe**](https://github.com/${{ github.repository }}/releases/download/v${{ needs.prepare.outputs.version }}/MuXolotl-Converter-${{ needs.prepare.outputs.version }}-windows-x64-portable.exe) - Portable
-
-            ### 🍎 macOS
-            - [**MuXolotl-Converter-${{ needs.prepare.outputs.version }}-macos-intel.dmg**](https://github.com/${{ github.repository }}/releases/download/v${{ needs.prepare.outputs.version }}/MuXolotl-Converter-${{ needs.prepare.outputs.version }}-macos-intel.dmg) - Intel (x64)
-            - [**MuXolotl-Converter-${{ needs.prepare.outputs.version }}-macos-apple-silicon.dmg**](https://github.com/${{ github.repository }}/releases/download/v${{ needs.prepare.outputs.version }}/MuXolotl-Converter-${{ needs.prepare.outputs.version }}-macos-apple-silicon.dmg) - Apple Silicon (M1/M2/M3)
-
-            ### 🐧 Linux
-            - [**MuXolotl-Converter-${{ needs.prepare.outputs.version }}-linux-x64.deb**](https://github.com/${{ github.repository }}/releases/download/v${{ needs.prepare.outputs.version }}/MuXolotl-Converter-${{ needs.prepare.outputs.version }}-linux-x64.deb) - Debian/Ubuntu
-
-            ### 🛠️ FFmpeg Binaries
-            - [ffmpeg-windows-x64.zip](https://github.com/${{ github.repository }}/releases/download/v${{ needs.prepare.outputs.version }}/ffmpeg-windows-x64.zip)
-            - [ffmpeg-linux-x64.tar.gz](https://github.com/${{ github.repository }}/releases/download/v${{ needs.prepare.outputs.version }}/ffmpeg-linux-x64.tar.gz)
-            - [ffmpeg-macos-intel.zip](https://github.com/${{ github.repository }}/releases/download/v${{ needs.prepare.outputs.version }}/ffmpeg-macos-intel.zip)
-            - [ffmpeg-macos-arm64.zip](https://github.com/${{ github.repository }}/releases/download/v${{ needs.prepare.outputs.version }}/ffmpeg-macos-arm64.zip)
-
-            ---
-
-            ## ✨ Features
-
-            - ⚡ **GPU Acceleration** - NVIDIA, Intel, AMD, Apple Silicon
-            - 🎯 **40+ Formats** - Audio (MP3, FLAC, AAC, Opus...) & Video (MP4, MKV, WebM...)
-            - 🔄 **Batch Processing** - Convert up to 50 files simultaneously
-            - 💾 **Persistent Queue** - Resume conversions anytime
-            - 🎨 **Modern UI** - Beautiful glass-morphism design
-
-            ---
-
-            ## 🚀 Quick Start
-
-            1. Download the installer for your platform
-            2. Drag & drop media files
-            3. Select output format
-            4. Click "Convert All"
-
-            **System Requirements**: Windows 10+ / macOS 10.15+ / Linux 64-bit
-
-            ---
-
-            **License**: GPL v2 / LGPL v2.1  
-            **Built with**: Tauri • React • FFmpeg • Rust
-          releaseDraft: false
-          prerelease: false
           args: --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
 
       - name: 🏷️ Rename and cleanup artifacts
@@ -279,8 +224,9 @@ jobs:
               cd "$BUNDLE_DIR/msi"
               ORIGINAL_MSI=$(ls *.msi 2>/dev/null | head -n 1)
               if [ -n "$ORIGINAL_MSI" ]; then
-                mv "$ORIGINAL_MSI" "MuXolotl-Converter-${VERSION}-windows-x64-setup.msi"
-                echo "✅ Renamed: $ORIGINAL_MSI → MuXolotl-Converter-${VERSION}-windows-x64-setup.msi"
+                NEW_NAME="MuXolotl-Converter-${VERSION}-windows-x64-setup.msi"
+                mv "$ORIGINAL_MSI" "$NEW_NAME"
+                echo "✅ Renamed: $ORIGINAL_MSI → $NEW_NAME"
               fi
               cd -
             fi
@@ -290,8 +236,9 @@ jobs:
               cd "$BUNDLE_DIR/nsis"
               ORIGINAL_EXE=$(ls *.exe 2>/dev/null | head -n 1)
               if [ -n "$ORIGINAL_EXE" ]; then
-                mv "$ORIGINAL_EXE" "MuXolotl-Converter-${VERSION}-windows-x64-portable.exe"
-                echo "✅ Renamed: $ORIGINAL_EXE → MuXolotl-Converter-${VERSION}-windows-x64-portable.exe"
+                NEW_NAME="MuXolotl-Converter-${VERSION}-windows-x64-portable.exe"
+                mv "$ORIGINAL_EXE" "$NEW_NAME"
+                echo "✅ Renamed: $ORIGINAL_EXE → $NEW_NAME"
               fi
               cd -
             fi
@@ -305,8 +252,9 @@ jobs:
               cd "$BUNDLE_DIR/deb"
               ORIGINAL_DEB=$(ls *.deb 2>/dev/null | head -n 1)
               if [ -n "$ORIGINAL_DEB" ]; then
-                mv "$ORIGINAL_DEB" "MuXolotl-Converter-${VERSION}-linux-x64.deb"
-                echo "✅ Renamed: $ORIGINAL_DEB → MuXolotl-Converter-${VERSION}-linux-x64.deb"
+                NEW_NAME="MuXolotl-Converter-${VERSION}-linux-x64.deb"
+                mv "$ORIGINAL_DEB" "$NEW_NAME"
+                echo "✅ Renamed: $ORIGINAL_DEB → $NEW_NAME"
               fi
               cd -
             fi
@@ -320,8 +268,9 @@ jobs:
               cd "$BUNDLE_DIR/dmg"
               ORIGINAL_DMG=$(ls *.dmg 2>/dev/null | head -n 1)
               if [ -n "$ORIGINAL_DMG" ]; then
-                mv "$ORIGINAL_DMG" "MuXolotl-Converter-${VERSION}-macos-intel.dmg"
-                echo "✅ Renamed: $ORIGINAL_DMG → MuXolotl-Converter-${VERSION}-macos-intel.dmg"
+                NEW_NAME="MuXolotl-Converter-${VERSION}-macos-intel.dmg"
+                mv "$ORIGINAL_DMG" "$NEW_NAME"
+                echo "✅ Renamed: $ORIGINAL_DMG → $NEW_NAME"
               fi
               cd -
             fi
@@ -335,8 +284,9 @@ jobs:
               cd "$BUNDLE_DIR/dmg"
               ORIGINAL_DMG=$(ls *.dmg 2>/dev/null | head -n 1)
               if [ -n "$ORIGINAL_DMG" ]; then
-                mv "$ORIGINAL_DMG" "MuXolotl-Converter-${VERSION}-macos-apple-silicon.dmg"
-                echo "✅ Renamed: $ORIGINAL_DMG → MuXolotl-Converter-${VERSION}-macos-apple-silicon.dmg"
+                NEW_NAME="MuXolotl-Converter-${VERSION}-macos-apple-silicon.dmg"
+                mv "$ORIGINAL_DMG" "$NEW_NAME"
+                echo "✅ Renamed: $ORIGINAL_DMG → $NEW_NAME"
               fi
               cd -
             fi
@@ -348,6 +298,34 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.prepare.outputs.tag_name }}
+          name: "MuXolotl Converter v${{ needs.prepare.outputs.version }}"
+          body: |
+            <div align="center">
+
+            # 🦎 MuXolotl-Converter v1.0.2
+
+            **High-Performance Audio & Video Converter**
+
+            ---
+
+            ## 📦 Download MuXolotl-Converter
+
+            | OS | Link to installer file | FFmpeg Binaries |
+            |-|-|-|
+            | Windows Installer ***(Recommended)*** | [**MuXolotl-Converter-1.0.2-windows-x64-setup.msi**](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/v1.0.2/MuXolotl-Converter-1.0.2-windows-x64-setup.msi) | [ffmpeg-windows-x64.zip](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/v1.0.2/ffmpeg-windows-x64.zip) |
+            | Windows Portable | [**MuXolotl-Converter-1.0.2-windows-x64-portable.exe**](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/v1.0.2/MuXolotl-Converter-1.0.2-windows-x64-portable.exe) | [ffmpeg-windows-x64.zip](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/v1.0.2/ffmpeg-windows-x64.zip) |
+            | macOS Intel (x64) | [**MuXolotl-Converter-1.0.2-macos-intel.dmg**](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/v1.0.2/MuXolotl-Converter-1.0.2-macos-intel.dmg) | [ffmpeg-macos-intel.zip](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/v1.0.2/ffmpeg-macos-intel.zip) |
+            | macOS  Apple Silicon (M1/M2/M3) | [**MuXolotl-Converter-1.0.2-macos-apple-silicon.dmg**](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/v1.0.2/MuXolotl-Converter-1.0.2-macos-apple-silicon.dmg) | [ffmpeg-macos-arm64.zip](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/v1.0.2/ffmpeg-macos-arm64.zip) |
+            | Linux (Debian/Ubuntu) | [**MuXolotl-Converter-1.0.2-linux-x64.deb**](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/v1.0.2/MuXolotl-Converter-1.0.2-linux-x64.deb) | [ffmpeg-linux-x64.tar.gz](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/v1.0.2/ffmpeg-linux-x64.tar.gz) |
+
+            ---
+
+            **License**: GPL v2 / LGPL v2.1  
+            **Built with**: Tauri • React • FFmpeg • Rust
+
+            </div>
+          draft: false
+          prerelease: false
           files: |
             src-tauri/target/${{ matrix.target }}/release/bundle/msi/MuXolotl-Converter-${{ needs.prepare.outputs.version }}-windows-x64-setup.msi
             src-tauri/target/${{ matrix.target }}/release/bundle/nsis/MuXolotl-Converter-${{ needs.prepare.outputs.version }}-windows-x64-portable.exe
