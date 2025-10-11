@@ -8,7 +8,7 @@
   },
   "package": {
     "productName": "MuXolotl-Converter",
-    "version": "1.0.0"
+    "version": "1.0.1"
   },
   "tauri": {
     "allowlist": {
@@ -32,7 +32,12 @@
         "removeFile": true,
         "renameFile": true,
         "exists": true,
-        "scope": ["$APPDATA/*", "$DOCUMENT/*", "$DOWNLOAD/*", "$HOME/*"]
+        "scope": [
+          "$APPDATA/*",
+          "$DOCUMENT/*",
+          "$DOWNLOAD/*",
+          "$HOME/*"
+        ]
       },
       "shell": {
         "all": false,
@@ -41,27 +46,38 @@
       },
       "protocol": {
         "asset": true,
-        "assetScope": ["$APPDATA/*"]
+        "assetScope": [
+          "$APPDATA/*"
+        ]
       }
     },
     "bundle": {
       "active": true,
       "targets": "all",
       "identifier": "com.muxolotl.converter",
-      "icon": ["icons/icon.ico"],
+      "icon": [
+        "icons/icon.ico"
+      ],
       "resources": [],
-      "externalBin": ["binaries/ffmpeg", "binaries/ffprobe"],
+      "externalBin": [
+        "binaries/ffmpeg",
+        "binaries/ffprobe"
+      ],
       "shortDescription": "High-Performance Media Converter",
       "longDescription": "Professional cross-platform audio and video converter with GPU acceleration and support for 40+ formats.",
       "windows": {
         "certificateThumbprint": null,
         "digestAlgorithm": "sha256",
         "timestampUrl": "",
-        "wix": { "language": "en-US" },
+        "wix": {
+          "language": "en-US"
+        },
         "nsis": {
           "installerIcon": "icons/icon.ico",
           "installMode": "perMachine",
-          "languages": ["English"],
+          "languages": [
+            "English"
+          ],
           "displayLanguageSelector": false
         }
       },
@@ -82,7 +98,9 @@
         "bundleMediaFramework": false
       }
     },
-    "security": { "csp": null },
+    "security": {
+      "csp": null
+    },
     "windows": [
       {
         "fullscreen": false,
