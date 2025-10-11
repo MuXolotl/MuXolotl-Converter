@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { Upload, FolderOpen } from 'lucide-react';
 import { open } from '@tauri-apps/api/dialog';
 import { invoke } from '@tauri-apps/api/tauri';
@@ -17,55 +17,58 @@ const MAX_PARALLEL_PROCESSING = 50;
 
 const DropZone: React.FC<DropZoneProps> = ({ onFilesAdded, currentCount, maxCount }) => {
   const [isDragging, setIsDragging] = useState(false);
+  const onFilesAddedRef = useRef(onFilesAdded);
 
-  const processFiles = useCallback(
-    async (paths: string[]) => {
-      const fileItems: FileItem[] = [];
-      const errors: string[] = [];
+  // Keep ref up-to-date
+  useEffect(() => {
+    onFilesAddedRef.current = onFilesAdded;
+  }, [onFilesAdded]);
 
-      for (let i = 0; i < paths.length; i += MAX_PARALLEL_PROCESSING) {
-        const chunk = paths.slice(i, i + MAX_PARALLEL_PROCESSING);
+  const processFiles = useCallback(async (paths: string[]) => {
+    const fileItems: FileItem[] = [];
+    const errors: string[] = [];
 
-        const results = await Promise.allSettled(
-          chunk.map(async path => {
-            const mediaInfo = await invoke<MediaInfo>('detect_media_type', { path });
-            const fileName = path.split(/[\\/]/).pop() || path;
-            return {
-              id: generateFileId(),
-              path,
-              name: fileName,
-              mediaInfo,
-              outputFormat: getDefaultFormat(mediaInfo.media_type),
-              settings: getDefaultSettings(false),
-              status: 'pending' as const,
-              progress: null,
-              error: null,
-              addedAt: Date.now(),
-            };
-          })
-        );
+    for (let i = 0; i < paths.length; i += MAX_PARALLEL_PROCESSING) {
+      const chunk = paths.slice(i, i + MAX_PARALLEL_PROCESSING);
 
-        results.forEach(result => {
-          if (result.status === 'fulfilled') {
-            fileItems.push(result.value);
-          } else {
-            errors.push(result.reason);
-          }
-        });
-      }
+      const results = await Promise.allSettled(
+        chunk.map(async path => {
+          const mediaInfo = await invoke<MediaInfo>('detect_media_type', { path });
+          const fileName = path.split(/[\\/]/).pop() || path;
+          return {
+            id: generateFileId(),
+            path,
+            name: fileName,
+            mediaInfo,
+            outputFormat: getDefaultFormat(mediaInfo.media_type),
+            settings: getDefaultSettings(false),
+            status: 'pending' as const,
+            progress: null,
+            error: null,
+            addedAt: Date.now(),
+          };
+        })
+      );
 
-      if (fileItems.length > 0) onFilesAdded(fileItems);
+      results.forEach(result => {
+        if (result.status === 'fulfilled') {
+          fileItems.push(result.value);
+        } else {
+          errors.push(result.reason);
+        }
+      });
+    }
 
-      if (errors.length > 0) {
-        const errorMsg =
-          errors.length === 1
-            ? `Failed to process file: ${errors[0]}`
-            : `Failed to process ${errors.length} files. First error: ${errors[0]}`;
-        alert(errorMsg);
-      }
-    },
-    [onFilesAdded]
-  );
+    if (fileItems.length > 0) onFilesAddedRef.current(fileItems);
+
+    if (errors.length > 0) {
+      const errorMsg =
+        errors.length === 1
+          ? `Failed to process file: ${errors[0]}`
+          : `Failed to process ${errors.length} files. First error: ${errors[0]}`;
+      alert(errorMsg);
+    }
+  }, []);
 
   const handleBrowse = useCallback(
     async (e?: React.MouseEvent) => {
@@ -114,6 +117,7 @@ const DropZone: React.FC<DropZoneProps> = ({ onFilesAdded, currentCount, maxCoun
     const unlisten = listen<string[]>('tauri://file-drop', async event => {
       await processFiles(event.payload);
     });
+    
     return () => {
       unlisten.then(fn => fn());
     };

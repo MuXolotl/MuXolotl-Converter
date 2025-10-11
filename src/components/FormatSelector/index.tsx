@@ -28,9 +28,10 @@ const FormatSelector: React.FC<FormatSelectorProps> = ({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const updateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMountedRef = useRef(true);
 
   const updatePosition = useCallback(() => {
-    if (!buttonRef.current) return;
+    if (!buttonRef.current || !isMountedRef.current) return;
 
     if (updateTimeoutRef.current) {
       clearTimeout(updateTimeoutRef.current);
@@ -38,7 +39,7 @@ const FormatSelector: React.FC<FormatSelectorProps> = ({
     }
 
     updateTimeoutRef.current = setTimeout(() => {
-      if (!buttonRef.current) return;
+      if (!buttonRef.current || !isMountedRef.current) return;
       const rect = buttonRef.current.getBoundingClientRect();
       const dropdownWidth = Math.max(rect.width, 320);
       const pos = calculateDropdownPosition(rect, dropdownWidth, 450);
@@ -47,16 +48,30 @@ const FormatSelector: React.FC<FormatSelectorProps> = ({
   }, []);
 
   useEffect(() => {
+    isMountedRef.current = true;
+
+    return () => {
+      isMountedRef.current = false;
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+        updateTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (isOpen) {
       const timer = setTimeout(() => {
-        updatePosition();
+        if (isMountedRef.current) {
+          updatePosition();
+        }
       }, 10);
       return () => clearTimeout(timer);
     }
   }, [isOpen, updatePosition]);
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && isMountedRef.current) {
       updatePosition();
     }
   }, [formats, recommendedFormats, isOpen, updatePosition]);
@@ -90,11 +105,6 @@ const FormatSelector: React.FC<FormatSelectorProps> = ({
       document.removeEventListener('keydown', handleEscape);
       window.removeEventListener('resize', updatePosition);
       window.removeEventListener('scroll', updatePosition, true);
-
-      if (updateTimeoutRef.current) {
-        clearTimeout(updateTimeoutRef.current);
-        updateTimeoutRef.current = null;
-      }
     };
   }, [isOpen, updatePosition]);
 

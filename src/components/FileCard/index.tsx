@@ -36,11 +36,24 @@ const FileCard: React.FC<FileCardProps> = ({
   const [isRetrying, setIsRetrying] = useState(false);
   const [recommendedFormats, setRecommendedFormats] = useState<RecommendedFormats | undefined>(undefined);
   const validationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isMountedRef = useRef(true);
 
   const isVideo = file.mediaInfo?.media_type === 'video';
   const isAudio = file.mediaInfo?.media_type === 'audio';
   const isDisabled = file.status !== 'pending';
   const shouldShowAudio = isVideo && file.settings.extractAudioOnly;
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    
+    return () => {
+      isMountedRef.current = false;
+      if (validationTimeoutRef.current) {
+        clearTimeout(validationTimeoutRef.current);
+        validationTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const loadFormats = async () => {
@@ -49,7 +62,10 @@ const FileCard: React.FC<FileCardProps> = ({
           shouldShowAudio || isAudio
             ? await invoke<AudioFormat[]>('get_audio_formats')
             : await invoke<VideoFormat[]>('get_video_formats');
-        setFormats(data);
+        
+        if (isMountedRef.current) {
+          setFormats(data);
+        }
       } catch (error) {
         console.error('Failed to load formats:', error);
       }
@@ -72,7 +88,11 @@ const FileCard: React.FC<FileCardProps> = ({
         width: width || null,
         height: height || null,
       })
-        .then(setRecommendedFormats)
+        .then(result => {
+          if (isMountedRef.current) {
+            setRecommendedFormats(result);
+          }
+        })
         .catch(error => console.error('Failed to get recommended formats:', error));
     }
   }, [file.mediaInfo, file.status, file.settings.extractAudioOnly]);
@@ -84,11 +104,12 @@ const FileCard: React.FC<FileCardProps> = ({
 
     if (validationTimeoutRef.current) {
       clearTimeout(validationTimeoutRef.current);
+      validationTimeoutRef.current = null;
     }
 
     validationTimeoutRef.current = setTimeout(() => {
       const mediaInfo = file.mediaInfo;
-      if (!mediaInfo) return;
+      if (!mediaInfo || !isMountedRef.current) return;
 
       const mediaType = file.settings.extractAudioOnly ? 'audio' : mediaInfo.media_type || 'unknown';
 
@@ -98,15 +119,13 @@ const FileCard: React.FC<FileCardProps> = ({
         mediaType: mediaType,
         settings: file.settings,
       })
-        .then(setValidation)
+        .then(result => {
+          if (isMountedRef.current) {
+            setValidation(result);
+          }
+        })
         .catch(error => console.error('Validation failed:', error));
     }, VALIDATION_DEBOUNCE_MS);
-
-    return () => {
-      if (validationTimeoutRef.current) {
-        clearTimeout(validationTimeoutRef.current);
-      }
-    };
   }, [file.outputFormat, file.settings, file.status, file.mediaInfo]);
 
   const handleFormatChange = useCallback(
@@ -145,7 +164,11 @@ const FileCard: React.FC<FileCardProps> = ({
     if (isRetrying) return;
     setIsRetrying(true);
     onRetry();
-    setTimeout(() => setIsRetrying(false), 500);
+    setTimeout(() => {
+      if (isMountedRef.current) {
+        setIsRetrying(false);
+      }
+    }, 500);
   }, [isRetrying, onRetry]);
 
   const handleCardClick = useCallback((e: React.MouseEvent) => {

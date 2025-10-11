@@ -113,7 +113,7 @@ pub async fn convert(
     let quality = settings.quality_str();
     let args = build_args(input, output, &format_info, quality, &settings);
 
-    super::spawn_ffmpeg(window, task_id, media_info.duration, args, processes).await
+    super::spawn_ffmpeg(window, task_id, media_info.duration, args, output.to_string(), processes).await
 }
 
 pub async fn extract_from_video(
@@ -176,5 +176,5 @@ pub async fn extract_from_video(
         normalize_path(output),
     ]);
 
-    super::spawn_ffmpeg(window, task_id, media_info.duration, args, processes).await
+    super::spawn_ffmpeg(window, task_id, media_info.duration, args, output.to_string(), processes).await
 }

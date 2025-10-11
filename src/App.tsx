@@ -25,7 +25,13 @@ const App: React.FC = () => {
   const [expandedAdvanced, setExpandedAdvanced] = useState<Set<string>>(new Set());
   const [expandedCompactCard, setExpandedCompactCard] = useState<string | null>(null);
 
+  const filesRef = useRef<FileItem[]>(files);
   const { gpuInfo, isLoading: gpuLoading } = useGpu();
+
+  // Keep ref synchronized
+  useEffect(() => {
+    filesRef.current = files;
+  }, [files]);
 
   // ============================================================================
   // FILE MANAGEMENT
@@ -33,14 +39,14 @@ const App: React.FC = () => {
 
   const handleFilesAdded = useCallback(
     (newFiles: FileItem[]) => {
-      const availableSlots = MAX_FILES_IN_QUEUE - files.length;
+      const availableSlots = MAX_FILES_IN_QUEUE - filesRef.current.length;
 
       if (availableSlots <= 0) {
         alert(`⚠️ Queue is full! Maximum ${MAX_FILES_IN_QUEUE} files allowed.`);
         return;
       }
 
-      const existingPaths = new Set(files.map(f => f.path));
+      const existingPaths = new Set(filesRef.current.map(f => f.path));
       const uniqueFiles = newFiles.filter(f => !existingPaths.has(f.path));
       const duplicateCount = newFiles.length - uniqueFiles.length;
 
@@ -63,7 +69,7 @@ const App: React.FC = () => {
 
       setFiles(prev => [...filesWithPath, ...prev]);
     },
-    [files, outputFolder]
+    [outputFolder]
   );
 
   const handleFileRemove = useCallback((fileId: string) => {
@@ -103,21 +109,25 @@ const App: React.FC = () => {
     if (outputFolder) saveOutputFolder(outputFolder);
   }, [outputFolder]);
 
-  const prevFilesForSave = useRef<string>('');
+  // Autosave with stable interval
   useEffect(() => {
+    const prevFilesStringRef = { current: '' };
+
     const interval = setInterval(() => {
-      if (files.length > 0) {
-        const filesString = JSON.stringify(files);
-        if (filesString !== prevFilesForSave.current) {
-          saveQueue(files);
-          prevFilesForSave.current = filesString;
-          console.log(`💾 Auto-saved ${files.length} files to queue`);
+      const currentFiles = filesRef.current;
+      
+      if (currentFiles.length > 0) {
+        const filesString = JSON.stringify(currentFiles);
+        if (filesString !== prevFilesStringRef.current) {
+          saveQueue(currentFiles);
+          prevFilesStringRef.current = filesString;
+          console.log(`💾 Auto-saved ${currentFiles.length} files to queue`);
         }
       }
     }, AUTOSAVE_INTERVAL_MS);
 
     return () => clearInterval(interval);
-  }, [files]);
+  }, []); // Empty deps - interval created once
 
   // ============================================================================
   // CONVERSION
@@ -182,7 +192,7 @@ const App: React.FC = () => {
   );
 
   const handleConvertAll = useCallback(async () => {
-    const pendingFiles = files.filter(f => f.status === 'pending');
+    const pendingFiles = filesRef.current.filter(f => f.status === 'pending');
     if (pendingFiles.length === 0) return;
 
     console.log(
@@ -203,7 +213,7 @@ const App: React.FC = () => {
         await conversionContext.startConversion(file).catch(() => {});
       }
     }
-  }, [files, parallelConversion, conversionContext]);
+  }, [parallelConversion, conversionContext]);
 
   const handleToggleAdvanced = useCallback((fileId: string) => {
     setExpandedAdvanced(prev => {

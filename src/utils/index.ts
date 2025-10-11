@@ -14,10 +14,13 @@ export const generateFileId = (): string => {
 export const generateOutputPath = (file: FileItem, folder: string): string => {
   const lastDotIndex = file.name.lastIndexOf('.');
   const inputName = lastDotIndex !== -1 ? file.name.substring(0, lastDotIndex) : file.name;
-  const separator = folder.includes('\\') ? '\\' : '/';
-  const normalizedFolder = folder.endsWith(separator) || folder.endsWith('/') || folder.endsWith('\\')
-    ? folder.slice(0, -1)
-    : folder;
+  
+  // Determine separator: prefer backslash if any exist, otherwise use forward slash
+  const hasBackslash = folder.includes('\\');
+  const separator = hasBackslash ? '\\' : '/';
+  
+  // Normalize folder path (remove trailing separator)
+  const normalizedFolder = folder.replace(/[\\/]+$/, '');
   
   return `${normalizedFolder}${separator}${inputName}.${file.outputFormat}`;
 };

@@ -17,6 +17,7 @@ use std::path::PathBuf;
 use tokio::sync::{Mutex, OnceCell};
 use std::collections::HashMap;
 use tokio::process::Child;
+use tokio::time::{timeout, Duration};
 
 static GPU_CACHE: OnceCell<gpu::GpuInfo> = OnceCell::const_new();
 static AUDIO_FORMATS_CACHE: OnceCell<Vec<formats::audio::AudioFormat>> = OnceCell::const_new();
@@ -132,36 +133,70 @@ fn main() {
             let window = app.get_window("main").unwrap();
             let state = app.state::<AppState>();
             let processes = state.active_processes.clone();
-            let window_for_cleanup = window.clone();
 
             window.on_window_event(move |event| {
                 if let tauri::WindowEvent::CloseRequested { .. } = event {
                     let processes = processes.clone();
-                    let window = window_for_cleanup.clone();
 
-                    std::thread::spawn(move || {
-                        tauri::async_runtime::block_on(async move {
-                            let mut procs = processes.lock().await;
-                            for (task_id, mut child) in procs.drain() {
+                    // Block until cleanup is done (with timeout)
+                    let cleanup_result = std::thread::scope(|s| {
+                        let handle = s.spawn(|| {
+                            tauri::async_runtime::block_on(async move {
+                                let mut procs = processes.lock().await;
+                                
                                 #[cfg(debug_assertions)]
-                                println!("🛑 Killing FFmpeg process on shutdown: {}", task_id);
+                                println!("🛑 Cleaning up {} FFmpeg processes...", procs.len());
+                                
+                                for (task_id, mut child) in procs.drain() {
+                                    #[cfg(debug_assertions)]
+                                    println!("🛑 Killing FFmpeg process: {}", task_id);
 
-                                let _ = child.kill().await;
-                                let _ = window.emit("conversion-error", serde_json::json!({
-                                    "task_id": task_id,
-                                    "error": "Application is closing"
-                                }));
-                            }
+                                    let kill_result = timeout(
+                                        Duration::from_secs(2),
+                                        async {
+                                            child.kill().await?;
+                                            child.wait().await
+                                        }
+                                    ).await;
+
+                                    match kill_result {
+                                        Ok(Ok(_)) => {
+                                            #[cfg(debug_assertions)]
+                                            println!("✅ Process {} terminated", task_id);
+                                        }
+                                        Ok(Err(e)) => {
+                                            eprintln!("⚠️ Failed to kill process {}: {}", task_id, e);
+                                        }
+                                        Err(_) => {
+                                            eprintln!("⚠️ Timeout killing process {}", task_id);
+                                        }
+                                    }
+                                }
+                            });
                         });
+
+                        match handle.join() {
+                            Ok(_) => {
+                                #[cfg(debug_assertions)]
+                                println!("✅ Cleanup completed successfully");
+                            }
+                            Err(e) => {
+                                eprintln!("⚠️ Cleanup thread panicked: {:?}", e);
+                            }
+                        }
                     });
+
+                    let _ = cleanup_result;
                 }
             });
 
+            // GPU detection
             tauri::async_runtime::spawn(async move {
                 let gpu_info = GPU_CACHE.get_or_init(|| async { gpu::detect_gpu().await }).await;
                 let _ = window.emit("gpu-detected", &gpu_info);
             });
 
+            // Format caches
             tauri::async_runtime::spawn(async {
                 let _ = AUDIO_FORMATS_CACHE.get_or_init(|| async { formats::audio::get_all_formats() }).await;
                 let _ = VIDEO_FORMATS_CACHE.get_or_init(|| async { formats::video::get_all_formats() }).await;
@@ -405,17 +440,33 @@ async fn cancel_conversion(state: tauri::State<'_, AppState>, task_id: String) -
     println!("⛔ Cancelling conversion: {}", task_id);
 
     if let Some(mut child) = state.active_processes.lock().await.remove(&task_id) {
-        match child.kill().await {
-            Ok(_) => {
-                #[cfg(debug_assertions)]
-                println!("✅ Killed FFmpeg process for task: {}", task_id);
+        // Kill with timeout
+        let kill_result = timeout(
+            Duration::from_secs(5),
+            async {
+                child.kill().await?;
+                child.wait().await
             }
-            Err(e) => eprintln!("⚠️ Failed to kill process {}: {}", task_id, e),
+        ).await;
+
+        match kill_result {
+            Ok(Ok(_)) => {
+                #[cfg(debug_assertions)]
+                println!("✅ Successfully killed FFmpeg process for task: {}", task_id);
+                Ok(())
+            }
+            Ok(Err(e)) => {
+                eprintln!("⚠️ Failed to kill process {}: {}", task_id, e);
+                Err(format!("Failed to kill process: {}", e))
+            }
+            Err(_) => {
+                eprintln!("⚠️ Timeout while killing process {}", task_id);
+                Err("Timeout while killing process".to_string())
+            }
         }
     } else {
         #[cfg(debug_assertions)]
         println!("⚠️ No active process found for task: {}", task_id);
+        Ok(())
     }
-
-    Ok(())
 }

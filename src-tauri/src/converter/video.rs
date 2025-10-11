@@ -358,5 +358,5 @@ pub async fn convert(
         normalize_path(output),
     ]);
 
-    super::spawn_ffmpeg(window, task_id, media_info.duration, args, processes).await
+    super::spawn_ffmpeg(window, task_id, media_info.duration, args, output.to_string(), processes).await
 }

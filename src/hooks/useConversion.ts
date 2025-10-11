@@ -4,7 +4,7 @@ import { invoke } from '@tauri-apps/api/tauri';
 import { save } from '@tauri-apps/api/dialog';
 import type { FileItem, ConversionProgress, GpuInfo, ConversionContextType } from '@/types';
 
-const PROGRESS_THROTTLE_MS = 50;
+const PROGRESS_THROTTLE_MS = 150;
 
 export const useConversion = (
   updateFile: (fileId: string, updates: Partial<FileItem>) => void,
@@ -13,19 +13,39 @@ export const useConversion = (
   const [activeConversions, setActiveConversions] = useState<Set<string>>(new Set());
   const progressTimeouts = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const unlistenFns = useRef<UnlistenFn[]>([]);
+  const isMountedRef = useRef(true);
 
   const isConverting = activeConversions.size > 0;
 
+  const clearProgressTimeout = useCallback((taskId: string) => {
+    const timeout = progressTimeouts.current.get(taskId);
+    if (timeout) {
+      clearTimeout(timeout);
+      progressTimeouts.current.delete(taskId);
+    }
+  }, []);
+
+  const clearAllProgressTimeouts = useCallback(() => {
+    progressTimeouts.current.forEach(timeout => clearTimeout(timeout));
+    progressTimeouts.current.clear();
+  }, []);
+
   useEffect(() => {
+    isMountedRef.current = true;
+
     const setupListeners = async () => {
       const listeners = await Promise.all([
         listen<ConversionProgress>('conversion-progress', event => {
+          if (!isMountedRef.current) return;
+          
           const progress = event.payload;
           const existing = progressTimeouts.current.get(progress.task_id);
 
           if (existing) clearTimeout(existing);
 
           const timeout = setTimeout(() => {
+            if (!isMountedRef.current) return;
+            
             updateFile(progress.task_id, { status: 'processing', progress });
             progressTimeouts.current.delete(progress.task_id);
           }, PROGRESS_THROTTLE_MS);
@@ -34,14 +54,12 @@ export const useConversion = (
         }),
 
         listen<string>('conversion-completed', event => {
+          if (!isMountedRef.current) return;
+          
           const taskId = event.payload;
           console.log('✅ Conversion completed:', taskId);
 
-          const timeout = progressTimeouts.current.get(taskId);
-          if (timeout) {
-            clearTimeout(timeout);
-            progressTimeouts.current.delete(taskId);
-          }
+          clearProgressTimeout(taskId);
 
           updateFile(taskId, {
             status: 'completed',
@@ -57,13 +75,11 @@ export const useConversion = (
         }),
 
         listen<{ task_id: string; error: string }>('conversion-error', event => {
+          if (!isMountedRef.current) return;
+          
           console.error('❌ Conversion error:', event.payload);
 
-          const timeout = progressTimeouts.current.get(event.payload.task_id);
-          if (timeout) {
-            clearTimeout(timeout);
-            progressTimeouts.current.delete(event.payload.task_id);
-          }
+          clearProgressTimeout(event.payload.task_id);
 
           updateFile(event.payload.task_id, {
             status: 'failed',
@@ -85,12 +101,12 @@ export const useConversion = (
     setupListeners();
 
     return () => {
-      progressTimeouts.current.forEach(timeout => clearTimeout(timeout));
-      progressTimeouts.current.clear();
+      isMountedRef.current = false;
+      clearAllProgressTimeouts();
       unlistenFns.current.forEach(fn => fn());
       unlistenFns.current = [];
     };
-  }, [updateFile]);
+  }, [updateFile, clearProgressTimeout, clearAllProgressTimeouts]);
 
   const selectOutputPath = async (file: FileItem, outputFormat: string): Promise<string | null> => {
     const lastDotIndex = file.name.lastIndexOf('.');
@@ -203,11 +219,7 @@ export const useConversion = (
       try {
         await invoke('cancel_conversion', { taskId: fileId });
 
-        const timeout = progressTimeouts.current.get(fileId);
-        if (timeout) {
-          clearTimeout(timeout);
-          progressTimeouts.current.delete(fileId);
-        }
+        clearProgressTimeout(fileId);
 
         updateFile(fileId, {
           status: 'cancelled',
@@ -224,7 +236,7 @@ export const useConversion = (
         console.error('Failed to cancel conversion:', error);
       }
     },
-    [updateFile]
+    [updateFile, clearProgressTimeout]
   );
 
   return { updateFile, startConversion, cancelConversion, isConverting };

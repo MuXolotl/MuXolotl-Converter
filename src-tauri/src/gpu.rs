@@ -36,15 +36,23 @@ impl Default for GpuInfo {
 }
 
 const TIMEOUT_SECS: u64 = 10;
+const ENCODER_CHECK_TIMEOUT_SECS: u64 = 5;
 
-fn check_encoder(encoder: &str) -> bool {
-    create_hidden_command("ffmpeg")
-        .args(&["-hide_banner", "-encoders"])
-        .output()
-        .ok()
-        .filter(|output| output.status.success())
-        .map(|output| String::from_utf8_lossy(&output.stdout).contains(encoder))
-        .unwrap_or(false)
+async fn check_encoder(encoder: &str) -> bool {
+    let encoder = encoder.to_string();
+    
+    let future = tokio::task::spawn_blocking(move || {
+        create_hidden_command("ffmpeg")
+            .args(&["-hide_banner", "-encoders"])
+            .output()
+    });
+    
+    match timeout(Duration::from_secs(ENCODER_CHECK_TIMEOUT_SECS), future).await {
+        Ok(Ok(Ok(output))) if output.status.success() => {
+            String::from_utf8_lossy(&output.stdout).contains(&encoder)
+        }
+        _ => false,
+    }
 }
 
 async fn run_with_timeout(program: &str, args: &[&str]) -> Option<std::process::Output> {
@@ -102,7 +110,7 @@ pub async fn detect_gpu() -> GpuInfo {
     if let Some(output) = run_with_timeout("nvidia-smi", &["--query-gpu=name", "--format=csv,noheader"]).await {
         if output.status.success() {
             let name = String::from_utf8_lossy(&output.stdout).trim().to_string();
-            if !name.is_empty() && check_encoder("h264_nvenc") {
+            if !name.is_empty() && check_encoder("h264_nvenc").await {
                 #[cfg(debug_assertions)]
                 println!("✅ Detected NVIDIA GPU: {}", name);
                 
@@ -120,7 +128,7 @@ pub async fn detect_gpu() -> GpuInfo {
 
     // AMD
     if let Some(name) = get_gpu_name(&["amd", "radeon"]).await {
-        if check_encoder("h264_amf") {
+        if check_encoder("h264_amf").await {
             #[cfg(debug_assertions)]
             println!("✅ Detected AMD GPU: {}", name);
             
@@ -140,7 +148,7 @@ pub async fn detect_gpu() -> GpuInfo {
 
     // Intel
     if let Some(name) = get_gpu_name(&["intel", "hd graphics", "uhd graphics", "iris"]).await {
-        if check_encoder("h264_qsv") {
+        if check_encoder("h264_qsv").await {
             #[cfg(debug_assertions)]
             println!("✅ Detected Intel GPU: {}", name);
             
@@ -161,7 +169,7 @@ pub async fn detect_gpu() -> GpuInfo {
     // Apple VideoToolbox (macOS only)
     #[cfg(target_os = "macos")]
     {
-        if check_encoder("h264_videotoolbox") {
+        if check_encoder("h264_videotoolbox").await {
             let name = get_gpu_name(&["apple"]).await
                 .unwrap_or_else(|| "Apple GPU".to_string());
             
