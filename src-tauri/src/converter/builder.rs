@@ -1,23 +1,54 @@
-use crate::gpu::{GpuInfo, GpuVendor};
-use crate::converter::common::normalize_path;
-use crate::types::FileMetadata;
+use crate::gpu::GpuInfo;
+use crate::types::{FileMetadata, Quality};
+use std::path::PathBuf;
 
-pub struct FfmpegCommand {
-    input: String,
-    output: String,
+/// FFmpeg command builder with fluent API
+pub struct FfmpegBuilder {
+    input: PathBuf,
+    output: PathBuf,
     args: Vec<String>,
     filters: Vec<String>,
 }
 
-impl FfmpegCommand {
+impl FfmpegBuilder {
     pub fn new(input: &str, output: &str) -> Self {
         Self {
-            input: normalize_path(input),
-            output: normalize_path(output),
-            args: Vec::new(),
-            filters: Vec::new(),
+            input: PathBuf::from(input),
+            output: PathBuf::from(output),
+            args: Vec::with_capacity(32),
+            filters: Vec::with_capacity(4),
         }
     }
+
+    // ========================================================================
+    // Basic Options
+    // ========================================================================
+
+    pub fn input_file(mut self) -> Self {
+        self.args.push("-i".to_string());
+        self.args.push(self.input.to_string_lossy().to_string());
+        self
+    }
+
+    pub fn overwrite(mut self) -> Self {
+        self.args.push("-y".to_string());
+        self
+    }
+
+    pub fn hide_banner(mut self) -> Self {
+        self.args.push("-hide_banner".to_string());
+        self
+    }
+
+    pub fn progress_pipe(mut self) -> Self {
+        self.args.push("-progress".to_string());
+        self.args.push("pipe:1".to_string());
+        self
+    }
+
+    // ========================================================================
+    // Key-Value Arguments
+    // ========================================================================
 
     pub fn arg(mut self, key: &str, value: &str) -> Self {
         self.args.push(key.to_string());
@@ -25,80 +56,19 @@ impl FfmpegCommand {
         self
     }
 
-    pub fn flag(mut self, key: &str) -> Self {
-        self.args.push(key.to_string());
+    pub fn flag(mut self, flag: &str) -> Self {
+        self.args.push(flag.to_string());
         self
     }
 
-    pub fn raw_args(mut self, args: &[String]) -> Self {
+    pub fn args_vec(mut self, args: &[String]) -> Self {
         self.args.extend_from_slice(args);
         self
     }
 
-    pub fn input_opts(mut self) -> Self {
-        // Standard input options to reduce boilerplate
-        self.args.insert(0, self.input.clone());
-        self.args.insert(0, "-i".to_string());
-        self
-    }
-
-    pub fn overwrite(self) -> Self {
-        self.flag("-y")
-    }
-
-    pub fn hide_banner(self) -> Self {
-        self.flag("-hide_banner")
-    }
-
-    // --- Metadata Logic ---
-    pub fn apply_metadata(mut self, metadata: &Option<FileMetadata>) -> Self {
-        // FIX: Capture the modified self back into the variable
-        self = self.arg("-map_metadata", "-1");
-
-        if let Some(meta) = metadata {
-            if let Some(val) = &meta.title { if !val.is_empty() { self = self.arg("-metadata", &format!("title={}", val)); } }
-            if let Some(val) = &meta.artist { if !val.is_empty() { self = self.arg("-metadata", &format!("artist={}", val)); } }
-            if let Some(val) = &meta.album { if !val.is_empty() { self = self.arg("-metadata", &format!("album={}", val)); } }
-            if let Some(val) = &meta.genre { if !val.is_empty() { self = self.arg("-metadata", &format!("genre={}", val)); } }
-            if let Some(val) = &meta.year { if !val.is_empty() { self = self.arg("-metadata", &format!("date={}", val)); } }
-        }
-        self
-    }
-
-    // --- GPU Acceleration Logic ---
-    pub fn apply_hw_accel(self, gpu: &GpuInfo) -> Self {
-        if !gpu.available { return self; }
-
-        match gpu.vendor {
-            GpuVendor::Nvidia => {
-                self.arg("-hwaccel", "cuda")
-                    .arg("-hwaccel_output_format", "cuda")
-            },
-            GpuVendor::Intel => {
-                self.arg("-hwaccel", "qsv")
-                    .arg("-hwaccel_output_format", "qsv")
-            },
-            GpuVendor::Amd => {
-                #[cfg(target_os = "windows")]
-                return self.arg("-hwaccel", "d3d11va");
-                #[cfg(not(target_os = "windows"))]
-                return self.arg("-hwaccel", "auto");
-            },
-            GpuVendor::Apple => {
-                self.arg("-hwaccel", "videotoolbox")
-            },
-            _ => self,
-        }
-    }
-
-    // --- Codec Logic ---
-    pub fn video_codec(self, codec: &str) -> Self {
-        self.arg("-c:v", codec)
-    }
-
-    pub fn audio_codec(self, codec: &str) -> Self {
-        self.arg("-c:a", codec)
-    }
+    // ========================================================================
+    // Stream Control
+    // ========================================================================
 
     pub fn disable_video(self) -> Self {
         self.flag("-vn")
@@ -108,22 +78,49 @@ impl FfmpegCommand {
         self.flag("-an")
     }
 
-    // --- Video Filters (Scaling, FPS) ---
-    pub fn resolution(mut self, width: Option<u32>, height: Option<u32>, force_even: bool) -> Self {
-        if let (Some(w), Some(h)) = (width, height) {
-            let w_str = if force_even { format!("{}", w & !1) } else { w.to_string() };
-            let h_str = if force_even { format!("{}", h & !1) } else { h.to_string() };
-            self.filters.push(format!("scale={}:{}", w_str, h_str));
-        }
-        self
+    pub fn video_codec(self, codec: &str) -> Self {
+        self.arg("-c:v", codec)
     }
 
-    pub fn fps(self, fps: Option<u32>) -> Self {
-        if let Some(f) = fps {
-            self.arg("-r", &f.to_string())
-        } else {
-            self
+    pub fn audio_codec(self, codec: &str) -> Self {
+        self.arg("-c:a", codec)
+    }
+
+    pub fn format(self, container: &str) -> Self {
+        self.arg("-f", container)
+    }
+
+    // ========================================================================
+    // Audio Settings
+    // ========================================================================
+
+    pub fn audio_bitrate(self, kbps: u32) -> Self {
+        self.arg("-b:a", &format!("{}k", kbps))
+    }
+
+    pub fn sample_rate(self, rate: u32) -> Self {
+        self.arg("-ar", &rate.to_string())
+    }
+
+    pub fn channels(self, count: u32) -> Self {
+        self.arg("-ac", &count.to_string())
+    }
+
+    // ========================================================================
+    // Video Settings
+    // ========================================================================
+
+    pub fn fps(self, fps: u32) -> Self {
+        self.arg("-r", &fps.to_string())
+    }
+
+    pub fn resolution(mut self, width: Option<u32>, height: Option<u32>, force_even: bool) -> Self {
+        if let (Some(w), Some(h)) = (width, height) {
+            let w = if force_even { w & !1 } else { w };
+            let h = if force_even { h & !1 } else { h };
+            self.filters.push(format!("scale={}:{}", w, h));
         }
+        self
     }
 
     pub fn pixel_format(mut self, fmt: &str) -> Self {
@@ -131,51 +128,137 @@ impl FfmpegCommand {
         self
     }
 
-    // --- Audio Settings ---
-    pub fn audio_bitrate(self, bitrate: Option<u32>) -> Self {
-        if let Some(b) = bitrate {
-            self.arg("-b:a", &format!("{}k", b))
-        } else {
-            self
+    // ========================================================================
+    // GPU Acceleration
+    // ========================================================================
+
+    pub fn hwaccel(mut self, gpu: &GpuInfo) -> Self {
+        for (key, value) in gpu.hwaccel_args() {
+            self.args.push(key.to_string());
+            self.args.push(value.to_string());
+        }
+        self
+    }
+
+    // ========================================================================
+    // Metadata
+    // ========================================================================
+
+    pub fn metadata(mut self, meta: &Option<FileMetadata>) -> Self {
+        let args = meta
+            .as_ref()
+            .map(|m| m.to_ffmpeg_args())
+            .unwrap_or_else(|| vec!["-map_metadata".to_string(), "-1".to_string()]);
+
+        self.args.extend(args);
+        self
+    }
+
+    // ========================================================================
+    // Codec-Specific Presets
+    // ========================================================================
+
+    pub fn x264_preset(self, quality: Quality) -> Self {
+        self.arg("-preset", quality.video_preset())
+            .arg("-crf", quality.video_crf())
+    }
+
+    pub fn x265_preset(self, quality: Quality) -> Self {
+        self.arg("-preset", quality.video_preset())
+            .arg("-crf", quality.video_crf())
+    }
+
+    pub fn nvenc_preset(self, quality: Quality) -> Self {
+        let cq = quality.video_crf();
+        self.arg("-preset", "p7")
+            .arg("-tune", "hq")
+            .arg("-rc", "vbr")
+            .arg("-cq", cq)
+    }
+
+    pub fn qsv_preset(self, quality: Quality) -> Self {
+        self.arg("-preset", "veryslow")
+            .arg("-global_quality", quality.video_crf())
+    }
+
+    pub fn amf_preset(self, quality: Quality) -> Self {
+        let qp = quality.video_crf();
+        self.arg("-quality", "quality")
+            .arg("-rc", "cqp")
+            .arg("-qp_i", qp)
+            .arg("-qp_p", qp)
+    }
+
+    pub fn videotoolbox_preset(self) -> Self {
+        self.arg("-profile:v", "high").arg("-allow_sw", "1")
+    }
+
+    pub fn vpx_preset(self, quality: Quality, is_vp9: bool) -> Self {
+        let crf = match quality {
+            Quality::Low => "35",
+            Quality::High => "24",
+            Quality::Ultra => "15",
+            _ => "31",
+        };
+        let cpu = match quality {
+            Quality::Low => "5",
+            Quality::High => "1",
+            Quality::Ultra => "0",
+            _ => "2",
+        };
+
+        let mut builder = self.arg("-crf", crf).arg("-b:v", "0").arg("-cpu-used", cpu);
+
+        if is_vp9 {
+            builder = builder.arg("-row-mt", "1").arg("-tile-columns", "2");
+        }
+
+        builder
+    }
+
+    pub fn mpeg2_preset(self, quality: Quality) -> Self {
+        let bitrate = match quality {
+            Quality::Low => "4000k",
+            Quality::High => "8000k",
+            Quality::Ultra => "12000k",
+            _ => "6000k",
+        };
+        self.arg("-b:v", bitrate)
+            .arg("-maxrate", bitrate)
+            .arg("-bufsize", "2M")
+    }
+
+    /// Apply codec-specific quality settings
+    pub fn apply_video_codec_preset(self, codec: &str, quality: Quality) -> Self {
+        match codec {
+            c if c.contains("nvenc") => self.nvenc_preset(quality),
+            c if c.contains("qsv") => self.qsv_preset(quality),
+            c if c.contains("amf") => self.amf_preset(quality),
+            c if c.contains("videotoolbox") => self.videotoolbox_preset(),
+            c if c.contains("libx264") => self.x264_preset(quality),
+            c if c.contains("libx265") => self.x265_preset(quality),
+            c if c.contains("libvpx-vp9") => self.vpx_preset(quality, true),
+            c if c.contains("libvpx") => self.vpx_preset(quality, false),
+            "mpeg2video" => self.mpeg2_preset(quality),
+            _ => self,
         }
     }
 
-    pub fn sample_rate(self, rate: Option<u32>) -> Self {
-        if let Some(r) = rate {
-            self.arg("-ar", &r.to_string())
-        } else {
-            self
-        }
-    }
+    // ========================================================================
+    // Build
+    // ========================================================================
 
-    pub fn channels(self, channels: Option<u32>) -> Self {
-        if let Some(c) = channels {
-            self.arg("-ac", &c.to_string())
-        } else {
-            self
-        }
-    }
-
-    // --- Container & Progress ---
-    pub fn format(self, container: &str) -> Self {
-        self.arg("-f", container)
-    }
-
-    pub fn progress_pipe(self) -> Self {
-        self.arg("-progress", "pipe:1")
-    }
-
-    // --- Final Build ---
     pub fn build(mut self) -> (Vec<String>, String) {
-        // Combine filters
+        // Apply video filters if any
         if !self.filters.is_empty() {
             self.args.push("-vf".to_string());
             self.args.push(self.filters.join(","));
         }
 
-        // Output comes last
-        self.args.push(self.output.clone());
+        // Output path comes last
+        let output = self.output.to_string_lossy().to_string();
+        self.args.push(output.clone());
 
-        (self.args, self.output)
+        (self.args, output)
     }
 }

@@ -1,3 +1,7 @@
+// ============================================================================
+// GPU
+// ============================================================================
+
 export type GpuVendor = 'nvidia' | 'intel' | 'amd' | 'apple' | 'none';
 
 export interface GpuInfo {
@@ -9,37 +13,50 @@ export interface GpuInfo {
   available: boolean;
 }
 
+// ============================================================================
+// Media
+// ============================================================================
+
 export type MediaType = 'audio' | 'video' | 'unknown';
-export type ConversionStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
-export type Quality = 'low' | 'medium' | 'high' | 'ultra' | 'custom';
+
+export interface VideoStream {
+  codec: string;
+  width: number;
+  height: number;
+  fps: number;
+  bitrate: number | null;
+}
+
+export interface AudioStream {
+  codec: string;
+  sample_rate: number;
+  channels: number;
+  bitrate: number | null;
+}
 
 export interface MediaInfo {
   media_type: MediaType;
   duration: number;
   file_size: number;
   format_name: string;
-  video_streams: Array<{
-    codec: string;
-    width: number;
-    height: number;
-    fps: number;
-    bitrate: number | null;
-  }>;
-  audio_streams: Array<{
-    codec: string;
-    sample_rate: number;
-    channels: number;
-    bitrate: number | null;
-  }>;
+  video_streams: VideoStream[];
+  audio_streams: AudioStream[];
 }
+
+// ============================================================================
+// Formats
+// ============================================================================
+
+export type Stability = 'stable' | 'requiressetup' | 'experimental' | 'problematic';
+export type Category = 'popular' | 'standard' | 'specialized' | 'legacy' | 'exotic';
 
 export interface AudioFormat {
   extension: string;
   name: string;
-  category: string;
+  category: Category;
   codec: string;
   container: string | null;
-  stability: 'stable' | 'requiressetup' | 'experimental' | 'problematic';
+  stability: Stability;
   description: string;
   typical_use: string;
   lossy: boolean;
@@ -54,15 +71,23 @@ export interface AudioFormat {
 export interface VideoFormat {
   extension: string;
   name: string;
-  category: string;
+  category: Category;
   video_codecs: string[];
   audio_codecs: string[];
   container: string;
-  stability: 'stable' | 'requiressetup' | 'experimental' | 'problematic';
+  stability: Stability;
   description: string;
   typical_use: string;
   max_resolution: [number, number] | null;
   special_params: string[];
+}
+
+export interface RecommendedFormats {
+  fast: string[];
+  safe: string[];
+  setup: string[];
+  experimental: string[];
+  problematic: string[];
 }
 
 export interface ValidationResult {
@@ -72,6 +97,13 @@ export interface ValidationResult {
   suggested_params: string[];
   alternative_codec: string | null;
 }
+
+// ============================================================================
+// Conversion
+// ============================================================================
+
+export type ConversionStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+export type Quality = 'low' | 'medium' | 'high' | 'ultra' | 'custom';
 
 export interface ConversionProgress {
   task_id: string;
@@ -103,6 +135,7 @@ export interface FileSettings {
   audioCodec?: string;
   useGpu: boolean;
   extractAudioOnly: boolean;
+  copyAudio?: boolean;
   metadata?: FileMetadata;
 }
 
@@ -121,17 +154,16 @@ export interface FileItem {
   addedAt: number;
 }
 
-export interface RecommendedFormats {
-  fast: string[];
-  safe: string[];
-  setup: string[];
-  experimental: string[];
-  problematic: string[];
-}
+// ============================================================================
+// Context
+// ============================================================================
 
 export interface ConversionContextType {
-  updateFile: (fileId: string, updates: Partial<FileItem>) => void;
-  startConversion: (file: FileItem) => Promise<void>;
-  cancelConversion: (fileId: string) => Promise<void>;
   isConverting: boolean;
+  activeCount: number;
+  startConversion: (file: FileItem) => Promise<void>;
+  startAll: () => Promise<void>;
+  cancelConversion: (fileId: string) => Promise<void>;
+  cancelAll: () => Promise<void>;
+  updateFile: (fileId: string, updates: Partial<FileItem>) => void;
 }

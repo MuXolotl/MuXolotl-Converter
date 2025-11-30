@@ -1,57 +1,51 @@
 import { invoke } from '@tauri-apps/api/tauri';
 import { generateFileId, getDefaultFormat, getDefaultSettings } from '@/utils';
-import { FileItem, MediaInfo } from '@/types';
+import type { FileItem, MediaInfo } from '@/types';
 
-const MAX_PARALLEL_PROCESSING = 50;
+const BATCH_SIZE = 10;
 
-export const processFilePaths = async (paths: string[]): Promise<FileItem[]> => {
-  const fileItems: FileItem[] = [];
+export async function processFilePaths(paths: string[]): Promise<FileItem[]> {
+  const results: FileItem[] = [];
   const errors: string[] = [];
 
-  // Process in chunks to avoid UI freeze if adding hundreds of files
-  for (let i = 0; i < paths.length; i += MAX_PARALLEL_PROCESSING) {
-    const chunk = paths.slice(i, i + MAX_PARALLEL_PROCESSING);
+  // Process in batches to avoid blocking UI
+  for (let i = 0; i < paths.length; i += BATCH_SIZE) {
+    const batch = paths.slice(i, i + BATCH_SIZE);
 
-    const results = await Promise.allSettled(
-      chunk.map(async (path) => {
-        // Call Rust to analyze file
-        const mediaInfo = await invoke<MediaInfo>('detect_media_type', { path });
-        
-        // Create safe filename
-        const name = path.split(/[\\/]/).pop() || 'unknown';
-        
-        // Determine defaults
-        const isAudio = mediaInfo.media_type === 'audio';
-        
-        return {
-          id: generateFileId(),
-          path,
-          name,
-          mediaInfo,
-          outputFormat: getDefaultFormat(mediaInfo.media_type),
-          settings: getDefaultSettings(false), // GPU check happens later/globally usually, or pass it in if needed
-          status: 'pending',
-          progress: null,
-          error: null,
-          addedAt: Date.now(),
-        } as FileItem;
-      })
+    const batchResults = await Promise.allSettled(
+      batch.map(path => processFile(path))
     );
 
-    results.forEach((result) => {
+    for (const result of batchResults) {
       if (result.status === 'fulfilled') {
-        fileItems.push(result.value);
+        results.push(result.value);
       } else {
-        console.error('Failed to process file:', result.reason);
         errors.push(String(result.reason));
       }
-    });
+    }
   }
 
   if (errors.length > 0) {
-    console.warn(`Failed to process ${errors.length} files.`);
-    // Optionally you could return errors too, but for now just logging
+    console.warn(`Failed to process ${errors.length} file(s):`, errors);
   }
 
-  return fileItems;
-};
+  return results;
+}
+
+async function processFile(path: string): Promise<FileItem> {
+  const mediaInfo = await invoke<MediaInfo>('detect_media_type', { path });
+  const name = path.split(/[\\/]/).pop() || 'unknown';
+
+  return {
+    id: generateFileId(),
+    path,
+    name,
+    mediaInfo,
+    outputFormat: getDefaultFormat(mediaInfo.media_type),
+    settings: getDefaultSettings(false),
+    status: 'pending',
+    progress: null,
+    error: null,
+    addedAt: Date.now(),
+  };
+}

@@ -1,7 +1,7 @@
+use super::ConversionProgress;
+use lazy_static::lazy_static;
 use regex::Regex;
 use std::time::Instant;
-use lazy_static::lazy_static;
-use super::ConversionProgress;
 
 lazy_static! {
     static ref TIME_REGEX: Regex = Regex::new(r"out_time_ms=(\d+)").unwrap();
@@ -9,112 +9,104 @@ lazy_static! {
     static ref SPEED_REGEX: Regex = Regex::new(r"speed=([\d.]+)x").unwrap();
 }
 
+const UPDATE_INTERVAL_MS: u128 = 500;
+
 pub struct ProgressParser {
-    total_duration: f64,
     task_id: String,
-    last_update: Instant,
-    update_interval_ms: u128,
+    total_duration: f64,
     start_time: Instant,
+    last_update: Instant,
     last_progress: Option<ConversionProgress>,
 }
 
 impl ProgressParser {
     pub fn new(task_id: String, total_duration: f64) -> Self {
         Self {
-            total_duration,
             task_id,
-            last_update: Instant::now(),
-            update_interval_ms: 500,
+            total_duration,
             start_time: Instant::now(),
+            last_update: Instant::now(),
             last_progress: None,
         }
     }
 
     pub fn parse_line(&mut self, line: &str) -> Option<ConversionProgress> {
-        let is_final_progress = line.contains("progress=end");
-
-        if is_final_progress {
-            if let Some(last) = &self.last_progress {
-                let mut final_progress = last.clone();
-                final_progress.percent = 100.0;
-                final_progress.eta_seconds = Some(0);
-                final_progress.current_time = self.total_duration;
-                return Some(final_progress);
-            }
+        // Handle final progress
+        if line.contains("progress=end") {
+            return self.last_progress.as_ref().map(|p| ConversionProgress {
+                percent: 100.0,
+                eta_seconds: Some(0),
+                current_time: self.total_duration,
+                ..p.clone()
+            });
         }
 
-        let elapsed = self.last_update.elapsed().as_millis();
-
-        if elapsed < self.update_interval_ms && self.last_progress.is_some() {
+        // Throttle updates
+        if self.last_update.elapsed().as_millis() < UPDATE_INTERVAL_MS && self.last_progress.is_some()
+        {
             return None;
         }
 
-        let mut current_time: Option<f64> = None;
-        let mut fps: Option<f64> = None;
-        let mut speed: Option<f64> = None;
+        // Parse values
+        let current_time = TIME_REGEX
+            .captures(line)
+            .and_then(|c| c[1].parse::<i64>().ok())
+            .map(|us| us as f64 / 1_000_000.0)?;
 
-        if let Some(time_match) = TIME_REGEX.captures(line) {
-            if let Ok(microseconds) = time_match[1].parse::<i64>() {
-                current_time = Some(microseconds as f64 / 1_000_000.0);
+        let fps = FPS_REGEX
+            .captures(line)
+            .and_then(|c| c[1].parse().ok());
+
+        let speed = SPEED_REGEX
+            .captures(line)
+            .and_then(|c| c[1].parse().ok());
+
+        // Calculate progress
+        let percent = if self.total_duration > 0.0 {
+            ((current_time / self.total_duration) * 100.0).min(100.0)
+        } else {
+            0.0
+        };
+
+        let eta_seconds = self.calculate_eta(current_time, speed);
+
+        self.last_update = Instant::now();
+
+        let progress = ConversionProgress {
+            task_id: self.task_id.clone(),
+            percent,
+            fps,
+            speed,
+            eta_seconds,
+            current_time,
+            total_time: self.total_duration,
+        };
+
+        self.last_progress = Some(progress.clone());
+        Some(progress)
+    }
+
+    fn calculate_eta(&self, current_time: f64, speed: Option<f64>) -> Option<u64> {
+        if current_time <= 0.0 || self.total_duration <= current_time {
+            return Some(0);
+        }
+
+        let remaining = self.total_duration - current_time;
+
+        // Use speed if available
+        if let Some(s) = speed {
+            if s > 0.0 {
+                return Some((remaining / s) as u64);
             }
         }
 
-        if let Some(fps_match) = FPS_REGEX.captures(line) {
-            fps = fps_match[1].parse::<f64>().ok();
-        }
-
-        if let Some(speed_match) = SPEED_REGEX.captures(line) {
-            speed = speed_match[1].parse::<f64>().ok();
-        }
-
-        if let Some(time) = current_time {
-            let percent = if self.total_duration > 0.0 {
-                ((time / self.total_duration) * 100.0).min(100.0)
-            } else {
-                0.0
-            };
-
-            let eta_seconds = if time > 0.0 && self.total_duration > time {
-                if let Some(spd) = speed {
-                    if spd > 0.0 {
-                        let remaining = self.total_duration - time;
-                        Some((remaining / spd) as u64)
-                    } else {
-                        None
-                    }
-                } else {
-                    let elapsed = self.start_time.elapsed().as_secs_f64();
-                    if elapsed > 0.0 && time > 0.0 {
-                        let remaining_duration = self.total_duration - time;
-                        let current_speed = time / elapsed;
-                        
-                        if current_speed > 0.0 {
-                            Some((remaining_duration / current_speed) as u64)
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                }
-            } else {
-                Some(0)
-            };
-
-            self.last_update = Instant::now();
-
-            let progress = ConversionProgress {
-                task_id: self.task_id.clone(),
-                percent,
-                fps,
-                speed,
-                eta_seconds,
-                current_time: time,
-                total_time: self.total_duration,
-            };
-
-            self.last_progress = Some(progress.clone());
-            return Some(progress);
+        // Fallback: calculate from elapsed time
+        let elapsed = self.start_time.elapsed().as_secs_f64();
+        if elapsed > 0.0 && current_time > 0.0 {
+            let rate = current_time / elapsed;
+            if rate > 0.0 {
+                return Some((remaining / rate) as u64);
+            }
         }
 
         None

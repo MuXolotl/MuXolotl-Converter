@@ -1,49 +1,18 @@
-use anyhow::{Context, Result};
-use std::sync::Arc;
-use std::collections::HashMap;
-use tokio::process::Child;
-use tokio::sync::Mutex;
-use tauri::Manager;
-use crate::formats::audio;
+use super::builder::FfmpegBuilder;
+use super::spawn_ffmpeg;
+use crate::formats::audio::{self, AudioFormat};
 use crate::media;
 use crate::types::ConversionSettings;
-use super::builder::FfmpegCommand;
-use super::common::*;
+use anyhow::{Context, Result};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tauri::Manager;
+use tokio::process::Child;
+use tokio::sync::Mutex;
 
-fn apply_audio_settings(
-    mut cmd: FfmpegCommand, 
-    fmt: &audio::AudioFormat, 
-    settings: &ConversionSettings
-) -> FfmpegCommand {
-    let sr = get_sample_rate(settings.get_sample_rate(), &fmt.sample_rates, fmt.recommended_sample_rate);
-    cmd = cmd.sample_rate(Some(sr));
-
-    let ch = get_channels(settings.get_channels(), &fmt.channels_support);
-    cmd = cmd.channels(Some(ch));
-
-    let quality = settings.quality_str();
-    if fmt.lossy {
-        match fmt.codec.as_str() {
-            "libvorbis" => {
-                let q = match quality { "low"=>"3", "high"=>"7", "ultra"=>"9", _=>"5" };
-                cmd = cmd.arg("-q:a", q);
-            },
-            "libopus" => {
-                let br = settings.get_bitrate().unwrap_or(fmt.get_bitrate_for_quality(quality).unwrap_or(128));
-                cmd = cmd.arg("-vbr", "on").audio_bitrate(Some(br));
-            },
-            "flac" | "wavpack" => {
-                let lvl = match quality { "low"=>"0", "high"=>"8", "ultra"=>"12", _=>"5" };
-                cmd = cmd.arg("-compression_level", lvl);
-            },
-            _ => {
-                let br = settings.get_bitrate().unwrap_or(fmt.get_bitrate_for_quality(quality).unwrap_or(192));
-                cmd = cmd.audio_bitrate(Some(br));
-            }
-        }
-    }
-    cmd
-}
+// ============================================================================
+// Audio Conversion
+// ============================================================================
 
 pub async fn convert(
     window: tauri::Window,
@@ -54,29 +23,38 @@ pub async fn convert(
     processes: Arc<Mutex<HashMap<String, Child>>>,
 ) -> Result<String> {
     let task_id = settings.task_id();
-    let fmt_info = audio::get_format(format).context("Unknown audio format")?;
-    let media_info = media::detect_media_type(&window.app_handle(), input).await?;
+    println!("🎵 [{}] Starting audio conversion", task_id);
+    println!("🎵 [{}] Input: {}", task_id, input);
+    println!("🎵 [{}] Output: {}", task_id, output);
+    println!("🎵 [{}] Format: {}", task_id, format);
 
-    let mut cmd = FfmpegCommand::new(input, output)
-        .input_opts()
-        .overwrite()
+    let fmt = audio::get_format(format).context(format!("Unknown audio format: {}", format))?;
+    let media = media::detect_media_type(&window.app_handle(), input).await?;
+
+    println!("🎵 [{}] Duration: {}s", task_id, media.duration);
+
+    let builder = FfmpegBuilder::new(input, output)
         .hide_banner()
+        .overwrite()
+        .input_file()
+        .progress_pipe()
         .disable_video()
-        .audio_codec(&fmt_info.codec)
-        .progress_pipe();
+        .metadata(&settings.metadata)
+        .audio_codec(&fmt.codec);
 
-    cmd = cmd.apply_metadata(&settings.metadata);
+    let builder = apply_audio_settings(builder, &fmt, &settings);
+    let builder = apply_container_and_params(builder, &fmt);
 
-    if let Some(container) = &fmt_info.container {
-        cmd = cmd.format(container);
-    }
-
-    cmd = apply_audio_settings(cmd, &fmt_info, &settings);
-    cmd = cmd.raw_args(&fmt_info.special_params);
-
-    let (args, path) = cmd.build();
-    super::spawn_ffmpeg(window, task_id, media_info.duration, args, path, processes).await
+    let (args, output_path) = builder.build();
+    
+    println!("🎵 [{}] FFmpeg args ready", task_id);
+    
+    spawn_ffmpeg(window, task_id, media.duration, args, output_path, processes).await
 }
+
+// ============================================================================
+// Audio Extraction from Video
+// ============================================================================
 
 pub async fn extract_from_video(
     window: tauri::Window,
@@ -87,32 +65,120 @@ pub async fn extract_from_video(
     processes: Arc<Mutex<HashMap<String, Child>>>,
 ) -> Result<String> {
     let task_id = settings.task_id();
-    let fmt_info = audio::get_format(format).context("Unknown audio format")?;
-    let media_info = media::detect_media_type(&window.app_handle(), input).await?;
+    println!("🎵 [{}] Starting audio extraction", task_id);
 
-    if media_info.audio_streams.is_empty() {
+    let fmt = audio::get_format(format).context(format!("Unknown audio format: {}", format))?;
+    let media = media::detect_media_type(&window.app_handle(), input).await?;
+
+    if media.audio_streams.is_empty() {
         anyhow::bail!("No audio streams found in video file");
     }
 
-    let mut cmd = FfmpegCommand::new(input, output)
-        .input_opts()
-        .overwrite()
+    let mut builder = FfmpegBuilder::new(input, output)
         .hide_banner()
+        .overwrite()
+        .input_file()
+        .progress_pipe()
         .disable_video()
-        .progress_pipe();
+        .metadata(&settings.metadata);
 
-    cmd = cmd.apply_metadata(&settings.metadata);
-
-    let src_codec = &media_info.audio_streams[0].codec;
-    if settings.copy_audio && fmt_info.can_copy_codec(src_codec) {
-        cmd = cmd.audio_codec("copy");
+    let source_codec = &media.audio_streams[0].codec;
+    if settings.copy_audio && fmt.can_copy_codec(source_codec) {
+        builder = builder.audio_codec("copy");
     } else {
-        cmd = cmd.audio_codec(&fmt_info.codec);
-        if let Some(c) = &fmt_info.container { cmd = cmd.format(c); }
-        cmd = apply_audio_settings(cmd, &fmt_info, &settings);
-        cmd = cmd.raw_args(&fmt_info.special_params);
+        builder = builder.audio_codec(&fmt.codec);
+        builder = apply_audio_settings(builder, &fmt, &settings);
+        builder = apply_container_and_params(builder, &fmt);
     }
 
-    let (args, path) = cmd.build();
-    super::spawn_ffmpeg(window, task_id, media_info.duration, args, path, processes).await
+    let (args, output_path) = builder.build();
+    spawn_ffmpeg(window, task_id, media.duration, args, output_path, processes).await
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+fn apply_audio_settings(
+    builder: FfmpegBuilder,
+    fmt: &AudioFormat,
+    settings: &ConversionSettings,
+) -> FfmpegBuilder {
+    let sample_rate = fmt.best_sample_rate(settings.sample_rate());
+    let channels = fmt.best_channels(settings.channels());
+
+    let mut builder = builder.sample_rate(sample_rate).channels(channels);
+
+    if fmt.lossy {
+        builder = apply_lossy_settings(builder, fmt, settings);
+    } else {
+        builder = apply_lossless_settings(builder, fmt, settings);
+    }
+
+    builder
+}
+
+fn apply_lossy_settings(
+    builder: FfmpegBuilder,
+    fmt: &AudioFormat,
+    settings: &ConversionSettings,
+) -> FfmpegBuilder {
+    let quality = settings.quality.as_str();
+
+    match fmt.codec.as_str() {
+        "libvorbis" => {
+            let q = match quality {
+                "low" => "3",
+                "high" => "7",
+                "ultra" => "9",
+                _ => "5",
+            };
+            builder.arg("-q:a", q)
+        }
+        "libopus" => {
+            let bitrate = settings
+                .bitrate
+                .or_else(|| fmt.get_bitrate_for_quality(quality))
+                .unwrap_or(128);
+            builder.arg("-vbr", "on").audio_bitrate(bitrate)
+        }
+        _ => {
+            let bitrate = settings
+                .bitrate
+                .or_else(|| fmt.get_bitrate_for_quality(quality))
+                .unwrap_or(192);
+            builder.audio_bitrate(bitrate)
+        }
+    }
+}
+
+fn apply_lossless_settings(
+    builder: FfmpegBuilder,
+    fmt: &AudioFormat,
+    settings: &ConversionSettings,
+) -> FfmpegBuilder {
+    let quality = settings.quality.as_str();
+
+    match fmt.codec.as_str() {
+        "flac" | "wavpack" => {
+            let level = match quality {
+                "low" => "0",
+                "high" => "8",
+                "ultra" => "12",
+                _ => "5",
+            };
+            builder.arg("-compression_level", level)
+        }
+        _ => builder,
+    }
+}
+
+fn apply_container_and_params(builder: FfmpegBuilder, fmt: &AudioFormat) -> FfmpegBuilder {
+    let mut builder = builder;
+
+    if let Some(container) = &fmt.container {
+        builder = builder.format(container);
+    }
+
+    builder.args_vec(&fmt.special_params)
 }

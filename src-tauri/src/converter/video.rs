@@ -1,65 +1,19 @@
+use super::builder::FfmpegBuilder;
+use super::spawn_ffmpeg;
+use crate::formats::video::{self, VideoFormat};
+use crate::gpu::{GpuInfo, GpuVendor};
+use crate::media::{self, MediaInfo};
+use crate::types::ConversionSettings;
 use anyhow::{Context, Result};
-use std::sync::Arc;
 use std::collections::HashMap;
+use std::sync::Arc;
+use tauri::Manager;
 use tokio::process::Child;
 use tokio::sync::Mutex;
-use tauri::Manager;
-use crate::formats::video;
-use crate::media;
-use crate::gpu::{GpuInfo, GpuVendor};
-use crate::types::ConversionSettings;
-use super::builder::FfmpegCommand;
 
-// --- Helper: Codec Specific Params ---
-fn apply_codec_params(cmd: FfmpegCommand, codec: &str, quality: &str) -> FfmpegCommand {
-    match codec {
-        c if c.contains("nvenc") => {
-            let cq = match quality { "low" => "28", "high" => "19", "ultra" => "15", _ => "23" };
-            cmd.arg("-preset", "p7").arg("-tune", "hq").arg("-rc", "vbr").arg("-cq", cq)
-        },
-        c if c.contains("qsv") => {
-            let gq = match quality { "low" => "28", "high" => "19", "ultra" => "15", _ => "23" };
-            cmd.arg("-preset", "veryslow").arg("-global_quality", gq)
-        },
-        c if c.contains("amf") => {
-            let qp = match quality { "low" => "28", "high" => "19", "ultra" => "15", _ => "23" };
-            cmd.arg("-quality", "quality").arg("-rc", "cqp").arg("-qp_i", qp).arg("-qp_p", qp)
-        },
-        c if c.contains("videotoolbox") => {
-            cmd.arg("-profile:v", "high").arg("-allow_sw", "1")
-        },
-        c if c.contains("libx264") || c.contains("libx265") => {
-            let preset = match quality { "low" => "veryfast", "high" => "slow", "ultra" => "veryslow", _ => "medium" };
-            let crf = match quality { "low" => "28", "high" => "19", "ultra" => "15", _ => "23" };
-            cmd.arg("-preset", preset).arg("-crf", crf)
-        },
-        c if c.contains("libvpx") => {
-            let crf = match quality { "low" => "35", "high" => "24", "ultra" => "15", _ => "31" };
-            let cpu = match quality { "low" => "5", "high" => "1", "ultra" => "0", _ => "2" };
-            let mut c = cmd.arg("-crf", crf).arg("-b:v", "0").arg("-cpu-used", cpu);
-            if codec == "libvpx-vp9" { c = c.arg("-row-mt", "1").arg("-tile-columns", "2"); }
-            c
-        },
-        "mpeg2video" => {
-            let br = match quality { "low" => "4000k", "high" => "8000k", "ultra" => "12000k", _ => "6000k" };
-            cmd.arg("-b:v", br).arg("-maxrate", br).arg("-bufsize", "2M")
-        },
-        _ => cmd,
-    }
-}
-
-// --- Helper: Determine Codec ---
-fn determine_video_codec(format: &video::VideoFormat, gpu: &GpuInfo, use_gpu: bool, settings: &ConversionSettings) -> String {
-    if let Some(manual) = &settings.video_codec { return manual.clone(); }
-    let gpu_vendor_str = match gpu.vendor {
-        GpuVendor::Nvidia => "nvidia",
-        GpuVendor::Intel => "intel",
-        GpuVendor::Amd => "amd",
-        GpuVendor::Apple => "apple",
-        _ => "none",
-    };
-    format.get_recommended_video_codec(gpu_vendor_str, use_gpu).unwrap_or_else(|| "libx264".to_string())
-}
+// ============================================================================
+// Video Conversion
+// ============================================================================
 
 pub async fn convert(
     window: tauri::Window,
@@ -71,73 +25,188 @@ pub async fn convert(
     processes: Arc<Mutex<HashMap<String, Child>>>,
 ) -> Result<String> {
     let task_id = settings.task_id();
-    let app_handle = window.app_handle();
-    
-    let format_info = video::get_format(format).context("Unknown video format")?;
-    let media_info = media::detect_media_type(&app_handle, input).await?;
+    let fmt = video::get_format(format).context("Unknown video format")?;
+    let media = media::detect_media_type(&window.app_handle(), input).await?;
 
-    let use_gpu = gpu_info.available && settings.use_gpu && !matches!(format, "dv" | "vob");
-    let codec = determine_video_codec(&format_info, &gpu_info, use_gpu, &settings);
+    // Determine if GPU should be used
+    let use_gpu = should_use_gpu(&gpu_info, &settings, format);
 
-    if !format_info.supports_video_codec(&codec) {
-        anyhow::bail!("Codec '{}' not compatible with {}", codec, format_info.extension);
+    // Determine video codec
+    let video_codec = determine_video_codec(&fmt, &gpu_info, use_gpu, &settings);
+
+    if !fmt.supports_video_codec(&video_codec) {
+        anyhow::bail!("Codec '{}' not compatible with {}", video_codec, fmt.extension);
     }
 
-    let mut cmd = FfmpegCommand::new(input, output)
-        .input_opts()
-        .overwrite()
+    // Build command
+    let mut builder = FfmpegBuilder::new(input, output)
         .hide_banner()
-        .progress_pipe();
+        .overwrite();
 
-    cmd = cmd.apply_metadata(&settings.metadata);
-
-    if use_gpu { cmd = cmd.apply_hw_accel(&gpu_info); }
-    cmd = cmd.video_codec(&codec);
-    cmd = apply_codec_params(cmd, &codec, settings.quality_str());
-
-    let (mut w, mut h) = (settings.width, settings.height);
-    
-    if matches!(format, "dv" | "vob") {
-        h = Some(if media_info.video_streams.first().map(|s| s.height).unwrap_or(576) <= 480 { 480 } else { 576 });
-        w = Some(720);
-        cmd = cmd.arg("-r", if h == Some(480) { "30000/1001" } else { "25" });
-    } else if let Some(fps) = settings.fps {
-        cmd = cmd.fps(Some(fps));
+    // Add hwaccel before input if using GPU
+    if use_gpu {
+        builder = builder.hwaccel(&gpu_info);
     }
 
-    if ["h264", "hevc", "mpeg4", "flv"].iter().any(|x| codec.contains(x)) {
-        cmd = cmd.pixel_format("yuv420p");
+    builder = builder
+        .input_file()
+        .progress_pipe()
+        .metadata(&settings.metadata)
+        .video_codec(&video_codec)
+        .apply_video_codec_preset(&video_codec, settings.quality);
+
+    // Resolution handling
+    builder = apply_resolution(builder, &fmt, &media, &settings);
+
+    // FPS
+    if let Some(fps) = settings.fps {
+        builder = builder.fps(fps);
     }
 
-    cmd = cmd.resolution(w, h, true);
+    // Pixel format for compatibility
+    if needs_yuv420p(&video_codec) {
+        builder = builder.pixel_format("yuv420p");
+    }
 
-    if !media_info.audio_streams.is_empty() && !format_info.audio_codecs.is_empty() {
-        let requested = settings.audio_codec.as_deref();
-        let input_ac = media_info.audio_streams.first().map(|s| s.codec.as_str()).unwrap_or("");
-        
-        if let Some(req) = requested {
-            if format_info.supports_audio_codec(req) { cmd = cmd.audio_codec(req); }
-        } else if input_ac != "" && format_info.audio_codecs.iter().any(|s| input_ac.contains(s) || s.contains(input_ac)) {
-            cmd = cmd.audio_codec("copy");
-        } else if let Some(rec) = format_info.get_recommended_audio_codec() {
-            cmd = cmd.audio_codec(&rec);
-            if !rec.starts_with("pcm") && rec != "copy" {
-                let br = match rec.as_str() { "libopus" => "128", "ac3" => "448", _ => "192" };
-                cmd = cmd.audio_bitrate(br.parse().ok());
-            }
+    // Audio handling
+    builder = apply_audio_settings(builder, &fmt, &media, &settings);
+
+    // Container-specific settings
+    builder = apply_container_settings(builder, &fmt, format, &video_codec);
+
+    let (args, output_path) = builder.build();
+    spawn_ffmpeg(window, task_id, media.duration, args, output_path, processes).await
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+fn should_use_gpu(gpu: &GpuInfo, settings: &ConversionSettings, format: &str) -> bool {
+    gpu.available && settings.use_gpu && !matches!(format, "dv" | "vob")
+}
+
+fn determine_video_codec(
+    fmt: &VideoFormat,
+    gpu: &GpuInfo,
+    use_gpu: bool,
+    settings: &ConversionSettings,
+) -> String {
+    // User-specified codec takes priority
+    if let Some(codec) = &settings.video_codec {
+        return codec.clone();
+    }
+
+    let vendor = match gpu.vendor {
+        GpuVendor::Nvidia => "nvidia",
+        GpuVendor::Intel => "intel",
+        GpuVendor::Amd => "amd",
+        GpuVendor::Apple => "apple",
+        GpuVendor::None => "none",
+    };
+
+    fmt.get_recommended_video_codec(vendor, use_gpu)
+        .unwrap_or_else(|| "libx264".to_string())
+}
+
+fn apply_resolution(
+    builder: FfmpegBuilder,
+    fmt: &VideoFormat,
+    media: &MediaInfo,
+    settings: &ConversionSettings,
+) -> FfmpegBuilder {
+    let (mut width, mut height) = (settings.width, settings.height);
+
+    // Handle formats with strict resolution requirements
+    if fmt.has_strict_resolution() {
+        let source_height = media
+            .primary_video()
+            .map(|v| v.height)
+            .unwrap_or(576);
+
+        height = Some(if source_height <= 480 { 480 } else { 576 });
+        width = Some(720);
+
+        // DV/VOB also need specific framerates
+        let fps = if height == Some(480) {
+            "30000/1001"
+        } else {
+            "25"
+        };
+        return builder.resolution(width, height, true).arg("-r", fps);
+    }
+
+    builder.resolution(width, height, true)
+}
+
+fn needs_yuv420p(codec: &str) -> bool {
+    ["h264", "hevc", "mpeg4", "flv"]
+        .iter()
+        .any(|c| codec.contains(c))
+}
+
+fn apply_audio_settings(
+    builder: FfmpegBuilder,
+    fmt: &VideoFormat,
+    media: &MediaInfo,
+    settings: &ConversionSettings,
+) -> FfmpegBuilder {
+    // No audio streams or format doesn't support audio
+    if media.audio_streams.is_empty() || fmt.audio_codecs.is_empty() {
+        return builder.disable_audio();
+    }
+
+    let input_codec = media.audio_codec().unwrap_or("");
+
+    // User-specified audio codec
+    if let Some(requested) = &settings.audio_codec {
+        if fmt.supports_audio_codec(requested) {
+            return builder.audio_codec(requested);
         }
-    } else {
-        cmd = cmd.disable_audio();
     }
 
-    if let Some(c) = &settings.video_codec { if c.contains("libx264") && ["mp4", "mov"].contains(&format) {
-        cmd = cmd.arg("-profile:v", "high").arg("-level", "4.0");
-    }}
-    if ["mp4", "mov", "m4v"].contains(&format) { cmd = cmd.flag("-movflags").arg("+faststart", ""); }
-    
-    cmd = cmd.format(&format_info.container)
-             .raw_args(&format_info.special_params);
+    // Try to copy if compatible
+    if !input_codec.is_empty() && can_copy_audio(&fmt.audio_codecs, input_codec) {
+        return builder.audio_codec("copy");
+    }
 
-    let (args, output_path) = cmd.build();
-    super::spawn_ffmpeg(window, task_id, media_info.duration, args, output_path, processes).await
+    // Use recommended codec
+    if let Some(rec) = fmt.get_recommended_audio_codec() {
+        let mut b = builder.audio_codec(&rec);
+
+        // Add bitrate for lossy codecs
+        if !rec.starts_with("pcm") && rec != "copy" {
+            let bitrate = match rec.as_str() {
+                "libopus" => 128,
+                "ac3" => 448,
+                _ => 192,
+            };
+            b = b.audio_bitrate(bitrate);
+        }
+        return b;
+    }
+
+    builder
+}
+
+fn can_copy_audio(supported: &[String], input_codec: &str) -> bool {
+    supported.iter().any(|s| {
+        input_codec.contains(s) || s.contains(input_codec)
+    })
+}
+
+fn apply_container_settings(
+    builder: FfmpegBuilder,
+    fmt: &VideoFormat,
+    format: &str,
+    _video_codec: &str,
+) -> FfmpegBuilder {
+    let mut builder = builder.format(&fmt.container);
+
+    // MP4/MOV faststart for streaming
+    if ["mp4", "mov", "m4v"].contains(&format) {
+        builder = builder.flag("-movflags").arg("+faststart", "");
+    }
+
+    builder.args_vec(&fmt.special_params)
 }

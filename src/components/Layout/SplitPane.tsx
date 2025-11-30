@@ -3,19 +3,17 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 interface SplitPaneProps {
   left: React.ReactNode;
   right: React.ReactNode;
-  initialLeftWidth: number; // pixel width
+  initialLeftWidth: number;
   minLeftWidth?: number;
   maxLeftWidth?: number;
-  className?: string;
 }
 
 const SplitPane: React.FC<SplitPaneProps> = ({
   left,
   right,
   initialLeftWidth,
-  minLeftWidth = 200,
-  maxLeftWidth = 600,
-  className = '',
+  minLeftWidth = 300,
+  maxLeftWidth = 800,
 }) => {
   const [leftWidth, setLeftWidth] = useState(initialLeftWidth);
   const [isDragging, setIsDragging] = useState(false);
@@ -31,17 +29,13 @@ const SplitPane: React.FC<SplitPaneProps> = ({
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!containerRef.current) return;
-      const containerRect = containerRef.current.getBoundingClientRect();
-      const newWidth = e.clientX - containerRect.left;
-
-      if (newWidth >= minLeftWidth && newWidth <= maxLeftWidth) {
-        setLeftWidth(newWidth);
-      }
+      
+      const rect = containerRef.current.getBoundingClientRect();
+      const newWidth = Math.max(minLeftWidth, Math.min(maxLeftWidth, e.clientX - rect.left));
+      setLeftWidth(newWidth);
     };
 
-    const handleMouseUp = () => {
-      setIsDragging(false);
-    };
+    const handleMouseUp = () => setIsDragging(false);
 
     document.addEventListener('mousemove', handleMouseMove);
     document.addEventListener('mouseup', handleMouseUp);
@@ -57,18 +51,22 @@ const SplitPane: React.FC<SplitPaneProps> = ({
   }, [isDragging, minLeftWidth, maxLeftWidth]);
 
   return (
-    <div ref={containerRef} className={`flex h-full w-full overflow-hidden ${className}`}>
-      <div style={{ width: leftWidth }} className="h-full flex-shrink-0 overflow-hidden flex flex-col relative">
+    <div ref={containerRef} className="flex h-full w-full overflow-hidden">
+      {/* Left Panel */}
+      <div style={{ width: leftWidth }} className="h-full shrink-0 overflow-hidden">
         {left}
-        {/* Drag Handle Overlay - makes grabbing easier */}
-        <div className="absolute right-0 top-0 bottom-0 w-1 hover:w-2 z-50 cursor-col-resize group"
-             onMouseDown={handleMouseDown}>
-             {/* Visual Line */}
-             <div className="absolute right-0 top-0 bottom-0 w-[1px] bg-white/10 group-hover:bg-primary-purple/50 transition-colors" />
-        </div>
       </div>
-      
-      <div className="flex-1 h-full min-w-0 overflow-hidden relative">
+
+      {/* Divider */}
+      <div
+        onMouseDown={handleMouseDown}
+        className={`w-1 h-full cursor-col-resize flex-shrink-0 transition-colors ${
+          isDragging ? 'bg-purple-500' : 'bg-white/10 hover:bg-purple-500/50'
+        }`}
+      />
+
+      {/* Right Panel */}
+      <div className="flex-1 h-full min-w-0 overflow-hidden">
         {right}
       </div>
     </div>

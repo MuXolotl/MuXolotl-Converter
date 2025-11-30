@@ -9,7 +9,7 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
@@ -21,7 +21,7 @@ body {
 }
 
 /* ============================================================================
-   SCROLLBAR
+   Scrollbar
    ========================================================================= */
 
 ::-webkit-scrollbar {
@@ -31,7 +31,6 @@ body {
 
 ::-webkit-scrollbar-track {
   background: rgba(255, 255, 255, 0.03);
-  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -44,20 +43,19 @@ body {
 }
 
 /* ============================================================================
-   GLASS EFFECT
+   Glass Effect
    ========================================================================= */
 
 .glass {
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 0.75rem;
-  position: relative;
-  -webkit-user-select: none;
-  user-select: none;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 /* ============================================================================
-   UTILITIES
+   Utilities
    ========================================================================= */
 
 .gradient-text {
@@ -67,75 +65,76 @@ body {
   background-clip: text;
 }
 
-.line-clamp-2 {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+.bg-gradient-main {
+  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
+}
+
+.bg-gradient-primary {
+  background: linear-gradient(90deg, #8b5cf6 0%, #ec4899 100%);
 }
 
 /* ============================================================================
-   SELECT DROPDOWN
+   Window Drag Region
+   ========================================================================= */
+
+[data-tauri-drag-region] {
+  -webkit-app-region: drag;
+}
+
+[data-tauri-drag-region] button,
+[data-tauri-drag-region] a {
+  -webkit-app-region: no-drag;
+}
+
+/* ============================================================================
+   Select Dropdown
    ========================================================================= */
 
 select option {
-  background-color: #1e293b !important;
-  color: white !important;
-  padding: 8px 12px;
-}
-
-select option:hover {
-  background-color: #334155 !important;
-}
-
-select option:checked {
-  background: linear-gradient(90deg, #8b5cf6 0%, #ec4899 100%) !important;
-  color: white !important;
-  font-weight: 600;
+  background-color: #1e293b;
+  color: white;
+  padding: 8px;
 }
 
 select:focus {
   outline: none;
-  border-color: #8b5cf6;
-}
-
-@-moz-document url-prefix() {
-  select option {
-    background-color: #1e293b;
-    color: white;
-  }
 }
 
 /* ============================================================================
-   ANIMATIONS
+   Animations
    ========================================================================= */
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
 
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
 
-.animate-pulse {
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
 .animate-spin {
   animation: spin 1s linear infinite;
 }
 
-/* ============================================================================
-   TRANSITIONS
-   ========================================================================= */
-
-button {
-  transition: background-color 0.15s ease, opacity 0.15s ease;
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
-select, input {
-  transition: border-color 0.15s ease;
+.animate-pulse {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+/* ============================================================================
+   Checkbox
+   ========================================================================= */
+
+input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: all 0.15s ease;
+}
+
+input[type="checkbox"]:checked {
+  background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3e%3c/svg%3e");
+  border-color: transparent;
 }

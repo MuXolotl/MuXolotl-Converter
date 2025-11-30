@@ -3,7 +3,7 @@ import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/tauri';
 import type { GpuInfo } from '@/types';
 
-const DEFAULT_GPU_INFO: GpuInfo = {
+const DEFAULT_GPU: GpuInfo = {
   vendor: 'none',
   name: 'CPU Only',
   encoder_h264: null,
@@ -12,40 +12,41 @@ const DEFAULT_GPU_INFO: GpuInfo = {
   available: false,
 };
 
-export const useGpu = () => {
-  const [gpuInfo, setGpuInfo] = useState<GpuInfo>(DEFAULT_GPU_INFO);
+export function useGpu() {
+  const [gpuInfo, setGpuInfo] = useState<GpuInfo>(DEFAULT_GPU);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    let isMounted = true;
+    let mounted = true;
 
-    const initGpu = async () => {
+    const init = async () => {
       try {
         const info = await invoke<GpuInfo>('detect_gpu');
-        if (isMounted) {
+        if (mounted) {
           setGpuInfo(info);
           setIsLoading(false);
         }
       } catch (error) {
-        console.error('Failed to detect GPU:', error);
-        if (isMounted) setIsLoading(false);
+        console.error('GPU detection failed:', error);
+        if (mounted) setIsLoading(false);
       }
     };
 
+    // Listen for GPU detection event (from backend init)
     const unlisten = listen<GpuInfo>('gpu-detected', event => {
-      if (isMounted) {
+      if (mounted) {
         setGpuInfo(event.payload);
         setIsLoading(false);
       }
     });
 
-    initGpu();
+    init();
 
     return () => {
-      isMounted = false;
+      mounted = false;
       unlisten.then(fn => fn());
     };
   }, []);
 
   return { gpuInfo, isLoading };
-};
+}

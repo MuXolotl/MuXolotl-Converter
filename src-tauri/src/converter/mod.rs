@@ -1,22 +1,28 @@
 pub mod audio;
-pub mod video;
-pub mod progress;
-pub mod common;
 pub mod builder;
+pub mod progress;
+pub mod video;
 
-use serde::{Deserialize, Serialize};
+use crate::binary::get_ffmpeg_path;
+use crate::utils::create_async_hidden_command;
 use anyhow::{Context, Result};
-use std::process::Stdio;
-use std::sync::Arc;
+use progress::ProgressParser;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
+use std::process::Stdio;
+use std::sync::Arc;
+use tauri::Manager;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Child;
 use tokio::sync::Mutex;
 use tokio::time::{timeout, Duration};
-use tauri::Manager;
 
-use progress::ProgressParser;
+const CONVERSION_TIMEOUT: Duration = Duration::from_secs(3600); // 1 hour
+
+// ============================================================================
+// Progress Event
+// ============================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConversionProgress {
@@ -29,17 +35,10 @@ pub struct ConversionProgress {
     pub total_time: f64,
 }
 
-/// Helper to clean up incomplete files
-async fn cleanup_failed_output(output_path: &str) {
-    let path = Path::new(output_path);
-    if path.exists() {
-        let _ = tokio::fs::remove_file(path).await;
-        #[cfg(debug_assertions)]
-        println!("🗑️ Cleaned up failed output: {:?}", path);
-    }
-}
+// ============================================================================
+// FFmpeg Spawner
+// ============================================================================
 
-/// Generic FFmpeg process spawner
 pub async fn spawn_ffmpeg(
     window: tauri::Window,
     task_id: String,
@@ -48,90 +47,116 @@ pub async fn spawn_ffmpeg(
     output_path: String,
     processes: Arc<Mutex<HashMap<String, Child>>>,
 ) -> Result<String> {
-    #[cfg(debug_assertions)]
-    println!("🎬 FFmpeg Command [{}]: ffmpeg {}", task_id, args.join(" "));
+    println!("🎬 [{}] FFmpeg args: {:?}", task_id, args);
 
-    let app_handle = window.app_handle();
-    let ffmpeg_path = crate::get_ffmpeg_path(&app_handle)
-        .map_err(|e| anyhow::anyhow!("FFmpeg binary not found: {}", e))?;
+    let ffmpeg_path = get_ffmpeg_path(&window.app_handle())
+        .map_err(|e| anyhow::anyhow!("FFmpeg not found: {}", e))?;
 
-    // Configure command
-    let mut cmd = tokio::process::Command::new(ffmpeg_path);
-    
-    #[cfg(target_os = "windows")]
-    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    println!("🎬 [{}] FFmpeg path: {:?}", task_id, ffmpeg_path);
 
+    // Build command
+    let mut cmd = create_async_hidden_command(ffmpeg_path.to_str().unwrap());
     cmd.args(&args)
-       .stdout(Stdio::piped())
-       .stderr(Stdio::piped());
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
 
-    // Spawn
-    let mut child = cmd.spawn().context("Failed to spawn FFmpeg process")?;
+    // Spawn process
+    let mut child = cmd.spawn().context("Failed to spawn FFmpeg")?;
+    
+    println!("🎬 [{}] FFmpeg spawned", task_id);
 
     let stdout = child.stdout.take().context("Failed to capture stdout")?;
     let stderr = child.stderr.take().context("Failed to capture stderr")?;
 
-    // Register process
+    // Register process for cancellation
     processes.lock().await.insert(task_id.clone(), child);
     let _ = window.emit("conversion-started", &task_id);
 
-    // Monitor stderr (for logs/errors)
+    // Spawn stderr monitor
+    let task_id_err = task_id.clone();
     tokio::spawn(async move {
         let mut reader = BufReader::new(stderr).lines();
         while let Ok(Some(line)) = reader.next_line().await {
-            if line.contains("Error") || line.contains("Invalid") {
-                #[cfg(debug_assertions)]
-                eprintln!("⚠️ FFmpeg STDERR: {}", line);
+            if line.contains("Error") || line.contains("Invalid") || line.contains("failed") {
+                eprintln!("⚠️ [{}] FFmpeg: {}", task_id_err, line);
             }
         }
     });
 
-    // Monitor stdout (for progress)
-    let mut stdout_reader = BufReader::new(stdout).lines();
-    let mut parser = ProgressParser::new(task_id.clone(), duration);
-    let window_clone = window.clone();
-    let processes_clone = processes.clone();
-    let task_id_clone = task_id.clone();
-    let output_path_clone = output_path.clone();
+    // Progress monitoring
+    let window_progress = window.clone();
+    let task_id_progress = task_id.clone();
+    let processes_monitor = processes.clone();
 
-    let conversion_future = async move {
-        while let Ok(Some(line)) = stdout_reader.next_line().await {
+    let monitor_future = async move {
+        let mut reader = BufReader::new(stdout).lines();
+        let mut parser = ProgressParser::new(task_id_progress.clone(), duration);
+
+        while let Ok(Some(line)) = reader.next_line().await {
             if let Some(progress) = parser.parse_line(&line) {
-                let _ = window_clone.emit("conversion-progress", &progress);
+                let _ = window_progress.emit("conversion-progress", &progress);
             }
         }
-        // Remove process from map when done
-        processes_clone.lock().await.remove(&task_id_clone)
+
+        processes_monitor.lock().await.remove(&task_id_progress)
     };
 
-    // Set strict timeout (1 hour)
-    match timeout(Duration::from_secs(3600), conversion_future).await {
+    // Execute with timeout
+    match timeout(CONVERSION_TIMEOUT, monitor_future).await {
         Ok(Some(mut child)) => {
             let status = child.wait().await?;
+            println!("🎬 [{}] FFmpeg exited with: {:?}", task_id, status);
+
             if status.success() {
-                #[cfg(debug_assertions)]
-                println!("✅ Task {} completed successfully", task_id);
+                println!("✅ [{}] Conversion completed", task_id);
                 let _ = window.emit("conversion-completed", &task_id);
                 Ok(task_id)
             } else {
-                cleanup_failed_output(&output_path).await;
-                let msg = format!("FFmpeg exited with error code: {}", status);
-                let _ = window.emit("conversion-error", serde_json::json!({ "task_id": task_id, "error": msg }));
-                anyhow::bail!(msg)
+                cleanup_failed(&output_path).await;
+                let error = format!("FFmpeg exited with code: {}", status);
+                emit_error(&window, &task_id, &error);
+                anyhow::bail!(error)
             }
         }
         Ok(None) => {
-            // Process was removed externally (cancelled)
-            cleanup_failed_output(&output_path_clone).await;
-            Err(anyhow::anyhow!("Conversion cancelled by user"))
+            // Process was cancelled by user - this is NOT an error
+            cleanup_failed(&output_path).await;
+            println!("🛑 [{}] Conversion cancelled by user", task_id);
+            
+            // Emit cancelled event instead of error
+            let _ = window.emit("conversion-cancelled", &task_id);
+            
+            // Return Ok since cancellation is intentional
+            Ok(task_id)
         }
         Err(_) => {
-            // Timeout
+            // Timeout - this IS an error
             if let Some(mut child) = processes.lock().await.remove(&task_id) {
                 let _ = child.kill().await;
             }
-            cleanup_failed_output(&output_path).await;
-            anyhow::bail!("Conversion timed out (limit: 1 hour)")
+            cleanup_failed(&output_path).await;
+            let error = "Conversion timed out (limit: 1 hour)";
+            emit_error(&window, &task_id, error);
+            anyhow::bail!(error)
         }
     }
+}
+
+async fn cleanup_failed(path: &str) {
+    let path = Path::new(path);
+    if path.exists() {
+        let _ = tokio::fs::remove_file(path).await;
+        println!("🗑️ Cleaned up: {:?}", path);
+    }
+}
+
+fn emit_error(window: &tauri::Window, task_id: &str, error: &str) {
+    println!("❌ [{}] Error: {}", task_id, error);
+    let _ = window.emit(
+        "conversion-error",
+        serde_json::json!({
+            "task_id": task_id,
+            "error": error
+        }),
+    );
 }

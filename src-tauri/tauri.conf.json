@@ -49,6 +49,15 @@
         "assetScope": [
           "$APPDATA/*"
         ]
+      },
+      "window": {
+        "all": false,
+        "minimize": true,
+        "maximize": true,
+        "unmaximize": true,
+        "close": true,
+        "startDragging": true,
+        "setFullscreen": true
       }
     },
     "bundle": {
@@ -106,13 +115,14 @@
         "fullscreen": false,
         "resizable": true,
         "title": "MuXolotl-Converter",
-        "width": 1000,
-        "height": 700,
-        "minWidth": 800,
-        "minHeight": 600,
+        "width": 1280,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 650,
         "center": true,
-        "decorations": true,
+        "decorations": false,
         "transparent": false,
+        "maximized": true,
         "fileDropEnabled": true
       }
     ]

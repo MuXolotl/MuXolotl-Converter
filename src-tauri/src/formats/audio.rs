@@ -1,7 +1,11 @@
-use super::{Category, Stability};
-use serde::{Deserialize, Serialize};
+use super::{sort_formats_by_category, Category, Stability};
 use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+// ============================================================================
+// AudioFormat
+// ============================================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AudioFormat {
@@ -27,29 +31,13 @@ pub struct AudioFormat {
 
 impl AudioFormat {
     #[inline]
-    pub fn supports_sample_rate(&self, sample_rate: u32) -> bool {
-        self.sample_rates.contains(&sample_rate)
+    pub fn supports_sample_rate(&self, rate: u32) -> bool {
+        self.sample_rates.contains(&rate)
     }
 
     #[inline]
     pub fn supports_channels(&self, channels: u32) -> bool {
         self.channels_support.contains(&channels)
-    }
-
-    pub fn validate_bitrate(&self, bitrate: u32) -> Result<(), String> {
-        if !self.lossy {
-            return Ok(());
-        }
-
-        if let Some((min, max)) = self.bitrate_range {
-            if bitrate < min || bitrate > max {
-                return Err(format!(
-                    "Bitrate {}kbps out of range [{}-{}] for {}",
-                    bitrate, min, max, self.extension
-                ));
-            }
-        }
-        Ok(())
     }
 
     pub fn get_bitrate_for_quality(&self, quality: &str) -> Option<u32> {
@@ -69,16 +57,7 @@ impl AudioFormat {
         })
     }
 
-    #[inline]
-    pub fn get_ffmpeg_codec(&self) -> String {
-        self.codec.clone()
-    }
-
-    #[inline]
-    pub fn get_container_format(&self) -> Option<String> {
-        self.container.clone()
-    }
-
+    /// Checks if source codec can be copied without re-encoding
     pub fn can_copy_codec(&self, source_codec: &str) -> bool {
         let source = source_codec.to_lowercase();
         let target = self.codec.to_lowercase();
@@ -87,60 +66,56 @@ impl AudioFormat {
             return true;
         }
 
+        // Codec compatibility mapping
         match self.extension.as_str() {
             "mp3" => source.contains("mp3"),
             "aac" | "m4a" => source.contains("aac") || source.contains("alac"),
             "ogg" => source.contains("vorbis") || source.contains("opus"),
             "opus" => source.contains("opus"),
             "flac" => source.contains("flac"),
-            "wav" => source.starts_with("pcm_"),
+            "wav" | "aiff" => source.starts_with("pcm_"),
             "wma" => source.starts_with("wmav"),
             "ac3" => source.contains("ac3"),
             "dts" => source.contains("dts") || source.contains("dca"),
             "amr" => source.starts_with("amr"),
             "alac" => source.contains("alac"),
-            "aiff" => source.starts_with("pcm_"),
             "wv" => source.contains("wavpack"),
             "ape" => source.contains("ape"),
             "tta" => source.contains("tta"),
-            "mka" => true,
+            "mka" => true, // Matroska accepts anything
             _ => false,
         }
     }
 
-    pub fn get_quality_args(&self, quality: &str) -> Vec<String> {
-        match self.codec.as_str() {
-            "libvorbis" => {
-                let q = match quality {
-                    "low" => "3",
-                    "high" => "7",
-                    "ultra" => "9",
-                    _ => "5",
-                };
-                vec!["-q:a".to_string(), q.to_string()]
-            }
-            "libopus" => vec!["-vbr".to_string(), "on".to_string()],
-            "flac" => {
-                let comp = match quality {
-                    "low" => "0",
-                    "high" => "8",
-                    "ultra" => "12",
-                    _ => "5",
-                };
-                vec!["-compression_level".to_string(), comp.to_string()]
-            }
-            "wavpack" => {
-                let comp = match quality {
-                    "low" => "0",
-                    "ultra" | "high" => "8",
-                    _ => "4",
-                };
-                vec!["-compression_level".to_string(), comp.to_string()]
-            }
-            _ => Vec::new(),
+    /// Returns best sample rate from supported list
+    pub fn best_sample_rate(&self, requested: u32) -> u32 {
+        if self.supports_sample_rate(requested) {
+            requested
+        } else {
+            self.recommended_sample_rate
+        }
+    }
+
+    /// Returns best channel count from supported list
+    pub fn best_channels(&self, requested: u32) -> u32 {
+        if self.supports_channels(requested) {
+            requested
+        } else {
+            // Prefer stereo, then mono, then first supported
+            self.channels_support
+                .iter()
+                .find(|&&c| c == 2)
+                .or_else(|| self.channels_support.iter().find(|&&c| c == 1))
+                .or_else(|| self.channels_support.first())
+                .copied()
+                .unwrap_or(2)
         }
     }
 }
+
+// ============================================================================
+// TOML Parsing
+// ============================================================================
 
 #[derive(Debug, Deserialize)]
 struct TomlAudioFormat {
@@ -167,54 +142,60 @@ struct AudioFormatsToml {
 }
 
 impl From<TomlAudioFormat> for AudioFormat {
-    fn from(toml: TomlAudioFormat) -> Self {
-        AudioFormat {
-            extension: toml.extension,
-            name: toml.name,
-            category: toml.category,
-            codec: toml.codec,
-            container: if toml.container.is_empty() { None } else { Some(toml.container) },
-            stability: toml.stability,
-            description: toml.description,
-            typical_use: toml.typical_use,
-            lossy: toml.lossy,
-            bitrate_range: if toml.bitrate_range.len() == 2 {
-                Some((toml.bitrate_range[0], toml.bitrate_range[1]))
+    fn from(t: TomlAudioFormat) -> Self {
+        Self {
+            extension: t.extension,
+            name: t.name,
+            category: t.category,
+            codec: t.codec,
+            container: if t.container.is_empty() {
+                None
+            } else {
+                Some(t.container)
+            },
+            stability: t.stability,
+            description: t.description,
+            typical_use: t.typical_use,
+            lossy: t.lossy,
+            bitrate_range: if t.bitrate_range.len() == 2 {
+                Some((t.bitrate_range[0], t.bitrate_range[1]))
             } else {
                 None
             },
-            recommended_bitrate: if toml.recommended_bitrate == 0 {
+            recommended_bitrate: if t.recommended_bitrate == 0 {
                 None
             } else {
-                Some(toml.recommended_bitrate)
+                Some(t.recommended_bitrate)
             },
-            sample_rates: toml.sample_rates,
-            recommended_sample_rate: toml.recommended_sample_rate,
-            channels_support: toml.channels_support,
-            special_params: toml.special_params,
+            sample_rates: t.sample_rates,
+            recommended_sample_rate: t.recommended_sample_rate,
+            channels_support: t.channels_support,
+            special_params: t.special_params,
         }
     }
 }
 
+// ============================================================================
+// Static Cache
+// ============================================================================
+
 lazy_static! {
     static ref AUDIO_FORMATS: HashMap<String, AudioFormat> = {
-        let toml_str = include_str!("../formats/audio_formats.toml");
-        let parsed: AudioFormatsToml = toml::from_str(toml_str)
-            .expect("Failed to parse audio_formats.toml");
-        
-        parsed.format
+        let toml_str = include_str!("audio_formats.toml");
+        let parsed: AudioFormatsToml =
+            toml::from_str(toml_str).expect("Failed to parse audio_formats.toml");
+
+        parsed
+            .format
             .into_iter()
-            .map(|f| {
-                let ext = f.extension.clone();
-                (ext, f.into())
-            })
+            .map(|f| (f.extension.clone(), f.into()))
             .collect()
     };
 }
 
 pub fn get_all_formats() -> Vec<AudioFormat> {
     let mut formats: Vec<AudioFormat> = AUDIO_FORMATS.values().cloned().collect();
-    super::sort_by_category(&mut formats, |f| &f.category);
+    sort_formats_by_category(&mut formats, |f| &f.category);
     formats
 }
 

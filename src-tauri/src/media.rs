@@ -1,8 +1,12 @@
-use serde::{Deserialize, Serialize};
-use anyhow::{Context, Result};
 use crate::utils::create_hidden_command;
+use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+// ============================================================================
+// Types
+// ============================================================================
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum MediaType {
     Audio,
@@ -37,36 +41,67 @@ pub struct MediaInfo {
     pub audio_streams: Vec<AudioStream>,
 }
 
+impl MediaInfo {
+    pub fn primary_video(&self) -> Option<&VideoStream> {
+        self.video_streams.first()
+    }
+
+    pub fn primary_audio(&self) -> Option<&AudioStream> {
+        self.audio_streams.first()
+    }
+
+    pub fn video_codec(&self) -> Option<&str> {
+        self.primary_video().map(|v| v.codec.as_str())
+    }
+
+    pub fn audio_codec(&self) -> Option<&str> {
+        self.primary_audio().map(|a| a.codec.as_str())
+    }
+
+    pub fn resolution(&self) -> Option<(u32, u32)> {
+        self.primary_video().map(|v| (v.width, v.height))
+    }
+}
+
+// ============================================================================
+// Detection
+// ============================================================================
+
 pub async fn detect_media_type(app_handle: &tauri::AppHandle, path: &str) -> Result<MediaInfo> {
     let ffprobe_path = crate::get_ffprobe_path(app_handle)
         .map_err(|e| anyhow::anyhow!("FFprobe not found: {}", e))?;
 
-    let ffprobe_str = ffprobe_path.to_str()
+    let ffprobe_str = ffprobe_path
+        .to_str()
         .ok_or_else(|| anyhow::anyhow!("Invalid FFprobe path encoding"))?;
 
-    let mut cmd = create_hidden_command(ffprobe_str);
-    cmd.args(&[
-        "-v", "quiet",
-        "-print_format", "json",
-        "-show_format",
-        "-show_streams",
-        path,
-    ]);
-    
-    let output = cmd.output().context("Failed to execute ffprobe")?;
+    let output = create_hidden_command(ffprobe_str)
+        .args([
+            "-v", "quiet",
+            "-print_format", "json",
+            "-show_format",
+            "-show_streams",
+            path,
+        ])
+        .output()
+        .context("Failed to execute ffprobe")?;
 
     if !output.status.success() {
-        anyhow::bail!("FFprobe failed: {}", String::from_utf8_lossy(&output.stderr));
+        anyhow::bail!(
+            "FFprobe failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 
     let json_str = String::from_utf8(output.stdout).context("Invalid UTF-8 in ffprobe output")?;
-    let probe_result: serde_json::Value = serde_json::from_str(&json_str)
-        .context("Failed to parse ffprobe JSON")?;
 
-    parse_media_info(&probe_result, path)
+    let probe: serde_json::Value =
+        serde_json::from_str(&json_str).context("Failed to parse ffprobe JSON")?;
+
+    parse_probe_result(&probe, path)
 }
 
-fn parse_media_info(probe: &serde_json::Value, path: &str) -> Result<MediaInfo> {
+fn parse_probe_result(probe: &serde_json::Value, path: &str) -> Result<MediaInfo> {
     let format = probe.get("format").context("No format information")?;
 
     let duration = format
@@ -76,6 +111,7 @@ fn parse_media_info(probe: &serde_json::Value, path: &str) -> Result<MediaInfo> 
         .unwrap_or(0.0);
 
     let file_size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
+
     let format_name = format
         .get("format_name")
         .and_then(|f| f.as_str())
@@ -125,52 +161,38 @@ fn parse_media_info(probe: &serde_json::Value, path: &str) -> Result<MediaInfo> 
 }
 
 fn parse_video_stream(stream: &serde_json::Value) -> Option<VideoStream> {
-    let codec = stream.get("codec_name")?.as_str()?.to_string();
-    let width = stream.get("width")?.as_u64()? as u32;
-    let height = stream.get("height")?.as_u64()? as u32;
-
-    let fps = stream
-        .get("r_frame_rate")
-        .and_then(|f| f.as_str())
-        .and_then(|s| {
-            let parts: Vec<&str> = s.split('/').collect();
-            if parts.len() == 2 {
-                let num: f64 = parts[0].parse().ok()?;
-                let den: f64 = parts[1].parse().ok()?;
-                Some(if den != 0.0 { num / den } else { 0.0 })
-            } else {
-                None
-            }
-        })
-        .unwrap_or(0.0);
-
-    let bitrate = stream
-        .get("bit_rate")
-        .and_then(|b| b.as_str())
-        .and_then(|s| s.parse::<u64>().ok());
-
     Some(VideoStream {
-        codec,
-        width,
-        height,
-        fps,
-        bitrate,
+        codec: stream.get("codec_name")?.as_str()?.to_string(),
+        width: stream.get("width")?.as_u64()? as u32,
+        height: stream.get("height")?.as_u64()? as u32,
+        fps: parse_framerate(stream.get("r_frame_rate")?.as_str()?),
+        bitrate: stream
+            .get("bit_rate")
+            .and_then(|b| b.as_str())
+            .and_then(|s| s.parse().ok()),
     })
 }
 
 fn parse_audio_stream(stream: &serde_json::Value) -> Option<AudioStream> {
-    let codec = stream.get("codec_name")?.as_str()?.to_string();
-    let sample_rate = stream.get("sample_rate")?.as_str()?.parse::<u32>().ok()?;
-    let channels = stream.get("channels")?.as_u64()? as u32;
-    let bitrate = stream
-        .get("bit_rate")
-        .and_then(|b| b.as_str())
-        .and_then(|s| s.parse::<u64>().ok());
-
     Some(AudioStream {
-        codec,
-        sample_rate,
-        channels,
-        bitrate,
+        codec: stream.get("codec_name")?.as_str()?.to_string(),
+        sample_rate: stream.get("sample_rate")?.as_str()?.parse().ok()?,
+        channels: stream.get("channels")?.as_u64()? as u32,
+        bitrate: stream
+            .get("bit_rate")
+            .and_then(|b| b.as_str())
+            .and_then(|s| s.parse().ok()),
     })
+}
+
+fn parse_framerate(fps_str: &str) -> f64 {
+    let parts: Vec<&str> = fps_str.split('/').collect();
+    if parts.len() == 2 {
+        let num: f64 = parts[0].parse().unwrap_or(0.0);
+        let den: f64 = parts[1].parse().unwrap_or(1.0);
+        if den != 0.0 {
+            return num / den;
+        }
+    }
+    0.0
 }

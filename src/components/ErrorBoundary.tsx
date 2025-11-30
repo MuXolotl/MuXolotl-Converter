@@ -8,83 +8,67 @@ interface Props {
 interface State {
   hasError: boolean;
   error: Error | null;
-  errorInfo: ErrorInfo | null;
 }
 
 class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = {
-      hasError: false,
-      error: null,
-      errorInfo: null,
-    };
+    this.state = { hasError: false, error: null };
   }
 
-  static getDerivedStateFromError(error: Error): Partial<State> {
+  static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('🔴 Error Boundary caught:', error, errorInfo);
-    this.setState({ errorInfo });
+    console.error('Error Boundary caught:', error, errorInfo);
   }
-
-  handleReset = () => {
-    this.setState({
-      hasError: false,
-      error: null,
-      errorInfo: null,
-    });
-  };
 
   handleReload = () => {
     window.location.reload();
+  };
+
+  handleReset = () => {
+    this.setState({ hasError: false, error: null });
   };
 
   render() {
     if (this.state.hasError) {
       return (
         <div className="w-screen h-screen bg-gradient-main flex items-center justify-center p-8">
-          <div className="glass max-w-2xl w-full p-8 text-center">
-            <AlertTriangle size={64} className="text-red-500 mx-auto mb-4" />
+          <div className="glass max-w-lg w-full p-8 text-center">
+            <AlertTriangle size={48} className="text-red-500 mx-auto mb-4" />
             
-            <h1 className="text-3xl font-bold text-white mb-4">Oops! Something went wrong</h1>
+            <h1 className="text-2xl font-bold text-white mb-2">
+              Something went wrong
+            </h1>
             
-            <p className="text-white/70 mb-6">
-              The application encountered an unexpected error. Don't worry, your files are safe!
+            <p className="text-white/60 mb-6">
+              An unexpected error occurred. Your files are safe.
             </p>
 
             {this.state.error && (
-              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-6 text-left">
-                <p className="text-red-400 font-mono text-sm mb-2">{this.state.error.toString()}</p>
-                {this.state.errorInfo && (
-                  <details className="text-white/50 text-xs">
-                    <summary className="cursor-pointer hover:text-white/70 transition-colors">
-                      Stack trace
-                    </summary>
-                    <pre className="mt-2 overflow-auto max-h-40">
-                      {this.state.errorInfo.componentStack}
-                    </pre>
-                  </details>
-                )}
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-6 text-left">
+                <p className="text-red-400 font-mono text-sm break-all">
+                  {this.state.error.message}
+                </p>
               </div>
             )}
 
             <div className="flex gap-3 justify-center">
               <button
                 onClick={this.handleReset}
-                className="glass px-6 py-3 bg-white/10 hover:bg-white/20 rounded-lg transition-all font-semibold text-white flex items-center gap-2"
+                className="px-5 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white font-medium flex items-center gap-2 transition-colors"
               >
-                <RefreshCw size={18} />
+                <RefreshCw size={16} />
                 Try Again
               </button>
               
               <button
                 onClick={this.handleReload}
-                className="px-6 py-3 bg-gradient-primary rounded-lg transition-all font-semibold text-white hover:shadow-lg"
+                className="px-5 py-2 bg-gradient-primary rounded-lg text-white font-medium transition-shadow hover:shadow-lg"
               >
-                Reload Application
+                Reload App
               </button>
             </div>
           </div>

@@ -2,8 +2,13 @@ pub mod audio;
 pub mod video;
 
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+// ============================================================================
+// Common Types
+// ============================================================================
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum Category {
     Popular,
@@ -13,7 +18,31 @@ pub enum Category {
     Exotic,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+impl Category {
+    fn priority(&self) -> u8 {
+        match self {
+            Category::Popular => 0,
+            Category::Standard => 1,
+            Category::Specialized => 2,
+            Category::Legacy => 3,
+            Category::Exotic => 4,
+        }
+    }
+}
+
+impl Ord for Category {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.priority().cmp(&other.priority())
+    }
+}
+
+impl PartialOrd for Category {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum Stability {
     Stable,
@@ -22,26 +51,19 @@ pub enum Stability {
     Problematic,
 }
 
-pub fn sort_by_category<T>(formats: &mut Vec<T>, get_category: impl Fn(&T) -> &Category) {
-    formats.sort_by(|a, b| {
-        use Category::*;
-        let cat_a = get_category(a);
-        let cat_b = get_category(b);
-        
-        match (cat_a, cat_b) {
-            (Popular, Popular) => std::cmp::Ordering::Equal,
-            (Popular, _) => std::cmp::Ordering::Less,
-            (_, Popular) => std::cmp::Ordering::Greater,
-            (Standard, Standard) => std::cmp::Ordering::Equal,
-            (Standard, _) => std::cmp::Ordering::Less,
-            (_, Standard) => std::cmp::Ordering::Greater,
-            (Specialized, Specialized) => std::cmp::Ordering::Equal,
-            (Specialized, _) => std::cmp::Ordering::Less,
-            (_, Specialized) => std::cmp::Ordering::Greater,
-            (Legacy, Legacy) => std::cmp::Ordering::Equal,
-            (Legacy, _) => std::cmp::Ordering::Less,
-            (_, Legacy) => std::cmp::Ordering::Greater,
-            _ => std::cmp::Ordering::Equal,
-        }
-    });
+impl Stability {
+    pub fn is_safe(&self) -> bool {
+        matches!(self, Stability::Stable | Stability::RequiresSetup)
+    }
+}
+
+// ============================================================================
+// Sorting Helper
+// ============================================================================
+
+pub fn sort_formats_by_category<T, F>(formats: &mut [T], get_category: F)
+where
+    F: Fn(&T) -> &Category,
+{
+    formats.sort_by(|a, b| get_category(a).cmp(get_category(b)));
 }
