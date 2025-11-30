@@ -29,6 +29,15 @@ impl Default for Quality {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileMetadata {
+    pub title: Option<String>,
+    pub artist: Option<String>,
+    pub album: Option<String>,
+    pub genre: Option<String>,
+    pub year: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConversionSettings {
     pub task_id: Option<String>,
@@ -47,6 +56,7 @@ pub struct ConversionSettings {
     pub audio_action: Option<String>,
     #[serde(default)]
     pub copy_audio: bool,
+    pub metadata: Option<FileMetadata>,
 }
 
 impl ConversionSettings {

@@ -7,88 +7,42 @@ use tauri::Manager;
 use crate::formats::audio;
 use crate::media;
 use crate::types::ConversionSettings;
+use super::builder::FfmpegCommand;
 use super::common::*;
 
-fn add_quality_params(
-    args: &mut Vec<String>,
-    format_info: &audio::AudioFormat,
-    quality: &str,
-    settings: &ConversionSettings,
-) {
-    if format_info.lossy {
-        match format_info.codec.as_str() {
+fn apply_audio_settings(
+    mut cmd: FfmpegCommand, 
+    fmt: &audio::AudioFormat, 
+    settings: &ConversionSettings
+) -> FfmpegCommand {
+    let sr = get_sample_rate(settings.get_sample_rate(), &fmt.sample_rates, fmt.recommended_sample_rate);
+    cmd = cmd.sample_rate(Some(sr));
+
+    let ch = get_channels(settings.get_channels(), &fmt.channels_support);
+    cmd = cmd.channels(Some(ch));
+
+    let quality = settings.quality_str();
+    if fmt.lossy {
+        match fmt.codec.as_str() {
             "libvorbis" => {
-                args.extend(format_info.get_quality_args(quality));
-            }
+                let q = match quality { "low"=>"3", "high"=>"7", "ultra"=>"9", _=>"5" };
+                cmd = cmd.arg("-q:a", q);
+            },
             "libopus" => {
-                let bitrate = settings.get_bitrate().unwrap_or_else(|| {
-                    format_info.get_bitrate_for_quality(quality).unwrap_or(128)
-                });
-                args.extend_from_slice(&["-b:a".to_string(), format!("{}k", bitrate)]);
-                args.extend(format_info.get_quality_args(quality));
-            }
+                let br = settings.get_bitrate().unwrap_or(fmt.get_bitrate_for_quality(quality).unwrap_or(128));
+                cmd = cmd.arg("-vbr", "on").audio_bitrate(Some(br));
+            },
+            "flac" | "wavpack" => {
+                let lvl = match quality { "low"=>"0", "high"=>"8", "ultra"=>"12", _=>"5" };
+                cmd = cmd.arg("-compression_level", lvl);
+            },
             _ => {
-                let bitrate = settings.get_bitrate().unwrap_or_else(|| {
-                    format_info.get_bitrate_for_quality(quality).unwrap_or(192)
-                });
-                args.extend_from_slice(&["-b:a".to_string(), format!("{}k", bitrate)]);
+                let br = settings.get_bitrate().unwrap_or(fmt.get_bitrate_for_quality(quality).unwrap_or(192));
+                cmd = cmd.audio_bitrate(Some(br));
             }
         }
-    } else {
-        args.extend(format_info.get_quality_args(quality));
     }
-}
-
-fn add_audio_params(
-    args: &mut Vec<String>,
-    format_info: &audio::AudioFormat,
-    settings: &ConversionSettings,
-) {
-    let sample_rate = get_sample_rate(
-        settings.get_sample_rate(),
-        &format_info.sample_rates,
-        format_info.recommended_sample_rate,
-    );
-    args.extend_from_slice(&["-ar".to_string(), sample_rate.to_string()]);
-
-    let channels = get_channels(settings.get_channels(), &format_info.channels_support);
-    args.extend_from_slice(&["-ac".to_string(), channels.to_string()]);
-}
-
-fn build_args(
-    input: &str,
-    output: &str,
-    format_info: &audio::AudioFormat,
-    quality: &str,
-    settings: &ConversionSettings,
-) -> Vec<String> {
-    let mut args = vec![
-        "-i".to_string(),
-        normalize_path(input),
-        "-vn".to_string(),
-        "-c:a".to_string(),
-        format_info.get_ffmpeg_codec(),
-    ];
-
-    if let Some(container) = format_info.get_container_format() {
-        args.extend_from_slice(&["-f".to_string(), container]);
-    }
-
-    add_quality_params(&mut args, format_info, quality, settings);
-    add_audio_params(&mut args, format_info, settings);
-
-    if !matches!(format_info.codec.as_str(), "libvorbis" | "libopus" | "flac" | "wavpack") {
-        args.extend(format_info.special_params.clone());
-    }
-
-    args.extend_from_slice(&[
-        "-progress".to_string(),
-        "pipe:1".to_string(),
-        "-y".to_string(),
-        normalize_path(output),
-    ]);
-
-    args
+    cmd
 }
 
 pub async fn convert(
@@ -100,20 +54,28 @@ pub async fn convert(
     processes: Arc<Mutex<HashMap<String, Child>>>,
 ) -> Result<String> {
     let task_id = settings.task_id();
+    let fmt_info = audio::get_format(format).context("Unknown audio format")?;
+    let media_info = media::detect_media_type(&window.app_handle(), input).await?;
 
-    #[cfg(debug_assertions)]
-    println!("🎵 Converting audio: {} -> {} (task: {})", input, output, task_id);
+    let mut cmd = FfmpegCommand::new(input, output)
+        .input_opts()
+        .overwrite()
+        .hide_banner()
+        .disable_video()
+        .audio_codec(&fmt_info.codec)
+        .progress_pipe();
 
-    let format_info = audio::get_format(format)
-        .context(format!("Unknown audio format: {}", format))?;
+    cmd = cmd.apply_metadata(&settings.metadata);
 
-    let app_handle = window.app_handle();
-    let media_info = media::detect_media_type(&app_handle, input).await?;
+    if let Some(container) = &fmt_info.container {
+        cmd = cmd.format(container);
+    }
 
-    let quality = settings.quality_str();
-    let args = build_args(input, output, &format_info, quality, &settings);
+    cmd = apply_audio_settings(cmd, &fmt_info, &settings);
+    cmd = cmd.raw_args(&fmt_info.special_params);
 
-    super::spawn_ffmpeg(window, task_id, media_info.duration, args, output.to_string(), processes).await
+    let (args, path) = cmd.build();
+    super::spawn_ffmpeg(window, task_id, media_info.duration, args, path, processes).await
 }
 
 pub async fn extract_from_video(
@@ -125,56 +87,32 @@ pub async fn extract_from_video(
     processes: Arc<Mutex<HashMap<String, Child>>>,
 ) -> Result<String> {
     let task_id = settings.task_id();
-
-    #[cfg(debug_assertions)]
-    println!("🎵 Extracting audio from video: {} -> {} (task: {})", input, output, task_id);
-
-    let app_handle = window.app_handle();
-    let media_info = media::detect_media_type(&app_handle, input).await?;
+    let fmt_info = audio::get_format(format).context("Unknown audio format")?;
+    let media_info = media::detect_media_type(&window.app_handle(), input).await?;
 
     if media_info.audio_streams.is_empty() {
         anyhow::bail!("No audio streams found in video file");
     }
 
-    let format_info = audio::get_format(format)
-        .context(format!("Unknown audio format: {}", format))?;
+    let mut cmd = FfmpegCommand::new(input, output)
+        .input_opts()
+        .overwrite()
+        .hide_banner()
+        .disable_video()
+        .progress_pipe();
 
-    let copy_audio = settings.copy_audio;
-    let source_codec = &media_info.audio_streams[0].codec;
+    cmd = cmd.apply_metadata(&settings.metadata);
 
-    let mut args = vec!["-i".to_string(), normalize_path(input), "-vn".to_string()];
-
-    if copy_audio && format_info.can_copy_codec(source_codec) {
-        args.extend_from_slice(&["-c:a".to_string(), "copy".to_string()]);
-        #[cfg(debug_assertions)]
-        println!("✅ Copying audio stream ({})", source_codec);
+    let src_codec = &media_info.audio_streams[0].codec;
+    if settings.copy_audio && fmt_info.can_copy_codec(src_codec) {
+        cmd = cmd.audio_codec("copy");
     } else {
-        #[cfg(debug_assertions)]
-        if copy_audio {
-            println!("⚠️ Cannot copy '{}' to '{}', transcoding required", source_codec, format_info.extension);
-        }
-
-        args.extend_from_slice(&["-c:a".to_string(), format_info.get_ffmpeg_codec()]);
-
-        if let Some(container) = format_info.get_container_format() {
-            args.extend_from_slice(&["-f".to_string(), container]);
-        }
-
-        let quality = settings.quality_str();
-        add_quality_params(&mut args, &format_info, quality, &settings);
-        add_audio_params(&mut args, &format_info, &settings);
-
-        if !matches!(format_info.codec.as_str(), "libvorbis" | "libopus" | "flac" | "wavpack") {
-            args.extend(format_info.special_params.clone());
-        }
+        cmd = cmd.audio_codec(&fmt_info.codec);
+        if let Some(c) = &fmt_info.container { cmd = cmd.format(c); }
+        cmd = apply_audio_settings(cmd, &fmt_info, &settings);
+        cmd = cmd.raw_args(&fmt_info.special_params);
     }
 
-    args.extend_from_slice(&[
-        "-progress".to_string(),
-        "pipe:1".to_string(),
-        "-y".to_string(),
-        normalize_path(output),
-    ]);
-
-    super::spawn_ffmpeg(window, task_id, media_info.duration, args, output.to_string(), processes).await
+    let (args, path) = cmd.build();
+    super::spawn_ffmpeg(window, task_id, media_info.duration, args, path, processes).await
 }

@@ -4,240 +4,122 @@ import { invoke } from '@tauri-apps/api/tauri';
 import { save } from '@tauri-apps/api/dialog';
 import type { FileItem, ConversionProgress, GpuInfo, ConversionContextType } from '@/types';
 
-const PROGRESS_THROTTLE_MS = 150;
-
 export const useConversion = (
-  updateFile: (fileId: string, updates: Partial<FileItem>) => void,
-  gpuInfo: GpuInfo
+  updateFile: (id: string, updates: Partial<FileItem>) => void,
+  gpuInfo: GpuInfo,
+  filesRef: React.MutableRefObject<FileItem[]> // Pass ref to avoid closure staleness
 ): ConversionContextType => {
-  const [activeConversions, setActiveConversions] = useState<Set<string>>(new Set());
-  const progressTimeouts = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
-  const unlistenFns = useRef<UnlistenFn[]>([]);
-  const isMountedRef = useRef(true);
-
-  const isConverting = activeConversions.size > 0;
-
-  const clearProgressTimeout = useCallback((taskId: string) => {
-    const timeout = progressTimeouts.current.get(taskId);
-    if (timeout) {
-      clearTimeout(timeout);
-      progressTimeouts.current.delete(taskId);
-    }
-  }, []);
-
-  const clearAllProgressTimeouts = useCallback(() => {
-    progressTimeouts.current.forEach(timeout => clearTimeout(timeout));
-    progressTimeouts.current.clear();
-  }, []);
+  const [activeCount, setActiveCount] = useState(0);
+  const unlistenRef = useRef<UnlistenFn[]>([]);
+  
+  // Map task_id -> debounce timer
+  const progressTimers = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   useEffect(() => {
-    isMountedRef.current = true;
+    const setup = async () => {
+      const fns = await Promise.all([
+        // Progress
+        listen<ConversionProgress>('conversion-progress', e => {
+          const p = e.payload;
+          if (progressTimers.current.has(p.task_id)) return;
 
-    const setupListeners = async () => {
-      const listeners = await Promise.all([
-        listen<ConversionProgress>('conversion-progress', event => {
-          if (!isMountedRef.current) return;
+          // Update immediately, then throttle
+          updateFile(p.task_id, { status: 'processing', progress: p });
           
-          const progress = event.payload;
-          const existing = progressTimeouts.current.get(progress.task_id);
-
-          if (existing) clearTimeout(existing);
-
-          const timeout = setTimeout(() => {
-            if (!isMountedRef.current) return;
-            
-            updateFile(progress.task_id, { status: 'processing', progress });
-            progressTimeouts.current.delete(progress.task_id);
-          }, PROGRESS_THROTTLE_MS);
-
-          progressTimeouts.current.set(progress.task_id, timeout);
+          const timer = setTimeout(() => {
+            progressTimers.current.delete(p.task_id);
+          }, 200); // 200ms throttle
+          progressTimers.current.set(p.task_id, timer);
         }),
 
-        listen<string>('conversion-completed', event => {
-          if (!isMountedRef.current) return;
-          
-          const taskId = event.payload;
-          console.log('✅ Conversion completed:', taskId);
-
-          clearProgressTimeout(taskId);
-
-          updateFile(taskId, {
-            status: 'completed',
-            progress: null,
-            completedAt: Date.now(),
-          });
-
-          setActiveConversions(prev => {
-            const next = new Set(prev);
-            next.delete(taskId);
-            return next;
-          });
+        // Completed
+        listen<string>('conversion-completed', e => {
+          const id = e.payload;
+          updateFile(id, { status: 'completed', progress: null, completedAt: Date.now() });
+          setActiveCount(c => Math.max(0, c - 1));
         }),
 
-        listen<{ task_id: string; error: string }>('conversion-error', event => {
-          if (!isMountedRef.current) return;
-          
-          console.error('❌ Conversion error:', event.payload);
-
-          clearProgressTimeout(event.payload.task_id);
-
-          updateFile(event.payload.task_id, {
-            status: 'failed',
-            error: event.payload.error,
-            completedAt: Date.now(),
-          });
-
-          setActiveConversions(prev => {
-            const next = new Set(prev);
-            next.delete(event.payload.task_id);
-            return next;
-          });
-        }),
+        // Error
+        listen<{ task_id: string; error: string }>('conversion-error', e => {
+          const { task_id, error } = e.payload;
+          updateFile(task_id, { status: 'failed', error, progress: null, completedAt: Date.now() });
+          setActiveCount(c => Math.max(0, c - 1));
+        })
       ]);
-
-      unlistenFns.current = listeners;
+      unlistenRef.current = fns;
     };
 
-    setupListeners();
+    setup();
 
     return () => {
-      isMountedRef.current = false;
-      clearAllProgressTimeouts();
-      unlistenFns.current.forEach(fn => fn());
-      unlistenFns.current = [];
+      unlistenRef.current.forEach(f => f());
+      progressTimers.current.forEach(t => clearTimeout(t));
     };
-  }, [updateFile, clearProgressTimeout, clearAllProgressTimeouts]);
+  }, [updateFile]);
 
-  const selectOutputPath = async (file: FileItem, outputFormat: string): Promise<string | null> => {
-    const lastDotIndex = file.name.lastIndexOf('.');
-    const inputName = lastDotIndex !== -1 ? file.name.substring(0, lastDotIndex) : file.name;
-    const defaultFileName = `${inputName}.${outputFormat}`;
+  const startConversion = useCallback(async (file: FileItem) => {
+    try {
+      setActiveCount(c => c + 1);
+      
+      // 1. Output Path Selection (if missing)
+      let outputPath = file.outputPath;
+      if (!outputPath) {
+        const saved = await save({
+          defaultPath: file.name.replace(/\.[^.]+$/, `.${file.outputFormat}`),
+          filters: [{ name: file.outputFormat, extensions: [file.outputFormat] }]
+        });
+        if (!saved) {
+          setActiveCount(c => Math.max(0, c - 1));
+          return; // Cancelled by user
+        }
+        outputPath = saved;
+        updateFile(file.id, { outputPath });
+      }
 
-    return await save({
-      defaultPath: defaultFileName,
-      filters: [{ name: outputFormat.toUpperCase(), extensions: [outputFormat] }],
-    });
+      // 2. Init State
+      updateFile(file.id, { 
+        status: 'processing', 
+        progress: { 
+          task_id: file.id, percent: 0, fps: null, speed: null, 
+          eta_seconds: null, current_time: 0, total_time: file.mediaInfo?.duration || 1 
+        }
+      });
+
+      // 3. Invoke Backend
+      const cmd = file.mediaInfo?.media_type === 'audio' ? 'convert_audio'
+                : file.settings.extractAudioOnly ? 'extract_audio'
+                : 'convert_video';
+      
+      await invoke(cmd, {
+        input: file.path,
+        output: outputPath,
+        format: file.outputFormat,
+        gpuInfo,
+        settings: { ...file.settings, task_id: file.id }
+      });
+
+    } catch (err) {
+      console.error('Conversion launch failed:', err);
+      updateFile(file.id, { status: 'failed', error: String(err) });
+      setActiveCount(c => Math.max(0, c - 1));
+    }
+  }, [gpuInfo, updateFile]);
+
+  const cancelConversion = useCallback(async (id: string) => {
+    try {
+      await invoke('cancel_conversion', { taskId: id });
+      // Status update handled by listener or here if needed immediately
+      updateFile(id, { status: 'cancelled', progress: null });
+      setActiveCount(c => Math.max(0, c - 1));
+    } catch (e) {
+      console.error('Cancel failed', e);
+    }
+  }, [updateFile]);
+
+  return {
+    isConverting: activeCount > 0,
+    startConversion,
+    cancelConversion,
+    updateFile // Re-export for context consumers
   };
-
-  const startConversion = useCallback(
-    async (file: FileItem) => {
-      setActiveConversions(prev => new Set(prev).add(file.id));
-
-      try {
-        const outputFormat = file.outputFormat;
-        let outputPath = file.outputPath;
-
-        if (!outputPath) {
-          const selected = await selectOutputPath(file, outputFormat);
-          if (!selected) {
-            console.log('❌ User cancelled output path selection');
-            setActiveConversions(prev => {
-              const next = new Set(prev);
-              next.delete(file.id);
-              return next;
-            });
-            return;
-          }
-          outputPath = selected;
-          updateFile(file.id, { outputPath });
-        }
-
-        updateFile(file.id, {
-          status: 'processing',
-          progress: {
-            task_id: file.id,
-            percent: 0,
-            fps: null,
-            speed: null,
-            eta_seconds: null,
-            current_time: 0,
-            total_time: file.mediaInfo?.duration || 0,
-          },
-        });
-
-        console.log('🚀 Starting conversion:', {
-          input: file.path,
-          output: outputPath,
-          format: outputFormat,
-        });
-
-        const conversionSettings = {
-          taskId: file.id,
-          quality: file.settings.quality,
-          bitrate: file.settings.bitrate,
-          sampleRate: file.settings.sampleRate,
-          channels: file.settings.channels,
-          useGpu: file.settings.useGpu,
-        };
-
-        const isVideo = file.mediaInfo?.media_type === 'video';
-        const extractAudio = file.settings.extractAudioOnly;
-
-        if (extractAudio && isVideo) {
-          await invoke<string>('extract_audio', {
-            input: file.path,
-            output: outputPath,
-            format: outputFormat,
-            settings: { ...conversionSettings, copyAudio: false },
-          });
-        } else if (file.mediaInfo?.media_type === 'audio') {
-          await invoke<string>('convert_audio', {
-            input: file.path,
-            output: outputPath,
-            format: outputFormat,
-            settings: conversionSettings,
-          });
-        } else if (isVideo) {
-          await invoke<string>('convert_video', {
-            input: file.path,
-            output: outputPath,
-            format: outputFormat,
-            gpuInfo,
-            settings: conversionSettings,
-          });
-        }
-      } catch (error) {
-        console.error('❌ Conversion failed:', error);
-        updateFile(file.id, {
-          status: 'failed',
-          error: String(error),
-          completedAt: Date.now(),
-        });
-        setActiveConversions(prev => {
-          const next = new Set(prev);
-          next.delete(file.id);
-          return next;
-        });
-        throw error;
-      }
-    },
-    [updateFile, gpuInfo]
-  );
-
-  const cancelConversion = useCallback(
-    async (fileId: string) => {
-      try {
-        await invoke('cancel_conversion', { taskId: fileId });
-
-        clearProgressTimeout(fileId);
-
-        updateFile(fileId, {
-          status: 'cancelled',
-          progress: null,
-          completedAt: Date.now(),
-        });
-
-        setActiveConversions(prev => {
-          const next = new Set(prev);
-          next.delete(fileId);
-          return next;
-        });
-      } catch (error) {
-        console.error('Failed to cancel conversion:', error);
-      }
-    },
-    [updateFile, clearProgressTimeout]
-  );
-
-  return { updateFile, startConversion, cancelConversion, isConverting };
 };

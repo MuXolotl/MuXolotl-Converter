@@ -1,11 +1,10 @@
-import React, { useCallback, useState, useEffect, useRef } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { Upload, FolderOpen } from 'lucide-react';
 import { open } from '@tauri-apps/api/dialog';
-import { invoke } from '@tauri-apps/api/tauri';
 import { listen } from '@tauri-apps/api/event';
 import { MEDIA_EXTENSIONS } from '@/constants';
-import { getDefaultFormat, generateFileId, getDefaultSettings } from '@/utils';
-import type { FileItem, MediaInfo } from '@/types';
+import { processFilePaths } from '@/utils/fileHelpers'; // NEW Import
+import type { FileItem } from '@/types';
 
 interface DropZoneProps {
   onFilesAdded: (files: FileItem[]) => void;
@@ -13,80 +12,35 @@ interface DropZoneProps {
   maxCount: number;
 }
 
-const MAX_PARALLEL_PROCESSING = 50;
-
 const DropZone: React.FC<DropZoneProps> = ({ onFilesAdded, currentCount, maxCount }) => {
   const [isDragging, setIsDragging] = useState(false);
-  const onFilesAddedRef = useRef(onFilesAdded);
 
-  // Keep ref up-to-date
-  useEffect(() => {
-    onFilesAddedRef.current = onFilesAdded;
+  // Generic handler for paths (from drag or dialog)
+  const handlePaths = useCallback(async (paths: string[]) => {
+    if (paths.length === 0) return;
+    
+    const processedFiles = await processFilePaths(paths);
+    if (processedFiles.length > 0) {
+      onFilesAdded(processedFiles);
+    }
   }, [onFilesAdded]);
 
-  const processFiles = useCallback(async (paths: string[]) => {
-    const fileItems: FileItem[] = [];
-    const errors: string[] = [];
-
-    for (let i = 0; i < paths.length; i += MAX_PARALLEL_PROCESSING) {
-      const chunk = paths.slice(i, i + MAX_PARALLEL_PROCESSING);
-
-      const results = await Promise.allSettled(
-        chunk.map(async path => {
-          const mediaInfo = await invoke<MediaInfo>('detect_media_type', { path });
-          const fileName = path.split(/[\\/]/).pop() || path;
-          return {
-            id: generateFileId(),
-            path,
-            name: fileName,
-            mediaInfo,
-            outputFormat: getDefaultFormat(mediaInfo.media_type),
-            settings: getDefaultSettings(false),
-            status: 'pending' as const,
-            progress: null,
-            error: null,
-            addedAt: Date.now(),
-          };
-        })
-      );
-
-      results.forEach(result => {
-        if (result.status === 'fulfilled') {
-          fileItems.push(result.value);
-        } else {
-          errors.push(result.reason);
-        }
+  const handleBrowse = useCallback(async (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    try {
+      const selected = await open({
+        multiple: true,
+        filters: [{ name: 'Media Files', extensions: [...MEDIA_EXTENSIONS] }],
       });
-    }
-
-    if (fileItems.length > 0) onFilesAddedRef.current(fileItems);
-
-    if (errors.length > 0) {
-      const errorMsg =
-        errors.length === 1
-          ? `Failed to process file: ${errors[0]}`
-          : `Failed to process ${errors.length} files. First error: ${errors[0]}`;
-      alert(errorMsg);
-    }
-  }, []);
-
-  const handleBrowse = useCallback(
-    async (e?: React.MouseEvent) => {
-      e?.stopPropagation();
-      try {
-        const selected = await open({
-          multiple: true,
-          filters: [{ name: 'Media Files', extensions: [...MEDIA_EXTENSIONS] }],
-        });
-        if (selected) {
-          await processFiles(Array.isArray(selected) ? selected : [selected as string]);
-        }
-      } catch (error) {
-        console.error('File selection error:', error);
+      
+      if (selected) {
+        const paths = Array.isArray(selected) ? selected : [selected];
+        await handlePaths(paths);
       }
-    },
-    [processFiles]
-  );
+    } catch (error) {
+      console.error('File selection error:', error);
+    }
+  }, [handlePaths]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -100,36 +54,32 @@ const DropZone: React.FC<DropZoneProps> = ({ onFilesAdded, currentCount, maxCoun
     setIsDragging(false);
   }, []);
 
-  const handleDrop = useCallback(
-    async (e: React.DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragging(false);
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
 
-      const files = Array.from(e.dataTransfer.files) as (File & { path: string })[];
-      const paths = files.map(f => f.path).filter(Boolean);
-      if (paths.length > 0) await processFiles(paths);
-    },
-    [processFiles]
-  );
+    // Web standard file drop (rare in Tauri but good fallback)
+    // But Tauri has a specific event for OS file drops which we handle in useEffect below
+    // This handler is mostly for "Browser" drag-n-drop behavior if not intercepted by OS
+    const files = Array.from(e.dataTransfer.files) as (File & { path?: string })[];
+    const paths = files.map(f => f.path).filter((p): p is string => !!p);
+    
+    if (paths.length > 0) await handlePaths(paths);
+  }, [handlePaths]);
 
+  // Native OS File Drop Listener
   useEffect(() => {
-    const unlisten = listen<string[]>('tauri://file-drop', async event => {
-      await processFiles(event.payload);
+    const unlisten = listen<string[]>('tauri://file-drop', async (event) => {
+      await handlePaths(event.payload);
     });
     
     return () => {
       unlisten.then(fn => fn());
     };
-  }, [processFiles]);
+  }, [handlePaths]);
 
   const isFull = currentCount >= maxCount;
-  const countColor =
-    currentCount >= maxCount * 0.9
-      ? 'text-status-error'
-      : currentCount >= maxCount * 0.7
-        ? 'text-status-warning'
-        : 'text-status-success';
 
   return (
     <div
@@ -137,41 +87,40 @@ const DropZone: React.FC<DropZoneProps> = ({ onFilesAdded, currentCount, maxCoun
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       onClick={isFull ? undefined : handleBrowse}
-      className={`glass px-6 py-4 flex items-center justify-between gap-4 h-full transition-all duration-200 border-2 border-dashed rounded-xl ${
-        isFull
-          ? 'border-red-500/50 bg-red-500/10 cursor-not-allowed'
-          : isDragging
-            ? 'border-primary-purple bg-primary-purple/10 scale-[1.01] cursor-pointer'
-            : 'border-white/20 hover:border-primary-pink/50 cursor-pointer'
-      }`}
+      className={`
+        h-full w-full flex flex-col items-center justify-center gap-4 
+        border-2 border-dashed rounded-xl transition-all duration-200 cursor-pointer
+        ${isFull 
+          ? 'border-red-500/30 bg-red-500/5 cursor-not-allowed' 
+          : isDragging 
+            ? 'border-primary-purple bg-primary-purple/10 scale-[1.01]' 
+            : 'border-white/10 hover:border-white/20 hover:bg-white/5'
+        }
+      `}
     >
-      <div className="flex items-center gap-4">
-        <Upload
-          size={32}
-          className={`transition-all ${isFull ? 'text-red-500' : isDragging ? 'text-primary-purple scale-110' : 'text-white/40'}`}
+      <div className={`p-4 rounded-full ${isDragging ? 'bg-primary-purple/20' : 'bg-white/5'}`}>
+        <Upload 
+          size={32} 
+          className={`transition-colors ${isFull ? 'text-red-400' : isDragging ? 'text-primary-purple' : 'text-white/40'}`} 
         />
-        <div>
-          <div className="flex items-center gap-2">
-            <p className={`text-lg font-bold ${isFull ? 'text-red-400' : 'text-white'}`}>
-              {isFull ? 'Queue is full!' : 'Drop media files here'}
-            </p>
-            <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${countColor} bg-white/10`}>
-              {currentCount}/{maxCount}
-            </span>
-          </div>
-          <p className="text-white/60 text-sm">
-            {isFull ? 'Remove some files to add more' : 'Audio & Video • 40+ formats supported'}
-          </p>
-        </div>
+      </div>
+      
+      <div className="text-center">
+        <p className={`text-lg font-bold ${isFull ? 'text-red-400' : 'text-white'}`}>
+          {isFull ? 'Queue is full' : 'Drop files here'}
+        </p>
+        <p className="text-sm text-white/40 mt-1">
+          or click to browse
+        </p>
       </div>
 
       {!isFull && (
         <button
           onClick={handleBrowse}
-          className="flex items-center gap-2 px-6 py-3 bg-white/10 hover:bg-white/20 rounded-lg transition-all font-semibold text-white flex-shrink-0"
+          className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-semibold text-white transition-colors flex items-center gap-2"
         >
-          <FolderOpen size={20} />
-          <span>Browse Files</span>
+          <FolderOpen size={16} />
+          Select Files
         </button>
       )}
     </div>

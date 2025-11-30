@@ -1,296 +1,106 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
-import Header from '@/components/Header';
-import GpuIndicator from '@/components/GpuIndicator';
-import DropZone from '@/components/DropZone';
-import FileList from '@/components/FileList';
-import ConvertButton from '@/components/ConvertButton';
-import OutputFolderSelector from '@/components/OutputFolderSelector';
 import { useGpu } from '@/hooks/useGpu';
+import { useFileQueue } from '@/hooks/useFileQueue';
 import { useConversion } from '@/hooks/useConversion';
-import { generateOutputPath, sortFilesByStatus, saveQueue, loadQueue, clearQueue, saveOutputFolder, loadOutputFolder } from '@/utils';
-import type { FileItem, ConversionContextType } from '@/types';
+import { saveOutputFolder, loadOutputFolder } from '@/utils';
+import type { ConversionContextType } from '@/types';
+
+// Layout Components
+import SplitPane from '@/components/Layout/SplitPane';
+import Sidebar from '@/components/Sidebar';
+import Queue from '@/components/Queue';
+import Inspector from '@/components/Inspector';
+import OutputFolderSelector from '@/components/OutputFolderSelector';
+import GpuIndicator from '@/components/GpuIndicator';
 
 export const ConversionContext = React.createContext<ConversionContextType | null>(null);
 
-const MAX_PARALLEL_CONVERSIONS = 4;
-const MAX_FILES_IN_QUEUE = 50;
-const AUTOSAVE_INTERVAL_MS = 10000;
-
 const App: React.FC = () => {
-  const [files, setFiles] = useState<FileItem[]>([]);
-  const [ffmpegAvailable, setFfmpegAvailable] = useState<boolean | null>(null);
-  const [parallelConversion, setParallelConversion] = useState(false);
+  // State
+  const [ffmpegReady, setFfmpegReady] = useState<boolean | null>(null);
   const [outputFolder, setOutputFolder] = useState<string>('');
-  const [expandedAdvanced, setExpandedAdvanced] = useState<Set<string>>(new Set());
-  const [expandedCompactCard, setExpandedCompactCard] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('queue');
+  const [selectedFileId, setSelectedFileId] = useState<string | null>(null);
 
-  const filesRef = useRef<FileItem[]>(files);
+  // Hooks
   const { gpuInfo, isLoading: gpuLoading } = useGpu();
+  const { files, addFiles, removeFile, updateFile, clearAll, retryFile, filesRef } = useFileQueue(outputFolder);
+  const conversionCtx = useConversion(updateFile, gpuInfo, filesRef);
 
-  // Keep ref synchronized
+  // Init
   useEffect(() => {
-    filesRef.current = files;
-  }, [files]);
-
-  // ============================================================================
-  // FILE MANAGEMENT
-  // ============================================================================
-
-  const handleFilesAdded = useCallback(
-    (newFiles: FileItem[]) => {
-      const availableSlots = MAX_FILES_IN_QUEUE - filesRef.current.length;
-
-      if (availableSlots <= 0) {
-        alert(`⚠️ Queue is full! Maximum ${MAX_FILES_IN_QUEUE} files allowed.`);
-        return;
-      }
-
-      const existingPaths = new Set(filesRef.current.map(f => f.path));
-      const uniqueFiles = newFiles.filter(f => !existingPaths.has(f.path));
-      const duplicateCount = newFiles.length - uniqueFiles.length;
-
-      if (duplicateCount > 0) {
-        alert(`⚠️ ${duplicateCount} duplicate file${duplicateCount > 1 ? 's' : ''} skipped.`);
-      }
-
-      const filesToAdd = uniqueFiles.slice(0, availableSlots);
-      const exceededCount = uniqueFiles.length - filesToAdd.length;
-
-      if (exceededCount > 0) {
-        alert(`⚠️ Only ${filesToAdd.length} files added. ${exceededCount} exceeded limit.`);
-      }
-
-      if (filesToAdd.length === 0) return;
-
-      const filesWithPath = outputFolder
-        ? filesToAdd.map(file => ({ ...file, outputPath: generateOutputPath(file, outputFolder) }))
-        : filesToAdd;
-
-      setFiles(prev => [...filesWithPath, ...prev]);
-    },
-    [outputFolder]
-  );
-
-  const handleFileRemove = useCallback((fileId: string) => {
-    setFiles(prev => prev.filter(f => f.id !== fileId));
-    setExpandedAdvanced(prev => {
-      const next = new Set(prev);
-      next.delete(fileId);
-      return next;
-    });
-    setExpandedCompactCard(prev => (prev === fileId ? null : prev));
-  }, []);
-
-  const handleClearAll = useCallback(() => {
-    setFiles([]);
-    clearQueue();
-  }, []);
-
-  // ============================================================================
-  // STORAGE
-  // ============================================================================
-
-  useEffect(() => {
-    const savedFiles = loadQueue();
-    if (savedFiles.length > 0) {
-      setFiles(savedFiles);
-      console.log(`✅ Restored ${savedFiles.length} files from previous session`);
-    }
-
-    const savedFolder = loadOutputFolder();
-    if (savedFolder) {
-      setOutputFolder(savedFolder);
-      console.log(`✅ Restored output folder: ${savedFolder}`);
-    }
+    invoke<boolean>('check_ffmpeg').then(setFfmpegReady).catch(() => setFfmpegReady(false));
+    const saved = loadOutputFolder();
+    if (saved) setOutputFolder(saved);
   }, []);
 
   useEffect(() => {
     if (outputFolder) saveOutputFolder(outputFolder);
   }, [outputFolder]);
 
-  // Autosave with stable interval
-  useEffect(() => {
-    const prevFilesStringRef = { current: '' };
+  // Derived
+  const selectedFile = files.find(f => f.id === selectedFileId) || null;
+  
+  // Auto-select newly added file
+  const handleFilesAdded = (newFiles: any[]) => {
+      addFiles(newFiles);
+      if (newFiles.length > 0) setSelectedFileId(newFiles[0].id);
+  };
 
-    const interval = setInterval(() => {
-      const currentFiles = filesRef.current;
-      
-      if (currentFiles.length > 0) {
-        const filesString = JSON.stringify(currentFiles);
-        if (filesString !== prevFilesStringRef.current) {
-          saveQueue(currentFiles);
-          prevFilesStringRef.current = filesString;
-          console.log(`💾 Auto-saved ${currentFiles.length} files to queue`);
-        }
-      }
-    }, AUTOSAVE_INTERVAL_MS);
+  const handleRemove = (id: string) => {
+      removeFile(id);
+      if (selectedFileId === id) setSelectedFileId(null);
+  };
 
-    return () => clearInterval(interval);
-  }, []); // Empty deps - interval created once
-
-  // ============================================================================
-  // CONVERSION
-  // ============================================================================
-
-  const updateFile = useCallback(
-    (fileId: string, updates: Partial<FileItem>) => {
-      setFiles(prev =>
-        prev.map(f => {
-          if (f.id !== fileId) return f;
-          const updated = { ...f, ...updates };
-
-          if (outputFolder && updated.status === 'pending' && !updated.outputPath) {
-            if (updates.outputFormat !== undefined) {
-              updated.outputPath = generateOutputPath(updated, outputFolder);
-            }
-          }
-
-          return updated;
-        })
-      );
-    },
-    [outputFolder]
-  );
-
-  const conversionContext = useConversion(updateFile, gpuInfo);
-
-  useEffect(() => {
-    invoke<boolean>('check_ffmpeg')
-      .then(setFfmpegAvailable)
-      .catch(error => {
-        console.error('FFmpeg check failed:', error);
-        setFfmpegAvailable(false);
-        alert(`⚠️ FFmpeg is not installed.\n\nError: ${error}`);
-      });
-  }, []);
-
-  useEffect(() => {
-    if (outputFolder) {
-      setFiles(prev =>
-        prev.map(file =>
-          file.status === 'pending' && !file.outputPath
-            ? { ...file, outputPath: generateOutputPath(file, outputFolder) }
-            : file
-        )
-      );
-    }
-  }, [outputFolder]);
-
-  const sortedFiles = useMemo(() => sortFilesByStatus(files), [files]);
-
-  const handleRetry = useCallback(
-    (fileId: string) => {
-      updateFile(fileId, {
-        status: 'pending',
-        progress: null,
-        error: null,
-        completedAt: undefined,
-      });
-    },
-    [updateFile]
-  );
-
-  const handleConvertAll = useCallback(async () => {
-    const pendingFiles = filesRef.current.filter(f => f.status === 'pending');
-    if (pendingFiles.length === 0) return;
-
-    console.log(
-      `🚀 Starting ${parallelConversion ? 'parallel' : 'sequential'} conversion for ${pendingFiles.length} files`
-    );
-
-    if (parallelConversion) {
-      const chunks = [];
-      for (let i = 0; i < pendingFiles.length; i += MAX_PARALLEL_CONVERSIONS) {
-        chunks.push(pendingFiles.slice(i, i + MAX_PARALLEL_CONVERSIONS));
-      }
-
-      for (const chunk of chunks) {
-        await Promise.allSettled(chunk.map(file => conversionContext.startConversion(file)));
-      }
-    } else {
-      for (const file of pendingFiles) {
-        await conversionContext.startConversion(file).catch(() => {});
-      }
-    }
-  }, [parallelConversion, conversionContext]);
-
-  const handleToggleAdvanced = useCallback((fileId: string) => {
-    setExpandedAdvanced(prev => {
-      const next = new Set(prev);
-      next.has(fileId) ? next.delete(fileId) : next.add(fileId);
-      return next;
-    });
-  }, []);
-
-  const handleToggleCompactCard = useCallback((fileId: string | null) => {
-    setExpandedCompactCard(prev => (prev === fileId ? null : fileId));
-  }, []);
-
-  const canConvert =
-    files.some(f => f.status === 'pending') && !conversionContext.isConverting && ffmpegAvailable === true;
-  const pendingCount = files.filter(f => f.status === 'pending').length;
-  const fileCountDisplay = `${files.length}/${MAX_FILES_IN_QUEUE}`;
-
-  if (ffmpegAvailable === null) {
-    return (
-      <div className="w-screen h-screen bg-gradient-main flex items-center justify-center">
-        <div className="text-white text-xl">Checking FFmpeg...</div>
-      </div>
-    );
-  }
+  if (ffmpegReady === null) return <div className="h-screen w-screen bg-gradient-main flex items-center justify-center text-white">Loading Core...</div>;
 
   return (
-    <ConversionContext.Provider value={conversionContext}>
-      <div className="w-screen h-screen bg-gradient-main overflow-hidden flex flex-col">
-        <div className="flex-1 flex flex-col p-4 gap-3 min-h-0">
-          <div className="flex-shrink-0 flex items-center justify-between">
-            <Header />
-            {!gpuLoading && <GpuIndicator gpuInfo={gpuInfo} />}
-          </div>
+    <ConversionContext.Provider value={conversionCtx}>
+      <div className="h-screen w-screen bg-[#0f172a] text-white flex overflow-hidden">
+        {/* 1. Left Sidebar (Fixed) */}
+        <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
-          <div className="flex-shrink-0 flex gap-3">
-            <div className="flex-1">
-              <DropZone onFilesAdded={handleFilesAdded} currentCount={files.length} maxCount={MAX_FILES_IN_QUEUE} />
-            </div>
+        {/* 2. Content Area (Split View) */}
+        <div className="flex-1 h-full overflow-hidden flex flex-col">
+           {/* Top Bar / Toolbar (Optional place for Global Controls) */}
+           <div className="h-14 border-b border-white/10 flex items-center justify-between px-4 bg-black/20 shrink-0">
+                <div className="flex items-center gap-4">
+                    <h1 className="font-bold text-lg gradient-text">Queue</h1>
+                    <div className="h-6 w-[1px] bg-white/10" />
+                    <div className="text-xs text-white/40">{files.length} items</div>
+                    {!gpuLoading && <div className="scale-75 origin-left"><GpuIndicator gpuInfo={gpuInfo} /></div>}
+                </div>
 
-            <div className="w-64 flex flex-col gap-2">
-              <ConvertButton
-                disabled={!canConvert}
-                isConverting={conversionContext.isConverting}
-                onClick={handleConvertAll}
-                fileCount={pendingCount}
-              />
+                <div className="flex items-center gap-3">
+                    <OutputFolderSelector outputFolder={outputFolder} onFolderChange={setOutputFolder} />
+                    {/* Global Convert All button could go here too */}
+                </div>
+           </div>
 
-              <OutputFolderSelector outputFolder={outputFolder} onFolderChange={setOutputFolder} />
-
-              <div className="glass px-3 py-2 flex items-center justify-between">
-                <span className="text-white text-sm">Parallel conversion</span>
-                <input
-                  type="checkbox"
-                  checked={parallelConversion}
-                  onChange={e => setParallelConversion(e.target.checked)}
-                  className="w-4 h-4 rounded bg-white/10 border-white/20 checked:bg-primary-purple cursor-pointer"
-                  title={`Enable parallel processing (max ${MAX_PARALLEL_CONVERSIONS} files)`}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="flex-1 min-h-0">
-            <FileList
-              files={sortedFiles}
-              onRemove={handleFileRemove}
-              onRetry={handleRetry}
-              gpuAvailable={gpuInfo?.available || true}
-              expandedAdvanced={expandedAdvanced}
-              onToggleAdvanced={handleToggleAdvanced}
-              expandedCompactCard={expandedCompactCard}
-              onToggleCompactCard={handleToggleCompactCard}
-              fileCountDisplay={fileCountDisplay}
-              onClearAll={handleClearAll}
-            />
-          </div>
+           {/* Split View: Queue | Inspector */}
+           <div className="flex-1 min-h-0 relative">
+               <SplitPane
+                  initialLeftWidth={window.innerWidth * 0.65} // Queue takes 65% by default
+                  minLeftWidth={400}
+                  maxLeftWidth={1200}
+                  left={
+                    <Queue 
+                        files={files} 
+                        selectedId={selectedFileId} 
+                        onSelect={setSelectedFileId}
+                        onFilesAdded={handleFilesAdded}
+                    />
+                  }
+                  right={
+                    <Inspector 
+                        file={selectedFile} 
+                        onRemove={handleRemove}
+                        onRetry={retryFile}
+                    />
+                  }
+               />
+           </div>
         </div>
       </div>
     </ConversionContext.Provider>

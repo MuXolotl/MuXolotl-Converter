@@ -10,41 +10,36 @@ export interface GpuInfo {
 }
 
 export type MediaType = 'audio' | 'video' | 'unknown';
-
-export interface VideoStream {
-  codec: string;
-  width: number;
-  height: number;
-  fps: number;
-  bitrate: number | null;
-}
-
-export interface AudioStream {
-  codec: string;
-  sample_rate: number;
-  channels: number;
-  bitrate: number | null;
-}
+export type ConversionStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+export type Quality = 'low' | 'medium' | 'high' | 'ultra' | 'custom';
 
 export interface MediaInfo {
   media_type: MediaType;
   duration: number;
   file_size: number;
   format_name: string;
-  video_streams: VideoStream[];
-  audio_streams: AudioStream[];
+  video_streams: Array<{
+    codec: string;
+    width: number;
+    height: number;
+    fps: number;
+    bitrate: number | null;
+  }>;
+  audio_streams: Array<{
+    codec: string;
+    sample_rate: number;
+    channels: number;
+    bitrate: number | null;
+  }>;
 }
-
-export type Category = 'popular' | 'standard' | 'specialized' | 'legacy' | 'exotic';
-export type Stability = 'stable' | 'requiressetup' | 'experimental' | 'problematic';
 
 export interface AudioFormat {
   extension: string;
   name: string;
-  category: Category;
+  category: string;
   codec: string;
   container: string | null;
-  stability: Stability;
+  stability: 'stable' | 'requiressetup' | 'experimental' | 'problematic';
   description: string;
   typical_use: string;
   lossy: boolean;
@@ -59,11 +54,11 @@ export interface AudioFormat {
 export interface VideoFormat {
   extension: string;
   name: string;
-  category: Category;
+  category: string;
   video_codecs: string[];
   audio_codecs: string[];
   container: string;
-  stability: Stability;
+  stability: 'stable' | 'requiressetup' | 'experimental' | 'problematic';
   description: string;
   typical_use: string;
   max_resolution: [number, number] | null;
@@ -88,23 +83,16 @@ export interface ConversionProgress {
   total_time: number;
 }
 
-export interface ConversionSettings {
-  taskId?: string;
-  quality: 'low' | 'medium' | 'high' | 'ultra' | 'custom';
-  bitrate?: number;
-  sampleRate?: number;
-  channels?: number;
-  width?: number;
-  height?: number;
-  fps?: number;
-  videoCodec?: string;
-  audioCodec?: string;
-  useGpu: boolean;
-  audioAction?: 'copy' | 'remove' | 'reencode';
+export interface FileMetadata {
+  title?: string;
+  artist?: string;
+  album?: string;
+  genre?: string;
+  year?: string;
 }
 
 export interface FileSettings {
-  quality: 'low' | 'medium' | 'high' | 'ultra' | 'custom';
+  quality: Quality;
   bitrate?: number;
   sampleRate?: number;
   channels?: number;
@@ -115,6 +103,7 @@ export interface FileSettings {
   audioCodec?: string;
   useGpu: boolean;
   extractAudioOnly: boolean;
+  metadata?: FileMetadata;
 }
 
 export interface FileItem {
@@ -125,7 +114,7 @@ export interface FileItem {
   outputFormat: string;
   outputPath?: string;
   settings: FileSettings;
-  status: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+  status: ConversionStatus;
   progress: ConversionProgress | null;
   error: string | null;
   completedAt?: number;
@@ -139,8 +128,6 @@ export interface RecommendedFormats {
   experimental: string[];
   problematic: string[];
 }
-
-export type TabType = 'audio' | 'video';
 
 export interface ConversionContextType {
   updateFile: (fileId: string, updates: Partial<FileItem>) => void;
