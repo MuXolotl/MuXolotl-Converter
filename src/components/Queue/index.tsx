@@ -1,10 +1,8 @@
-import React, { useCallback, useMemo } from 'react';
-import { open } from '@tauri-apps/api/dialog';
-import { CheckSquare, Square, Trash2 } from 'lucide-react';
-import { MEDIA_EXTENSIONS, MAX_QUEUE_SIZE } from '@/constants';
-import { processFilePaths } from '@/utils/fileHelpers';
-import QueueItem from './QueueItem';
+import React from 'react';
+import { useAutoAnimate } from '@formkit/auto-animate/react';
 import DropZone from '@/components/DropZone';
+import QueueItem from './QueueItem';
+import { MAX_QUEUE_SIZE } from '@/constants';
 import type { FileItem } from '@/types';
 
 interface QueueProps {
@@ -28,49 +26,38 @@ const Queue: React.FC<QueueProps> = ({
   onRemoveSelected,
   onFilesAdded,
 }) => {
-  const allSelected = useMemo(
-    () => files.length > 0 && selectedIds.size === files.length,
-    [files.length, selectedIds.size]
-  );
+  const [parent] = useAutoAnimate();
 
-  const someSelected = selectedIds.size > 0;
-
-  const handleAddFiles = useCallback(async () => {
-    try {
-      const selected = await open({
-        multiple: true,
-        filters: [{ name: 'Media Files', extensions: [...MEDIA_EXTENSIONS] }],
-      });
-
-      if (selected) {
-        const paths = Array.isArray(selected) ? selected : [selected];
-        const newFiles = await processFilePaths(paths);
-        if (newFiles.length > 0) {
-          onFilesAdded(newFiles);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to add files:', error);
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      onRemoveSelected();
     }
-  }, [onFilesAdded]);
-
-  const handleToggleSelectAll = useCallback(() => {
-    if (allSelected) {
-      onDeselectAll();
-    } else {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+      e.preventDefault();
       onSelectAll();
     }
-  }, [allSelected, onSelectAll, onDeselectAll]);
+    if (e.key === 'Escape') {
+      onDeselectAll();
+    }
+  };
 
-  const handleClick = useCallback((e: React.MouseEvent, id: string) => {
-    const isMulti = e.ctrlKey || e.metaKey || e.shiftKey;
-    onSelect(id, isMulti);
-  }, [onSelect]);
+  // Shared column widths configuration
+  // Total should be roughly 100%, but fixed pixels mixed with % is safer
+  const renderColGroup = () => (
+    <colgroup>
+      <col style={{ width: '40px' }} />  {/* # */}
+      <col style={{ width: '35%' }} />   {/* Name */}
+      <col style={{ width: '15%' }} />   {/* Format */}
+      <col style={{ width: '15%' }} />   {/* Size/Dur */}
+      <col style={{ width: '25%' }} />   {/* Status */}
+      <col style={{ width: '50px' }} />  {/* Action */}
+    </colgroup>
+  );
 
   // Empty state
   if (files.length === 0) {
     return (
-      <div className="h-full flex items-center justify-center p-8">
+      <div className="h-full flex flex-col items-center justify-center p-8 bg-[#1e293b]/30">
         <DropZone
           onFilesAdded={onFilesAdded}
           currentCount={0}
@@ -81,63 +68,60 @@ const Queue: React.FC<QueueProps> = ({
   }
 
   return (
-    <div className="flex flex-col h-full bg-black/10">
-      {/* Header with Select All / Delete Selected */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 bg-white/5 shrink-0">
-        {/* Left: Select All */}
-        <button
-          onClick={handleToggleSelectAll}
-          className="flex items-center gap-2 text-xs text-white/60 hover:text-white transition-colors"
-        >
-          {allSelected ? (
-            <CheckSquare size={16} className="text-purple-400" />
-          ) : (
-            <Square size={16} />
-          )}
-          <span>{allSelected ? 'Deselect All' : 'Select All'}</span>
-        </button>
-
-        {/* Right: Delete Selected */}
-        {someSelected && (
-          <button
-            onClick={onRemoveSelected}
-            className="flex items-center gap-1.5 px-3 py-1 text-xs text-red-400 hover:bg-red-500/10 rounded transition-colors"
-          >
-            <Trash2 size={14} />
-            <span>Delete Selected ({selectedIds.size})</span>
-          </button>
-        )}
+    <div 
+      className="h-full flex flex-col bg-[#1e293b]/30 outline-none"
+      tabIndex={0}
+      onKeyDown={handleKeyDown}
+      onClick={() => onDeselectAll()}
+    >
+      {/* Table Header - Fixed */}
+      <div className="shrink-0 bg-[#0f172a] border-b border-white/10 select-none">
+        <table className="pro-table">
+          {renderColGroup()}
+          <thead>
+            <tr>
+              <th className="text-center">#</th>
+              <th className="text-left">File Name</th>
+              <th className="text-left pl-4">Format</th>
+              <th className="text-right pr-4">Size / Dur</th>
+              <th className="text-left pl-4">Status</th>
+              <th className="text-center"></th>
+            </tr>
+          </thead>
+        </table>
       </div>
 
-      {/* Column Headers */}
-      <div className="flex items-center px-4 py-1.5 border-b border-white/5 text-[10px] uppercase font-bold text-white/40 tracking-wider shrink-0">
-        <div className="w-12 text-center">Type</div>
-        <div className="flex-1 pl-2">File</div>
-        <div className="w-32 text-center">Format</div>
-        <div className="w-28 text-center">Status</div>
-        <div className="w-10" />
-      </div>
-
-      {/* List */}
-      <div className="flex-1 overflow-y-auto">
-        {files.map(file => (
-          <QueueItem
-            key={file.id}
-            file={file}
-            isSelected={selectedIds.has(file.id)}
-            onClick={(e) => handleClick(e, file.id)}
-            onRemove={() => onRemove(file.id)}
-          />
-        ))}
-
-        {/* Add more button */}
+      {/* Scrollable Table Body */}
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
+        <table className="pro-table">
+          {renderColGroup()}
+          <tbody ref={parent}>
+            {files.map((file, index) => (
+              <QueueItem
+                key={file.id}
+                index={index}
+                file={file}
+                isSelected={selectedIds.has(file.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelect(file.id, e.ctrlKey || e.metaKey);
+                }}
+                onRemove={() => onRemove(file.id)}
+              />
+            ))}
+          </tbody>
+        </table>
+        
+        {/* Compact Drop zone at the bottom */}
         {files.length < MAX_QUEUE_SIZE && (
-          <button
-            onClick={handleAddFiles}
-            className="w-full p-4 text-white/30 text-xs hover:bg-white/5 hover:text-white/60 transition-colors border-t border-white/5"
-          >
-            + Add more files ({MAX_QUEUE_SIZE - files.length} slots available)
-          </button>
+           <div className="p-2 opacity-60 hover:opacity-100 transition-opacity">
+              <DropZone
+                onFilesAdded={onFilesAdded}
+                currentCount={files.length}
+                maxCount={MAX_QUEUE_SIZE}
+                compact // New prop we'll add to DropZone
+              />
+           </div>
         )}
       </div>
     </div>

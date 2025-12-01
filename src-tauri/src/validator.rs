@@ -126,7 +126,7 @@ fn validate_video(
 
         if let (Some(w), Some(h)) = (w, h) {
             if w > max_w as u64 || h > max_h as u64 {
-                if fmt.has_strict_resolution() {
+                if fmt.requires_fixed_resolution {
                     result.error(format!(
                         "{} requires exactly {}x{} resolution",
                         fmt.extension, max_w, max_h

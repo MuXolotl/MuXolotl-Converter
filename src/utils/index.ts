@@ -84,7 +84,7 @@ export function getDefaultFormat(mediaType: MediaType | string): string {
 export function getDefaultSettings(gpuAvailable = false): FileSettings {
   return {
     quality: 'medium',
-    useGpu: gpuAvailable,
+    useGpu: true, // Always default to true, logic handles availability check
     extractAudioOnly: false,
     sampleRate: 44100,
     channels: 2,

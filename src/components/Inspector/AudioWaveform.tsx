@@ -1,39 +1,38 @@
 import React, { useMemo } from 'react';
 
 const AudioWaveform: React.FC = () => {
-  // Generate random but consistent waveform bars
+  // Random bars but consistent for component lifecycle
   const bars = useMemo(() => {
-    const count = 40;
+    const count = 16;
     const result: number[] = [];
-    
-    // Create a smooth wave pattern
     for (let i = 0; i < count; i++) {
-      const position = i / count;
-      // Create multiple overlapping sine waves for natural look
-      const wave1 = Math.sin(position * Math.PI * 4) * 0.3;
-      const wave2 = Math.sin(position * Math.PI * 7 + 1) * 0.25;
-      const wave3 = Math.sin(position * Math.PI * 11 + 2) * 0.2;
-      const noise = (Math.random() - 0.5) * 0.15;
-      
-      const height = 0.3 + Math.abs(wave1 + wave2 + wave3 + noise);
-      result.push(Math.min(1, Math.max(0.1, height)));
+      // Create a nice sine-like wave
+      const val = Math.sin(i * 0.5) * 0.5 + 0.5; // Base shape
+      const noise = Math.random() * 0.3; // Add randomness
+      result.push(Math.max(0.2, Math.min(1, val + noise)));
     }
-    
     return result;
   }, []);
 
   return (
-    <div className="flex items-center justify-center gap-[2px] h-16 px-8">
+    <div className="w-full h-full flex items-center justify-center gap-[3px] px-2 overflow-hidden">
       {bars.map((height, i) => (
         <div
           key={i}
-          className="w-1 bg-gradient-to-t from-purple-500 to-pink-500 rounded-full opacity-60"
+          className="w-1 bg-gradient-to-t from-blue-600 to-cyan-400 rounded-full opacity-80"
           style={{
-            height: `${height * 100}%`,
-            animationDelay: `${i * 50}ms`,
+            height: `${height * 70}%`, 
+            animation: `wave 1.2s ease-in-out infinite alternate`,
+            animationDelay: `${i * 0.05}s`,
           }}
         />
       ))}
+      <style>{`
+        @keyframes wave {
+          0% { transform: scaleY(0.6); opacity: 0.6; }
+          100% { transform: scaleY(1); opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 };

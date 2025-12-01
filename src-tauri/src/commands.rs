@@ -1,6 +1,5 @@
 use crate::binary;
 use crate::converter;
-use crate::error::AppResult;
 use crate::formats::{audio, video};
 use crate::gpu::{self, GpuInfo};
 use crate::media::{self, MediaInfo};
@@ -43,6 +42,22 @@ pub async fn window_close(window: tauri::Window) -> Result<(), String> {
 #[tauri::command]
 pub async fn window_is_maximized(window: tauri::Window) -> Result<bool, String> {
     window.is_maximized().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn close_splash(window: tauri::Window) {
+    // 1. Prepare main window
+    if let Some(main) = window.get_window("main") {
+        // Force maximize before showing to ensure full screen
+        let _ = main.maximize(); 
+        let _ = main.show();
+        let _ = main.set_focus();
+    }
+    
+    // 2. Close splashscreen
+    if let Some(splash) = window.get_window("splashscreen") {
+        let _ = splash.close();
+    }
 }
 
 // ============================================================================

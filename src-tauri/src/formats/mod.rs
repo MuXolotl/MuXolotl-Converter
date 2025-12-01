@@ -52,6 +52,7 @@ pub enum Stability {
 }
 
 impl Stability {
+    #[allow(dead_code)]
     pub fn is_safe(&self) -> bool {
         matches!(self, Stability::Stable | Stability::RequiresSetup)
     }

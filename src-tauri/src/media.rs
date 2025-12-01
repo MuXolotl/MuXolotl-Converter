@@ -50,6 +50,7 @@ impl MediaInfo {
         self.audio_streams.first()
     }
 
+    #[allow(dead_code)]
     pub fn video_codec(&self) -> Option<&str> {
         self.primary_video().map(|v| v.codec.as_str())
     }
@@ -58,6 +59,7 @@ impl MediaInfo {
         self.primary_audio().map(|a| a.codec.as_str())
     }
 
+    #[allow(dead_code)]
     pub fn resolution(&self) -> Option<(u32, u32)> {
         self.primary_video().map(|v| (v.width, v.height))
     }

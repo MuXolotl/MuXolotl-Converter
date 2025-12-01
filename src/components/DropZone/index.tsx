@@ -10,9 +10,15 @@ interface DropZoneProps {
   onFilesAdded: (files: FileItem[]) => void;
   currentCount: number;
   maxCount: number;
+  compact?: boolean; // New prop
 }
 
-const DropZone: React.FC<DropZoneProps> = ({ onFilesAdded, currentCount, maxCount }) => {
+const DropZone: React.FC<DropZoneProps> = ({ 
+  onFilesAdded, 
+  currentCount, 
+  maxCount,
+  compact = false 
+}) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -48,7 +54,6 @@ const DropZone: React.FC<DropZoneProps> = ({ onFilesAdded, currentCount, maxCoun
     }
   }, [handlePaths, currentCount, maxCount]);
 
-  // Native file drop listener
   useEffect(() => {
     const unlisten = listen<string[]>('tauri://file-drop', async event => {
       await handlePaths(event.payload);
@@ -66,40 +71,56 @@ const DropZone: React.FC<DropZoneProps> = ({ onFilesAdded, currentCount, maxCoun
 
   const isFull = currentCount >= maxCount;
 
+  // Compact View (Small Strip)
+  if (compact) {
+    return (
+      <div
+        onClick={isFull || isProcessing ? undefined : handleBrowse}
+        className={`w-full py-2 flex items-center justify-center gap-2
+          border border-dashed rounded transition-all cursor-pointer
+          ${isFull
+            ? 'border-red-500/30 opacity-50 cursor-not-allowed'
+            : isDragging
+              ? 'border-blue-500 bg-blue-500/10'
+              : 'border-white/10 hover:border-blue-500/30 hover:bg-white/5'
+          }`}
+      >
+        <Upload size={14} className="text-white/40" />
+        <span className="text-xs text-white/40 font-medium">Add more files...</span>
+      </div>
+    );
+  }
+
+  // Full View (Large Box)
   return (
     <div
       onClick={isFull || isProcessing ? undefined : handleBrowse}
-      className={`w-full max-w-md h-64 flex flex-col items-center justify-center gap-4 
-        border-2 border-dashed rounded-xl transition-all cursor-pointer
+      className={`w-full py-12 flex flex-col items-center justify-center gap-4
+        border border-dashed rounded-xl transition-all cursor-pointer bg-[#0f172a]/50
         ${isFull
-          ? 'border-red-500/30 bg-red-500/5 cursor-not-allowed'
+          ? 'border-red-500/30 cursor-not-allowed opacity-50'
           : isDragging
-            ? 'border-purple-500 bg-purple-500/10 scale-[1.02]'
+            ? 'border-blue-500 bg-blue-500/5 scale-[1.01]'
             : isProcessing
-              ? 'border-purple-500/50 bg-purple-500/5'
-              : 'border-white/20 hover:border-purple-500/50 hover:bg-white/5'
+              ? 'border-blue-500/50'
+              : 'border-white/10 hover:border-blue-500/50 hover:bg-white/5'
         }`}
     >
       <div className={`p-4 rounded-full transition-colors ${
-        isDragging ? 'bg-purple-500/20' : 'bg-white/5'
+        isDragging ? 'bg-blue-500/20 text-blue-400' : 'bg-white/5 text-white/30'
       }`}>
         {isProcessing ? (
-          <div className="w-8 h-8 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
+          <div className="w-8 h-8 border-2 border-current border-t-transparent rounded-full animate-spin" />
         ) : (
-          <Upload size={32} className={isFull ? 'text-red-400' : 'text-white/40'} />
+          <Upload size={32} />
         )}
       </div>
 
       <div className="text-center">
-        <p className={`text-lg font-semibold ${isFull ? 'text-red-400' : 'text-white'}`}>
-          {isFull ? 'Queue is full' : isProcessing ? 'Processing...' : 'Drop files here'}
+        <p className="text-lg font-medium text-white/80">
+          {isFull ? 'Queue Full' : isProcessing ? 'Analyzing...' : 'Drop files here'}
         </p>
-        <p className="text-sm text-white/40 mt-1">
-          {isFull
-            ? `Maximum ${maxCount} files`
-            : 'or click to browse'
-          }
-        </p>
+        <p className="text-sm text-white/40 mt-1">or click to browse</p>
       </div>
     </div>
   );

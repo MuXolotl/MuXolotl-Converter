@@ -1,11 +1,12 @@
-import React, { useContext, useCallback } from 'react';
-import { FileVideo, RotateCcw, Play, Square, Settings, FolderOpen } from 'lucide-react';
+import React, { useContext, useCallback, useState, useEffect } from 'react';
+import { Play, Square, RotateCcw, FolderOpen, ArrowRight, FileVideo, Music, FileAudio } from 'lucide-react';
 import { ConversionContext } from '@/App';
 import { useFileSettings } from '@/hooks/useFileSettings';
 import { formatDuration, formatFileSize } from '@/utils';
 import FormatSelector from '@/components/FormatSelector';
 import SettingsPanel from './SettingsPanel';
 import ValidationBanner from './ValidationBanner';
+import Tabs, { TabId } from './Tabs';
 import AudioWaveform from './AudioWaveform';
 import type { FileItem, FileSettings as FileSettingsType } from '@/types';
 
@@ -35,15 +36,22 @@ const Inspector: React.FC<InspectorProps> = ({ file, selectedCount, outputFolder
 };
 
 const EmptyState: React.FC<{ selectedCount: number }> = ({ selectedCount }) => (
-  <div className="h-full flex flex-col items-center justify-center text-white/20 p-8 text-center bg-black/20">
-    <Settings size={48} strokeWidth={1} className="mb-4 opacity-50" />
-    <p className="text-sm">
+  <div className="h-full flex flex-col items-center justify-center text-slate-500 bg-[#1e293b] border-l border-white/5">
+    <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
+        <SettingsIcon />
+    </div>
+    <p className="text-sm font-medium">
       {selectedCount > 1
         ? `${selectedCount} files selected`
-        : 'Select a file to configure'
+        : 'Select a file to edit settings'
       }
     </p>
   </div>
+);
+
+// Visual helper
+const SettingsIcon = () => (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.1a2 2 0 0 1-1-1.72v-.51a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>
 );
 
 interface InspectorContentProps {
@@ -63,96 +71,177 @@ const InspectorContent: React.FC<InspectorContentProps> = ({
 }) => {
   const { updateFile, startConversion, cancelConversion } = context;
   const { formats, recommendations, validation } = useFileSettings(file);
+  const [activeTab, setActiveTab] = useState<TabId>('general');
 
   const isVideo = file.mediaInfo?.media_type === 'video';
   const isAudio = file.mediaInfo?.media_type === 'audio';
+  const isExtracting = file.settings.extractAudioOnly && isVideo; // Only extracting if source is video
+  
   const isDisabled = file.status !== 'pending';
   const isProcessing = file.status === 'processing';
   const canConvert = file.status === 'pending' && !!outputFolder;
 
-  // Handlers
+  useEffect(() => { setActiveTab('general'); }, [file.id, isExtracting]);
+
   const handleFormatChange = useCallback((format: string) => {
     updateFile(file.id, { outputFormat: format, outputPath: undefined });
   }, [updateFile, file.id]);
 
   const handleSettingsChange = useCallback((updates: Partial<FileSettingsType>) => {
-    updateFile(file.id, { settings: { ...file.settings, ...updates } });
+    if ('extractAudioOnly' in updates) {
+        const extracting = updates.extractAudioOnly;
+        updateFile(file.id, { 
+            settings: { ...file.settings, ...updates },
+            outputFormat: extracting ? 'mp3' : 'mp4', 
+            outputPath: undefined
+        });
+    } else {
+        updateFile(file.id, { settings: { ...file.settings, ...updates } });
+    }
   }, [updateFile, file.id, file.settings]);
 
-  const handleExtractAudioToggle = useCallback((extract: boolean) => {
-    updateFile(file.id, {
-      settings: { ...file.settings, extractAudioOnly: extract },
-      outputFormat: extract ? 'mp3' : 'mp4',
-      outputPath: undefined,
-    });
-  }, [updateFile, file.id, file.settings]);
+  // --- VISUALIZATION LOGIC ---
+  const renderPreviewIcon = () => {
+    // 1. Audio Source -> Audio Waveform
+    if (isAudio) {
+        return (
+            <div className="flex flex-col items-center gap-2">
+                <div className="w-48 h-24 bg-black/20 rounded-xl border border-white/5 flex items-center justify-center relative overflow-hidden">
+                    <AudioWaveform />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                        <Music size={32} className="text-white/20" />
+                    </div>
+                </div>
+                <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Audio File</span>
+            </div>
+        );
+    }
+
+    // 2. Video Source -> Extraction Mode
+    if (isExtracting) {
+        return (
+            <div className="flex items-center gap-4">
+                {/* Source Video */}
+                <div className="w-20 h-14 bg-slate-800 rounded border border-white/10 flex items-center justify-center relative">
+                    <FileVideo size={24} className="text-slate-500" />
+                    <span className="absolute bottom-1 right-1 text-[8px] bg-black/50 px-1 rounded text-white/70">MOV</span>
+                </div>
+
+                {/* Arrow */}
+                <div className="flex flex-col items-center gap-1 text-blue-500">
+                    <span className="text-[9px] font-bold uppercase tracking-wider">Extract</span>
+                    <ArrowRight size={20} className="animate-pulse" />
+                </div>
+
+                {/* Target Audio */}
+                <div className="w-20 h-14 bg-blue-900/20 rounded border border-blue-500/30 flex items-center justify-center relative overflow-hidden">
+                    <div className="absolute inset-x-2 inset-y-4 opacity-50"><AudioWaveform /></div>
+                    <FileAudio size={24} className="text-blue-400 relative z-10" />
+                </div>
+            </div>
+        );
+    }
+
+    // 3. Video Source -> Video Conversion
+    return (
+        <div className="flex flex-col items-center gap-2">
+            <div className="w-48 h-28 bg-black/30 rounded-lg border border-white/5 flex items-center justify-center relative group-hover:border-white/10 transition-colors">
+                <FileVideo size={48} className="text-slate-600 group-hover:text-slate-500 transition-colors" />
+                {/* Simulated Play Button Overlay */}
+                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="w-10 h-10 bg-black/50 backdrop-blur rounded-full flex items-center justify-center border border-white/10">
+                        <Play size={16} className="text-white fill-white ml-0.5" />
+                    </div>
+                </div>
+            </div>
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Video Preview</span>
+        </div>
+    );
+  };
 
   return (
-    <div className="h-full flex flex-col bg-black/20 border-l border-white/10">
-      {/* Header / Preview */}
-      <FileHeader file={file} isVideo={isVideo} isAudio={isAudio} />
+    <div className="h-full flex flex-col bg-[#1e293b] border-l border-white/5">
+      
+      {/* 1. BIG PREVIEW HEADER */}
+      <div className="h-48 shrink-0 bg-[#161e2e] relative flex flex-col items-center justify-center border-b border-white/5 overflow-hidden group">
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#1e293b]/30 pointer-events-none" />
+        
+        <div className="relative z-10">
+            {renderPreviewIcon()}
+        </div>
 
-      {/* File Details */}
-      <FileDetails file={file} />
-
-      {/* Settings */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-5">
-        {/* Multi-select indicator */}
-        {selectedCount > 1 && (
-          <div className="px-3 py-2 bg-purple-500/10 border border-purple-500/20 rounded-lg text-xs text-purple-300">
-            Editing settings for 1 of {selectedCount} selected files
-          </div>
-        )}
-
-        {/* Validation */}
-        {!isDisabled && validation && (
-          <ValidationBanner validation={validation} />
-        )}
-
-        {/* Format Selection */}
-        <Section title="Output Format">
-          <div className="flex items-center gap-3">
-            <FormatBadge format={file.mediaInfo?.format_name || 'unknown'} />
-            <span className="text-white/30">→</span>
-            <div className="flex-1">
-              <FormatSelector
-                formats={formats}
-                selected={file.outputFormat}
-                onChange={handleFormatChange}
-                disabled={isDisabled}
-                recommendedFormats={recommendations}
-              />
+        <div className="absolute bottom-3 left-4 right-4 text-center">
+            <div className="inline-block px-3 py-1 bg-black/40 backdrop-blur-md rounded-full border border-white/5 max-w-full">
+                <p className="text-xs font-mono text-white/70 truncate">
+                    {file.name}
+                </p>
             </div>
-          </div>
-
-          {/* Extract Audio Toggle */}
-          {isVideo && !isDisabled && (
-            <label className="flex items-center gap-2 mt-3 cursor-pointer group">
-              <input
-                type="checkbox"
-                checked={file.settings.extractAudioOnly}
-                onChange={e => handleExtractAudioToggle(e.target.checked)}
-                className="w-4 h-4 rounded bg-white/10 border-white/20 checked:bg-purple-500"
-              />
-              <span className="text-xs text-white/60 group-hover:text-white/80 transition-colors">
-                Extract audio only
-              </span>
-            </label>
-          )}
-        </Section>
-
-        {/* Advanced Settings */}
-        <Section title="Settings">
-          <SettingsPanel
-            file={file}
-            disabled={isDisabled}
-            onChange={handleSettingsChange}
-          />
-        </Section>
+        </div>
       </div>
 
-      {/* Actions */}
-      <div className="p-4 border-t border-white/10 bg-black/30">
+      {/* 2. TABS & SETTINGS */}
+      <div className="flex-1 overflow-hidden flex flex-col">
+        <div className="p-6 pb-2 shrink-0">
+            {/* Meta Stats Row */}
+            <div className="flex justify-between items-center mb-6 px-1 bg-black/10 p-3 rounded-lg border border-white/5">
+                <div className="text-center">
+                    <div className="text-[9px] uppercase text-slate-500 font-bold mb-0.5">Duration</div>
+                    <div className="text-xs font-mono text-slate-300">{formatDuration(file.mediaInfo?.duration || 0)}</div>
+                </div>
+                <div className="w-px h-6 bg-white/5" />
+                <div className="text-center">
+                    <div className="text-[9px] uppercase text-slate-500 font-bold mb-0.5">Size</div>
+                    <div className="text-xs font-mono text-slate-300">{formatFileSize(file.mediaInfo?.file_size || 0)}</div>
+                </div>
+                <div className="w-px h-6 bg-white/5" />
+                <div className="text-center">
+                    <div className="text-[9px] uppercase text-slate-500 font-bold mb-0.5">Codec</div>
+                    <div className="text-xs font-mono text-slate-300 uppercase">
+                        {isAudio ? file.mediaInfo?.audio_streams[0]?.codec : file.mediaInfo?.video_streams[0]?.codec || 'N/A'}
+                    </div>
+                </div>
+            </div>
+
+            {/* Format Selector */}
+            <div className="mb-4">
+                <div className="flex items-center gap-3">
+                    <FormatBadge format={file.mediaInfo?.format_name || 'raw'} />
+                    <span className="text-white/20">→</span>
+                    <div className="flex-1">
+                        <FormatSelector
+                            formats={formats}
+                            selected={file.outputFormat}
+                            onChange={handleFormatChange}
+                            disabled={isDisabled}
+                            recommendedFormats={recommendations}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {!isDisabled && validation && <div className="mb-4"><ValidationBanner validation={validation} /></div>}
+            
+            <Tabs 
+                activeTab={activeTab} 
+                onTabChange={setActiveTab}
+                hasVideo={isVideo && !isExtracting}
+                hasAudio={true}
+            />
+        </div>
+
+        {/* Scrollable Settings */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar px-6 pb-4">
+            <SettingsPanel
+                file={file}
+                activeTab={activeTab}
+                disabled={isDisabled}
+                onChange={handleSettingsChange}
+            />
+        </div>
+      </div>
+
+      {/* 3. FOOTER ACTION */}
+      <div className="p-6 border-t border-white/5 bg-[#172033]">
         <ActionButton
           file={file}
           isProcessing={isProcessing}
@@ -167,67 +256,8 @@ const InspectorContent: React.FC<InspectorContentProps> = ({
   );
 };
 
-// Sub-components
-
-const FileHeader: React.FC<{ file: FileItem; isVideo: boolean; isAudio: boolean }> = ({
-  file,
-  isVideo,
-  isAudio,
-}) => {
-  return (
-    <div className="h-36 bg-gradient-to-b from-white/5 to-transparent flex flex-col items-center justify-center relative overflow-hidden">
-      {isAudio ? (
-        <AudioWaveform />
-      ) : (
-        <FileVideo
-          size={40}
-          className="opacity-40 text-pink-400"
-        />
-      )}
-      
-      <div className="absolute bottom-2 left-2 right-2">
-        <div className="text-xs font-mono text-white/60 bg-black/40 px-2 py-1 rounded truncate text-center backdrop-blur-sm">
-          {file.name}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const FileDetails: React.FC<{ file: FileItem }> = ({ file }) => {
-  const video = file.mediaInfo?.video_streams[0];
-  const audio = file.mediaInfo?.audio_streams[0];
-
-  const details = [
-    { label: 'Duration', value: formatDuration(file.mediaInfo?.duration || 0) },
-    { label: 'Size', value: formatFileSize(file.mediaInfo?.file_size || 0) },
-    { label: 'Resolution', value: video ? `${video.width}×${video.height}` : 'N/A' },
-    { label: 'Codec', value: video?.codec || audio?.codec || 'N/A' },
-  ];
-
-  return (
-    <div className="grid grid-cols-2 gap-3 p-4 border-b border-white/5">
-      {details.map(({ label, value }) => (
-        <div key={label}>
-          <div className="text-[10px] text-white/40 uppercase">{label}</div>
-          <div className="text-xs text-white font-mono">{value}</div>
-        </div>
-      ))}
-    </div>
-  );
-};
-
-const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-  <div>
-    <h3 className="text-[10px] font-bold text-white/40 uppercase tracking-wider mb-2">
-      {title}
-    </h3>
-    {children}
-  </div>
-);
-
 const FormatBadge: React.FC<{ format: string }> = ({ format }) => (
-  <span className="px-2 py-1 text-[10px] font-mono uppercase bg-white/5 text-white/50 rounded">
+  <span className="px-2 py-1.5 text-[10px] font-mono uppercase bg-black/40 border border-white/10 text-slate-400 rounded min-w-[50px] text-center">
     {format.split(',')[0]}
   </span>
 );
@@ -242,56 +272,32 @@ interface ActionButtonProps {
   onRetry: () => void;
 }
 
-const ActionButton: React.FC<ActionButtonProps> = ({
-  file,
-  isProcessing,
-  canConvert,
-  outputFolder,
-  onStart,
-  onCancel,
-  onRetry,
-}) => {
+const ActionButton: React.FC<ActionButtonProps> = ({ file, isProcessing, canConvert, outputFolder, onStart, onCancel, onRetry }) => {
   if (file.status === 'pending') {
     if (!outputFolder) {
       return (
-        <div className="w-full py-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-yellow-400 text-sm text-center flex items-center justify-center gap-2">
-          <FolderOpen size={16} />
-          Select output folder first
+        <div className="w-full py-3.5 bg-orange-500/10 border border-orange-500/30 rounded text-orange-400 text-sm font-medium text-center flex items-center justify-center gap-2 animate-pulse">
+          <FolderOpen size={18} />
+          <span>Select Output Folder</span>
         </div>
       );
     }
-
     return (
-      <button
-        onClick={onStart}
-        disabled={!canConvert}
-        className="w-full py-3 bg-gradient-primary rounded-lg text-white font-bold flex items-center justify-center gap-2 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        <Play size={16} fill="currentColor" />
-        Convert
+      <button onClick={onStart} disabled={!canConvert} className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 rounded font-bold text-white shadow-lg shadow-blue-900/30 transition-all flex items-center justify-center gap-2 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">
+        <Play size={18} fill="currentColor" /> Convert File
       </button>
     );
   }
-
   if (isProcessing) {
     return (
-      <button
-        onClick={onCancel}
-        className="w-full py-3 bg-red-500/20 text-red-400 rounded-lg font-bold hover:bg-red-500/30 transition-colors flex items-center justify-center gap-2"
-      >
-        <Square size={16} />
-        Cancel
+      <button onClick={onCancel} className="w-full py-3.5 bg-red-500/10 border border-red-500/30 text-red-400 rounded font-bold hover:bg-red-500/20 transition-colors flex items-center justify-center gap-2">
+        <Square size={18} fill="currentColor" /> Stop
       </button>
     );
   }
-
   return (
-    <button
-      onClick={onRetry}
-      className="w-full py-3 bg-white/10 text-white rounded-lg font-bold hover:bg-white/20 flex items-center justify-center gap-2 transition-colors"
-    >
-      <RotateCcw size={16} />
-      Retry
+    <button onClick={onRetry} className="w-full py-3.5 bg-white/5 border border-white/10 text-white rounded font-bold hover:bg-white/10 transition-colors flex items-center justify-center gap-2">
+      <RotateCcw size={18} /> Convert Again
     </button>
   );
 };

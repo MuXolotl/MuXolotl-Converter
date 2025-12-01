@@ -27,6 +27,9 @@ pub struct AudioFormat {
     pub recommended_sample_rate: u32,
     pub channels_support: Vec<u32>,
     pub special_params: Vec<String>,
+    // New: List of codecs that can be copied directly into this format
+    #[serde(default)]
+    pub compatible_sources: Vec<String>,
 }
 
 impl AudioFormat {
@@ -58,33 +61,23 @@ impl AudioFormat {
     }
 
     /// Checks if source codec can be copied without re-encoding
+    /// Logic is now fully config-driven via 'compatible_sources' in TOML
     pub fn can_copy_codec(&self, source_codec: &str) -> bool {
         let source = source_codec.to_lowercase();
         let target = self.codec.to_lowercase();
 
+        // 1. Same codec is usually copyable
         if source == target {
             return true;
         }
 
-        // Codec compatibility mapping
-        match self.extension.as_str() {
-            "mp3" => source.contains("mp3"),
-            "aac" | "m4a" => source.contains("aac") || source.contains("alac"),
-            "ogg" => source.contains("vorbis") || source.contains("opus"),
-            "opus" => source.contains("opus"),
-            "flac" => source.contains("flac"),
-            "wav" | "aiff" => source.starts_with("pcm_"),
-            "wma" => source.starts_with("wmav"),
-            "ac3" => source.contains("ac3"),
-            "dts" => source.contains("dts") || source.contains("dca"),
-            "amr" => source.starts_with("amr"),
-            "alac" => source.contains("alac"),
-            "wv" => source.contains("wavpack"),
-            "ape" => source.contains("ape"),
-            "tta" => source.contains("tta"),
-            "mka" => true, // Matroska accepts anything
-            _ => false,
+        // 2. Check compatibility list from config
+        // "*" means accepts anything (like MKA)
+        if self.compatible_sources.contains(&"*".to_string()) {
+            return true;
         }
+
+        self.compatible_sources.iter().any(|s| source.contains(s))
     }
 
     /// Returns best sample rate from supported list
@@ -134,6 +127,8 @@ struct TomlAudioFormat {
     recommended_sample_rate: u32,
     channels_support: Vec<u32>,
     special_params: Vec<String>,
+    #[serde(default)]
+    compatible_sources: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -171,6 +166,7 @@ impl From<TomlAudioFormat> for AudioFormat {
             recommended_sample_rate: t.recommended_sample_rate,
             channels_support: t.channels_support,
             special_params: t.special_params,
+            compatible_sources: t.compatible_sources,
         }
     }
 }

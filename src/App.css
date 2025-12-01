@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --bg-dark: #0f172a;
+  --bg-panel: #1e293b;
+  --bg-hover: #334155;
+  --border-color: rgba(255, 255, 255, 0.08);
+  --accent-color: #3b82f6;
+}
+
 * {
   margin: 0;
   padding: 0;
@@ -9,10 +17,12 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
+  background-color: var(--bg-dark);
+  color: #e2e8f0;
 }
 
 #root {
@@ -20,121 +30,125 @@ body {
   height: 100vh;
 }
 
-/* ============================================================================
-   Scrollbar
-   ========================================================================= */
-
+/* Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
-
-::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.03);
-}
-
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(139, 92, 246, 0.4);
-  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
 }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+::-webkit-scrollbar-corner { background: transparent; }
 
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(139, 92, 246, 0.6);
-}
-
-/* ============================================================================
-   Glass Effect
-   ========================================================================= */
-
+/* Glass / Panel */
 .glass {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 0.75rem;
+  background: rgba(30, 41, 59, 0.95);
+  border: 1px solid var(--border-color);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
 
-/* ============================================================================
-   Utilities
-   ========================================================================= */
+/* Utilities */
+.gradient-text { color: white; }
+.bg-gradient-main { background: var(--bg-dark); }
+.bg-gradient-primary { background: var(--accent-color); }
 
-.gradient-text {
-  background: linear-gradient(90deg, #8b5cf6 0%, #ec4899 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.bg-gradient-main {
-  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #0f172a 100%);
-}
-
-.bg-gradient-primary {
-  background: linear-gradient(90deg, #8b5cf6 0%, #ec4899 100%);
-}
-
-/* ============================================================================
-   Window Drag Region
-   ========================================================================= */
-
-[data-tauri-drag-region] {
-  -webkit-app-region: drag;
-}
-
+/* Drag Region */
+[data-tauri-drag-region] { -webkit-app-region: drag; }
 [data-tauri-drag-region] button,
-[data-tauri-drag-region] a {
-  -webkit-app-region: no-drag;
-}
+[data-tauri-drag-region] a,
+[data-tauri-drag-region] input { -webkit-app-region: no-drag; }
 
-/* ============================================================================
-   Select Dropdown
-   ========================================================================= */
-
+/* Inputs */
 select option {
-  background-color: #1e293b;
+  background-color: var(--bg-panel);
   color: white;
   padding: 8px;
 }
+select:focus { outline: none; }
 
-select:focus {
-  outline: none;
+/* Animations */
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.animate-spin { animation: spin 1s linear infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+.animate-pulse { animation: pulse 2s ease-in-out infinite; }
+
+/* Table Styles */
+.pro-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  table-layout: fixed;
 }
 
-/* ============================================================================
-   Animations
-   ========================================================================= */
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+.pro-table th {
+  padding: 10px 12px;
+  font-weight: 600;
+  color: #94a3b8;
+  border-bottom: 1px solid var(--border-color);
+  background: rgba(15, 23, 42, 0.8);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.animate-spin {
-  animation: spin 1s linear infinite;
+.pro-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-color);
+  color: #e2e8f0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+.pro-table tr:hover td {
+  background-color: rgba(255, 255, 255, 0.03);
 }
 
-.animate-pulse {
-  animation: pulse 2s ease-in-out infinite;
+.pro-table tr.selected td {
+  background-color: rgba(59, 130, 246, 0.15);
 }
 
-/* ============================================================================
-   Checkbox
-   ========================================================================= */
+.pro-table tr.selected td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent-color);
+}
 
+/* Checkbox */
 input[type="checkbox"] {
   appearance: none;
   -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
   cursor: pointer;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  transition: all 0.15s ease;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+  transition: all 0.1s ease;
+  background: transparent;
+  display: grid;
+  place-content: center;
+}
+input[type="checkbox"]:checked {
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+}
+input[type="checkbox"]:checked::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3e%3c/svg%3e");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
 }
 
-input[type="checkbox"]:checked {
-  background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3e%3c/svg%3e");
-  border-color: transparent;
+/* Console / Terminal extra styles if needed */
+.console-font {
+    font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
 }

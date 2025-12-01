@@ -10,10 +10,11 @@ video_codecs = ["h264", "hevc", "mpeg4", "av1"]
 audio_codecs = ["aac", "mp3", "ac3"]
 container = "mp4"
 stability = "stable"
-description = "Universal video container, excellent compatibility. Note: AC3 audio supported but may have limited player compatibility; AAC recommended"
+description = "Universal video container, excellent compatibility"
 typical_use = "Streaming, web, mobile devices"
 max_resolution = []
 special_params = ["-movflags", "+faststart"]
+default_pixel_format = "yuv420p"
 
 [[format]]
 extension = "mkv"
@@ -23,10 +24,11 @@ video_codecs = ["h264", "hevc", "vp9", "av1", "mpeg4"]
 audio_codecs = ["aac", "opus", "vorbis", "ac3", "dts", "flac"]
 container = "matroska"
 stability = "stable"
-description = "Open-source universal container, supports everything"
+description = "Open-source universal container"
 typical_use = "Archiving, multi-track, subtitles"
 max_resolution = []
 special_params = []
+default_pixel_format = "yuv420p"
 
 [[format]]
 extension = "webm"
@@ -40,6 +42,7 @@ description = "Web-optimized open format"
 typical_use = "HTML5 video, YouTube"
 max_resolution = []
 special_params = []
+default_pixel_format = "yuv420p"
 
 [[format]]
 extension = "avi"
@@ -49,10 +52,11 @@ video_codecs = ["mpeg4", "h264", "mjpeg"]
 audio_codecs = ["mp3", "ac3", "pcm_s16le"]
 container = "avi"
 stability = "stable"
-description = "Classic Windows video format. Note: H.264 in AVI is technically possible but may cause compatibility/sync issues; MPEG-4 recommended"
-typical_use = "Legacy compatibility, Windows"
+description = "Classic Windows video format"
+typical_use = "Legacy compatibility"
 max_resolution = [2048, 2048]
 special_params = []
+default_pixel_format = "yuv420p"
 
 [[format]]
 extension = "mov"
@@ -66,6 +70,20 @@ description = "Apple's professional video format"
 typical_use = "macOS, professional video editing"
 max_resolution = []
 special_params = ["-movflags", "+faststart"]
+default_pixel_format = "yuv420p"
+
+[[format]]
+extension = "gif"
+name = "GIF (Animated)"
+category = "popular"
+video_codecs = ["gif"]
+audio_codecs = []
+container = "gif"
+stability = "stable"
+description = "Animated Image"
+typical_use = "Social media, memes"
+max_resolution = []
+special_params = []
 
 # ========================================
 # STANDARD FORMATS
@@ -82,7 +100,8 @@ stability = "stable"
 description = "iTunes video format"
 typical_use = "iTunes Store, Apple TV"
 max_resolution = []
-special_params = []
+special_params = ["-movflags", "+faststart"]
+default_pixel_format = "yuv420p"
 
 [[format]]
 extension = "flv"
@@ -93,9 +112,10 @@ audio_codecs = ["mp3", "aac"]
 container = "flv"
 stability = "requiressetup"
 description = "Legacy web video format"
-typical_use = "Old web videos, Flash players"
+typical_use = "Old web videos"
 max_resolution = []
 special_params = []
+default_pixel_format = "yuv420p"
 
 [[format]]
 extension = "wmv"
@@ -119,7 +139,7 @@ audio_codecs = ["mp2", "mp3"]
 container = "mpeg"
 stability = "stable"
 description = "Classic MPEG video"
-typical_use = "DVD, broadcast, VCD"
+typical_use = "DVD, broadcast"
 max_resolution = [1920, 1080]
 special_params = []
 
@@ -138,14 +158,14 @@ special_params = []
 
 [[format]]
 extension = "ts"
-name = "TS (MPEG Transport Stream)"
+name = "TS (Transport Stream)"
 category = "standard"
 video_codecs = ["h264", "hevc", "mpeg2video"]
 audio_codecs = ["aac", "ac3", "mp2"]
 container = "mpegts"
 stability = "stable"
 description = "Transport stream for broadcasting"
-typical_use = "DVB, IPTV, streaming"
+typical_use = "DVB, IPTV"
 max_resolution = []
 special_params = []
 
@@ -161,8 +181,8 @@ video_codecs = ["theora"]
 audio_codecs = ["vorbis", "opus"]
 container = "ogg"
 stability = "stable"
-description = "Open-source Theora video. Supports both Vorbis (classic) and Opus audio; older players may require Vorbis"
-typical_use = "Open-source projects, HTML5"
+description = "Open-source Theora video"
+typical_use = "Open-source projects"
 max_resolution = []
 special_params = []
 
@@ -174,9 +194,10 @@ video_codecs = ["h263", "h264", "mpeg4"]
 audio_codecs = ["amr_nb", "aac"]
 container = "3gp"
 stability = "requiressetup"
-description = "Mobile phone video format (requires external AMR encoder for AMR audio)"
+description = "Mobile phone video format"
 typical_use = "Old mobile devices"
 max_resolution = [352, 288]
+requires_fixed_resolution = true
 special_params = ["-strict", "experimental"]
 
 [[format]]
@@ -187,8 +208,21 @@ video_codecs = ["mpeg2video", "dnxhd", "prores"]
 audio_codecs = ["pcm_s16le"]
 container = "mxf"
 stability = "requiressetup"
-description = "Professional broadcast format (ProRes muxing supported, profile compatibility depends on receiver)"
-typical_use = "Television, professional production"
+description = "Professional broadcast format"
+typical_use = "Television production"
+max_resolution = []
+special_params = []
+
+[[format]]
+extension = "m2ts"
+name = "M2TS (BDAV)"
+category = "specialized"
+video_codecs = ["h264", "mpeg2video"]
+audio_codecs = ["ac3", "pcm_s16le"]
+container = "mpegts"
+stability = "stable"
+description = "Blu-ray stream format"
+typical_use = "Camcorders, Blu-ray"
 max_resolution = []
 special_params = []
 
@@ -204,6 +238,7 @@ description = "Adobe Flash video in MP4"
 typical_use = "Flash Player"
 max_resolution = []
 special_params = []
+default_pixel_format = "yuv420p"
 
 # ========================================
 # LEGACY FORMATS
@@ -217,9 +252,10 @@ video_codecs = ["mpeg2video"]
 audio_codecs = ["ac3", "mp2", "pcm_s16le"]
 container = "vob"
 stability = "stable"
-description = "DVD video format (supports 720×480 NTSC and 720×576 PAL)"
+description = "DVD video format"
 typical_use = "DVD discs"
 max_resolution = [720, 576]
+requires_fixed_resolution = true
 special_params = ["-target", "dvd"]
 
 [[format]]
@@ -231,7 +267,7 @@ audio_codecs = ["cook"]
 container = "rm"
 stability = "experimental"
 description = "Legacy RealPlayer format"
-typical_use = "90s internet video archives"
+typical_use = "Legacy video"
 max_resolution = []
 special_params = ["-strict", "-2"]
 
@@ -244,7 +280,7 @@ audio_codecs = ["mp3", "ac3"]
 container = "avi"
 stability = "stable"
 description = "DivX MPEG-4 in AVI"
-typical_use = "Legacy video collections"
+typical_use = "Legacy collections"
 max_resolution = []
 special_params = ["-vtag", "DIVX"]
 
@@ -260,8 +296,8 @@ video_codecs = ["h264", "mpeg4"]
 audio_codecs = ["vorbis", "mp3"]
 container = "nut"
 stability = "experimental"
-description = "FFmpeg's experimental container"
-typical_use = "Experimental projects"
+description = "FFmpeg experimental container"
+typical_use = "Testing"
 max_resolution = []
 special_params = []
 
@@ -274,7 +310,7 @@ audio_codecs = []
 container = "yuv4mpegpipe"
 stability = "stable"
 description = "Uncompressed YUV frames"
-typical_use = "Video processing, piping"
+typical_use = "Piping"
 max_resolution = []
 special_params = []
 
@@ -287,6 +323,7 @@ audio_codecs = ["pcm_s16le"]
 container = "dv"
 stability = "stable"
 description = "Digital Video from cameras"
-typical_use = "MiniDV camcorders"
+typical_use = "MiniDV"
 max_resolution = [720, 576]
+requires_fixed_resolution = true
 special_params = []

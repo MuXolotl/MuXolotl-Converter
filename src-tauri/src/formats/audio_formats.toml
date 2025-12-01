@@ -18,16 +18,17 @@ sample_rates = [8000, 16000, 22050, 24000, 32000, 44100, 48000]
 recommended_sample_rate = 44100
 channels_support = [1, 2]
 special_params = []
+compatible_sources = ["mp3"]
 
 [[format]]
 extension = "aac"
 name = "AAC (Advanced Audio Coding)"
 category = "popular"
 codec = "aac"
-container = ""
+container = "adts"
 stability = "stable"
 description = "Modern lossy format, better quality than MP3 at same bitrate"
-typical_use = "Streaming, iTunes, modern devices"
+typical_use = "Streaming, raw AAC streams"
 lossy = true
 bitrate_range = [64, 512]
 recommended_bitrate = 256
@@ -35,6 +36,7 @@ sample_rates = [8000, 16000, 22050, 24000, 32000, 44100, 48000, 96000]
 recommended_sample_rate = 48000
 channels_support = [1, 2, 6, 8]
 special_params = []
+compatible_sources = ["aac"]
 
 [[format]]
 extension = "m4a"
@@ -51,14 +53,15 @@ recommended_bitrate = 256
 sample_rates = [8000, 16000, 22050, 24000, 32000, 44100, 48000, 96000]
 recommended_sample_rate = 48000
 channels_support = [1, 2, 6, 8]
-special_params = ["-f", "mp4"]
+special_params = []
+compatible_sources = ["aac", "alac"]
 
 [[format]]
 extension = "flac"
 name = "FLAC (Free Lossless Audio Codec)"
 category = "popular"
 codec = "flac"
-container = ""
+container = "flac"
 stability = "stable"
 description = "Lossless compression, perfect audio quality"
 typical_use = "Music archiving, audiophile collections"
@@ -68,14 +71,15 @@ recommended_bitrate = 0
 sample_rates = [8000, 16000, 22050, 24000, 32000, 44100, 48000, 96000, 192000]
 recommended_sample_rate = 44100
 channels_support = [1, 2, 6, 8]
-special_params = ["-compression_level", "8"]
+special_params = []
+compatible_sources = ["flac"]
 
 [[format]]
 extension = "wav"
 name = "WAV (Waveform Audio File)"
 category = "popular"
 codec = "pcm_s16le"
-container = ""
+container = "wav"
 stability = "stable"
 description = "Uncompressed PCM audio, CD quality"
 typical_use = "Professional audio editing, CD authoring"
@@ -86,6 +90,7 @@ sample_rates = [8000, 16000, 22050, 24000, 32000, 44100, 48000, 96000, 192000]
 recommended_sample_rate = 44100
 channels_support = [1, 2, 6, 8]
 special_params = []
+compatible_sources = ["pcm"]
 
 [[format]]
 extension = "ogg"
@@ -102,7 +107,8 @@ recommended_bitrate = 192
 sample_rates = [8000, 16000, 22050, 24000, 32000, 44100, 48000]
 recommended_sample_rate = 44100
 channels_support = [1, 2, 6, 8]
-special_params = ["-q:a", "6"]
+special_params = []
+compatible_sources = ["vorbis", "opus"]
 
 [[format]]
 extension = "opus"
@@ -120,6 +126,7 @@ sample_rates = [8000, 12000, 16000, 24000, 48000]
 recommended_sample_rate = 48000
 channels_support = [1, 2, 6, 8]
 special_params = []
+compatible_sources = ["opus"]
 
 # ========================================
 # STANDARD FORMATS
@@ -140,7 +147,26 @@ recommended_bitrate = 0
 sample_rates = [8000, 16000, 22050, 24000, 32000, 44100, 48000, 96000, 192000]
 recommended_sample_rate = 44100
 channels_support = [1, 2, 6, 8]
-special_params = ["-f", "mp4"]
+special_params = []
+compatible_sources = ["alac"]
+
+[[format]]
+extension = "m4b"
+name = "M4B (Audiobook)"
+category = "standard"
+codec = "aac"
+container = "mp4"
+stability = "stable"
+description = "MPEG-4 Audio Book, bookmarkable"
+typical_use = "Audiobooks, Podcasts"
+lossy = true
+bitrate_range = [32, 320]
+recommended_bitrate = 128
+sample_rates = [22050, 44100, 48000]
+recommended_sample_rate = 44100
+channels_support = [1, 2]
+special_params = []
+compatible_sources = ["aac", "alac"]
 
 [[format]]
 extension = "wma"
@@ -149,7 +175,7 @@ category = "standard"
 codec = "wmav2"
 container = "asf"
 stability = "requiressetup"
-description = "Microsoft's audio format (stereo only, for multichannel use WMA Pro)"
+description = "Microsoft's audio format"
 typical_use = "Windows applications, legacy systems"
 lossy = true
 bitrate_range = [64, 320]
@@ -157,14 +183,15 @@ recommended_bitrate = 192
 sample_rates = [8000, 16000, 22050, 32000, 44100, 48000]
 recommended_sample_rate = 44100
 channels_support = [1, 2]
-special_params = ["-strict", "-2"]
+special_params = []
+compatible_sources = ["wmav"]
 
 [[format]]
 extension = "aiff"
 name = "AIFF (Audio Interchange File Format)"
 category = "standard"
 codec = "pcm_s16be"
-container = ""
+container = "aiff"
 stability = "stable"
 description = "Apple's uncompressed audio format"
 typical_use = "Mac audio production"
@@ -175,13 +202,14 @@ sample_rates = [8000, 16000, 22050, 24000, 32000, 44100, 48000, 96000]
 recommended_sample_rate = 44100
 channels_support = [1, 2, 6, 8]
 special_params = []
+compatible_sources = ["pcm"]
 
 [[format]]
 extension = "wv"
 name = "WavPack"
 category = "standard"
 codec = "wavpack"
-container = ""
+container = "wv"
 stability = "stable"
 description = "Hybrid lossless/lossy compression"
 typical_use = "Flexible audio archiving"
@@ -192,6 +220,7 @@ sample_rates = [8000, 16000, 22050, 24000, 32000, 44100, 48000, 96000, 192000]
 recommended_sample_rate = 44100
 channels_support = [1, 2, 6, 8]
 special_params = []
+compatible_sources = ["wavpack"]
 
 # ========================================
 # SPECIALIZED FORMATS
@@ -202,7 +231,7 @@ extension = "tta"
 name = "TTA (True Audio)"
 category = "specialized"
 codec = "tta"
-container = ""
+container = "tta"
 stability = "stable"
 description = "Real-time lossless codec"
 typical_use = "Lossless archiving"
@@ -213,13 +242,14 @@ sample_rates = [8000, 16000, 22050, 24000, 32000, 44100, 48000, 96000]
 recommended_sample_rate = 44100
 channels_support = [1, 2]
 special_params = []
+compatible_sources = ["tta"]
 
 [[format]]
 extension = "ac3"
 name = "AC3 (Dolby Digital)"
 category = "specialized"
 codec = "ac3"
-container = ""
+container = "ac3"
 stability = "stable"
 description = "Multichannel audio for home theater"
 typical_use = "DVD, Blu-ray, home cinema"
@@ -230,15 +260,16 @@ sample_rates = [32000, 44100, 48000]
 recommended_sample_rate = 48000
 channels_support = [1, 2, 6]
 special_params = []
+compatible_sources = ["ac3"]
 
 [[format]]
 extension = "dts"
 name = "DTS (Digital Theater Systems)"
 category = "specialized"
 codec = "dca"
-container = ""
+container = "dts"
 stability = "requiressetup"
-description = "High-quality multichannel audio (FFmpeg encoder supports up to 5.1 @ 48 kHz)"
+description = "High-quality multichannel audio"
 typical_use = "Blu-ray, home theater"
 lossy = true
 bitrate_range = [754, 1509]
@@ -247,15 +278,16 @@ sample_rates = [8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000]
 recommended_sample_rate = 48000
 channels_support = [1, 2, 4, 6]
 special_params = ["-strict", "-2"]
+compatible_sources = ["dca", "dts"]
 
 [[format]]
 extension = "amr"
 name = "AMR (Adaptive Multi-Rate)"
 category = "specialized"
 codec = "libopencore_amrnb"
-container = ""
+container = "amr"
 stability = "requiressetup"
-description = "Optimized for speech, mobile telephony (4.75-12.2 kbps)"
+description = "Optimized for speech, mobile telephony"
 typical_use = "Voice recordings, GSM"
 lossy = true
 bitrate_range = [5, 13]
@@ -264,6 +296,7 @@ sample_rates = [8000]
 recommended_sample_rate = 8000
 channels_support = [1]
 special_params = ["-ar", "8000"]
+compatible_sources = ["amr"]
 
 # ========================================
 # LEGACY FORMATS
@@ -274,7 +307,7 @@ extension = "au"
 name = "AU (Sun Audio)"
 category = "legacy"
 codec = "pcm_s16be"
-container = ""
+container = "au"
 stability = "stable"
 description = "Unix/Sun audio format"
 typical_use = "Legacy Unix systems"
@@ -285,6 +318,7 @@ sample_rates = [8000, 16000, 22050, 44100]
 recommended_sample_rate = 8000
 channels_support = [1, 2]
 special_params = []
+compatible_sources = ["pcm"]
 
 [[format]]
 extension = "ra"
@@ -302,13 +336,14 @@ sample_rates = [8000]
 recommended_sample_rate = 8000
 channels_support = [1]
 special_params = ["-strict", "-2"]
+compatible_sources = []
 
 [[format]]
 extension = "shn"
 name = "Shorten"
 category = "legacy"
 codec = "shorten"
-container = ""
+container = "shn"
 stability = "problematic"
 description = "Old lossless compression"
 typical_use = "Legacy audio archives"
@@ -319,6 +354,7 @@ sample_rates = [44100]
 recommended_sample_rate = 44100
 channels_support = [2]
 special_params = []
+compatible_sources = []
 
 # ========================================
 # EXOTIC FORMATS
@@ -340,6 +376,7 @@ sample_rates = [8000, 16000, 22050, 24000, 32000, 44100, 48000, 96000]
 recommended_sample_rate = 48000
 channels_support = [1, 2, 6, 8]
 special_params = []
+compatible_sources = ["*"]
 
 [[format]]
 extension = "spx"
@@ -357,3 +394,4 @@ sample_rates = [8000, 16000, 32000]
 recommended_sample_rate = 16000
 channels_support = [1, 2]
 special_params = ["-ar", "16000"]
+compatible_sources = []

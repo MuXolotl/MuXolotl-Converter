@@ -9,9 +9,9 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum FormatCompatibility {
-    Fast,        // Can copy codecs
-    Safe,        // Needs re-encoding but stable
-    Setup,       // Requires additional setup
+    Fast,
+    Safe,
+    Setup,
     Experimental,
     Problematic,
 }
@@ -28,6 +28,10 @@ pub struct VideoFormat {
     pub description: String,
     pub typical_use: String,
     pub max_resolution: Option<(u32, u32)>,
+    #[serde(default)]
+    pub requires_fixed_resolution: bool, // New: for VOB/DV
+    #[serde(default)]
+    pub default_pixel_format: Option<String>, // New: for yuv420p enforcement
     pub special_params: Vec<String>,
 }
 
@@ -93,16 +97,13 @@ impl VideoFormat {
         })
     }
 
-    pub fn has_strict_resolution(&self) -> bool {
-        matches!(self.extension.as_str(), "dv" | "vob" | "3gp")
-    }
-
     pub fn is_resolution_compatible(&self, width: u32, height: u32) -> bool {
+        if self.requires_fixed_resolution {
+            // Simplified check, strict logic is in converter
+            return width == 720 && (height == 576 || height == 480);
+        }
         match self.max_resolution {
-            Some((max_w, max_h)) => match self.extension.as_str() {
-                "dv" | "vob" => width == 720 && (height == 576 || height == 480),
-                _ => width <= max_w && height <= max_h,
-            },
+            Some((max_w, max_h)) => width <= max_w && height <= max_h,
             None => true,
         }
     }
@@ -114,7 +115,6 @@ impl VideoFormat {
         width: Option<u32>,
         height: Option<u32>,
     ) -> FormatCompatibility {
-        // Check stability first
         match self.stability {
             Stability::Problematic => return FormatCompatibility::Problematic,
             Stability::Experimental => return FormatCompatibility::Experimental,
@@ -122,16 +122,14 @@ impl VideoFormat {
             Stability::Stable => {}
         }
 
-        // Check resolution compatibility
         if let (Some(w), Some(h)) = (width, height) {
             if !self.is_resolution_compatible(w, h) {
-                if self.has_strict_resolution() {
+                if self.requires_fixed_resolution {
                     return FormatCompatibility::Setup;
                 }
             }
         }
 
-        // Check codec compatibility
         let video_ok = self.supports_video_codec(video_codec);
         let audio_ok =
             audio_codec.is_empty() || self.audio_codecs.is_empty() || self.supports_audio_codec(audio_codec);
@@ -161,6 +159,7 @@ fn codec_matches(container_codec: &str, actual_codec: &str) -> bool {
         "av1" => actual_codec.contains("av1"),
         "theora" => actual_codec == "libtheora" || actual_codec == "theora",
         "mpeg4" => actual_codec == "mpeg4" || actual_codec == "libxvid",
+        "gif" => actual_codec == "gif",
         _ => actual_codec.contains(container_codec),
     }
 }
@@ -198,6 +197,10 @@ struct TomlVideoFormat {
     description: String,
     typical_use: String,
     max_resolution: Vec<u32>,
+    #[serde(default)]
+    requires_fixed_resolution: bool,
+    #[serde(default)]
+    default_pixel_format: Option<String>,
     special_params: Vec<String>,
 }
 
@@ -223,6 +226,8 @@ impl From<TomlVideoFormat> for VideoFormat {
             } else {
                 None
             },
+            requires_fixed_resolution: t.requires_fixed_resolution,
+            default_pixel_format: t.default_pixel_format,
             special_params: t.special_params,
         }
     }

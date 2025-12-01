@@ -1,16 +1,10 @@
 import React from 'react';
-import { Cpu, Zap, HardDrive, Clock } from 'lucide-react';
+import { Zap, Cpu } from 'lucide-react';
 import OutputFolderSelector from '@/components/OutputFolderSelector';
 import type { GpuInfo } from '@/types';
 
 interface ToolbarProps {
-  stats: {
-    total: number;
-    pending: number;
-    processing: number;
-    completed: number;
-    failed: number;
-  };
+  stats: { total: number; pending: number; processing: number; completed: number; failed: number; };
   gpuInfo: GpuInfo;
   gpuLoading: boolean;
   outputFolder: string;
@@ -25,107 +19,54 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onFolderChange,
 }) => {
   return (
-    <div className="h-12 border-b border-white/10 flex items-center justify-between px-4 bg-black/20 shrink-0">
-      {/* Left: Stats */}
-      <div className="flex items-center gap-4">
-        {/* Queue Stats */}
-        <div className="flex items-center gap-3 text-xs">
-          <StatBadge 
-            icon={<HardDrive size={12} />} 
-            label="Queue" 
-            value={stats.total} 
-          />
-          
-          {stats.pending > 0 && (
-            <StatBadge 
-              icon={<Clock size={12} />}
-              label="Pending" 
-              value={stats.pending} 
-              color="text-yellow-400" 
-            />
-          )}
-          
-          {stats.processing > 0 && (
-            <StatBadge 
-              label="Converting" 
-              value={stats.processing} 
-              color="text-purple-400"
-              pulse 
-            />
-          )}
-          
-          {stats.completed > 0 && (
-            <StatBadge 
-              label="Done" 
-              value={stats.completed} 
-              color="text-green-400" 
-            />
-          )}
-          
-          {stats.failed > 0 && (
-            <StatBadge 
-              label="Failed" 
-              value={stats.failed} 
-              color="text-red-400" 
-            />
-          )}
-        </div>
-
-        {/* Divider */}
-        <div className="h-5 w-px bg-white/10" />
-
-        {/* GPU Info */}
+    <div className="h-12 bg-[#0f172a] border-b border-white/5 flex items-center justify-between px-4 shrink-0 gap-6">
+      
+      {/* LEFT: Stats & Hardware */}
+      <div className="flex items-center gap-6 text-[11px] font-mono text-slate-500">
+        {/* GPU Badge */}
         {!gpuLoading && (
-          <div className="flex items-center gap-1.5 text-xs">
+          <div className="flex items-center gap-2 px-2 py-1 bg-white/5 rounded border border-white/5" title={gpuInfo.name}>
             {gpuInfo.available ? (
               <>
-                <Zap size={12} className="text-yellow-400" />
-                <span className="text-white/60">{gpuInfo.name}</span>
-                <span className="text-[10px] px-1.5 py-0.5 bg-yellow-500/20 text-yellow-400 rounded">
-                  GPU
-                </span>
+                <Zap size={12} className="text-yellow-500" fill="currentColor" />
+                <span className="text-yellow-500/90 font-bold tracking-wide">GPU ENABLED</span>
               </>
             ) : (
               <>
-                <Cpu size={12} className="text-orange-400" />
-                <span className="text-white/40">CPU Only</span>
+                <Cpu size={12} className="text-slate-500" />
+                <span>CPU MODE</span>
               </>
             )}
           </div>
         )}
+
+        <div className="w-px h-4 bg-white/10" />
+
+        {/* Counters */}
+        <div className="flex gap-4">
+            <StatItem label="TOTAL" value={stats.total} />
+            <StatItem label="PENDING" value={stats.pending} active={stats.pending > 0} />
+            <StatItem label="DONE" value={stats.completed} active={stats.completed > 0} color="text-green-500" />
+            {stats.failed > 0 && <StatItem label="FAILED" value={stats.failed} active color="text-red-500" />}
+        </div>
       </div>
 
-      {/* Right: Output Folder */}
-      <OutputFolderSelector
-        outputFolder={outputFolder}
-        onFolderChange={onFolderChange}
-      />
+      {/* RIGHT: Output Folder (Big & Prominent) */}
+      <div className="flex-1 max-w-sm flex justify-end">
+        <OutputFolderSelector
+          outputFolder={outputFolder}
+          onFolderChange={onFolderChange}
+        />
+      </div>
     </div>
   );
 };
 
-interface StatBadgeProps {
-  icon?: React.ReactNode;
-  label: string;
-  value: number;
-  color?: string;
-  pulse?: boolean;
-}
-
-const StatBadge: React.FC<StatBadgeProps> = ({
-  icon,
-  label,
-  value,
-  color = 'text-white/60',
-  pulse = false,
-}) => (
-  <div className="flex items-center gap-1.5">
-    {icon && <span className="text-white/40">{icon}</span>}
-    <span className="text-white/40">{label}:</span>
-    <span className={`font-semibold ${color} ${pulse ? 'animate-pulse' : ''}`}>
-      {value}
-    </span>
-  </div>
+const StatItem: React.FC<{ label: string; value: number; active?: boolean; color?: string; }> = ({ label, value, active, color = 'text-blue-400' }) => (
+    <div className={`flex gap-1.5 ${active ? 'opacity-100' : 'opacity-40'}`}>
+        <span className="font-semibold">{label}</span>
+        <span className={active ? color : ''}>{value}</span>
+    </div>
 );
 
 export default React.memo(Toolbar);

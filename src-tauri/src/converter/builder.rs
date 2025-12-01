@@ -170,23 +170,31 @@ impl FfmpegBuilder {
 
     pub fn nvenc_preset(self, quality: Quality) -> Self {
         let cq = quality.video_crf();
-        self.arg("-preset", "p7")
-            .arg("-tune", "hq")
+        self.arg("-preset", "p4")
             .arg("-rc", "vbr")
             .arg("-cq", cq)
     }
 
     pub fn qsv_preset(self, quality: Quality) -> Self {
-        self.arg("-preset", "veryslow")
+        self.arg("-preset", "medium")
             .arg("-global_quality", quality.video_crf())
     }
 
     pub fn amf_preset(self, quality: Quality) -> Self {
-        let qp = quality.video_crf();
-        self.arg("-quality", "quality")
-            .arg("-rc", "cqp")
-            .arg("-qp_i", qp)
-            .arg("-qp_p", qp)
+        // Universal AMF Preset
+        // Works on R5 (old) and RDNA3 (new)
+        // Does NOT force CQP mode (crashes old drivers).
+        // Relies on Bitrate injected from video.rs
+        let (usage, qual_profile) = match quality {
+            Quality::Low => ("transcoding", "speed"),
+            Quality::Medium => ("transcoding", "balanced"),
+            Quality::High => ("transcoding", "quality"),
+            Quality::Ultra => ("transcoding", "quality"),
+            Quality::Custom => ("transcoding", "balanced"),
+        };
+
+        self.arg("-usage", usage)
+            .arg("-quality", qual_profile)
     }
 
     pub fn videotoolbox_preset(self) -> Self {

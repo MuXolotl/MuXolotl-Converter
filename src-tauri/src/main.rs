@@ -37,6 +37,7 @@ fn main() {
             commands::window_maximize,
             commands::window_close,
             commands::window_is_maximized,
+            commands::close_splash, // Handles showing and maximizing main window
             // System
             commands::check_ffmpeg,
             commands::detect_gpu,
@@ -56,38 +57,32 @@ fn main() {
             commands::cancel_conversion,
         ])
         .setup(|app| {
-            let window = app.get_window("main").unwrap();
-            let state = app.state::<AppState>();
-            let processes = state.active_processes.clone();
+            if let Some(window) = app.get_window("main") {
+                let state = app.state::<AppState>();
+                let processes = state.active_processes.clone();
 
-            // Maximize window on all platforms
-            let window_maximize = window.clone();
-            std::thread::spawn(move || {
-                std::thread::sleep(std::time::Duration::from_millis(100));
-                let _ = window_maximize.maximize();
-            });
-
-            // Graceful shutdown
-            window.on_window_event(move |event| {
-                if let tauri::WindowEvent::CloseRequested { .. } = event {
-                    let procs = processes.clone();
-                    std::thread::spawn(move || {
-                        tauri::async_runtime::block_on(async {
-                            let mut map = procs.lock().await;
-                            for (_, mut child) in map.drain() {
-                                let _ = child.kill().await;
-                            }
+                // Graceful shutdown logic
+                window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { .. } = event {
+                        let procs = processes.clone();
+                        std::thread::spawn(move || {
+                            tauri::async_runtime::block_on(async {
+                                let mut map = procs.lock().await;
+                                for (id, mut child) in map.drain() {
+                                    println!("Killing process: {}", id);
+                                    let _ = child.kill().await;
+                                }
+                            });
                         });
-                    });
-                }
-            });
+                    }
+                });
 
-            // Initialize caches
-            let window_clone = window.clone();
-            tauri::async_runtime::spawn(async move {
-                commands::init_caches(&window_clone).await;
-            });
-
+                // Init caches in background
+                let window_clone = window.clone();
+                tauri::async_runtime::spawn(async move {
+                    commands::init_caches(&window_clone).await;
+                });
+            }
             Ok(())
         })
         .run(tauri::generate_context!())

@@ -163,6 +163,7 @@ impl ConversionSettings {
         self.channels.unwrap_or(2)
     }
 
+    #[allow(dead_code)]
     pub fn metadata_args(&self) -> Vec<String> {
         self.metadata
             .as_ref()

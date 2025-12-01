@@ -31,11 +31,13 @@ pub fn create_async_hidden_command(program: &str) -> tokio::process::Command {
 }
 
 /// Normalizes path for cross-platform compatibility
+#[allow(dead_code)]
 pub fn normalize_path(path: &str) -> PathBuf {
     PathBuf::from(path)
 }
 
 /// Validates that a path exists and is a file
+#[allow(dead_code)]
 pub fn validate_input_path(path: &str) -> Result<PathBuf, String> {
     let path = Path::new(path);
     if !path.exists() {
@@ -48,6 +50,7 @@ pub fn validate_input_path(path: &str) -> Result<PathBuf, String> {
 }
 
 /// Clamps a value to supported range
+#[allow(dead_code)]
 pub fn clamp_to_supported<T: Ord + Copy>(value: T, supported: &[T], default: T) -> T {
     if supported.contains(&value) {
         value

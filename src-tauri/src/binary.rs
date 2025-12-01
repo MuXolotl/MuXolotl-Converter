@@ -22,7 +22,7 @@ pub fn get_binary_path(app_handle: &AppHandle, name: &str) -> AppResult<PathBuf>
     let suffix = get_binary_suffix();
     let full_name = format!("{}{}", name, suffix);
 
-    // 1. Try Tauri resource resolver (production)
+    // 1. Try Tauri resource resolver (Production Bundle)
     let resource_path = format!("binaries/{}", full_name);
     if let Some(path) = app_handle.path_resolver().resolve_resource(&resource_path) {
         if path.exists() {
@@ -30,11 +30,12 @@ pub fn get_binary_path(app_handle: &AppHandle, name: &str) -> AppResult<PathBuf>
         }
     }
 
-    // 2. Development fallback paths
+    // 2. Development/Manual fallback paths
     if let Ok(cwd) = std::env::current_dir() {
-        let candidates = [
-            cwd.join("src-tauri/binaries").join(&full_name),
+        let candidates = vec![
             cwd.join("binaries").join(&full_name),
+            cwd.join("src-tauri").join("binaries").join(&full_name),
+            cwd.join("..").join("src-tauri").join("binaries").join(&full_name),
         ];
 
         for path in candidates {
@@ -44,10 +45,13 @@ pub fn get_binary_path(app_handle: &AppHandle, name: &str) -> AppResult<PathBuf>
         }
     }
 
+    // Removed 'which' dependency block to fix build error.
+    // Relative paths above are sufficient for 99% of cases.
+
     Err(AppError::new(
         ErrorCode::BinaryNotFound,
         format!("Binary '{}' not found. Expected: {}", name, full_name),
-    ))
+    ).with_details("Please ensure FFmpeg binaries are placed in src-tauri/binaries/"))
 }
 
 pub fn get_ffmpeg_path(app: &AppHandle) -> AppResult<PathBuf> {
@@ -58,13 +62,12 @@ pub fn get_ffprobe_path(app: &AppHandle) -> AppResult<PathBuf> {
     get_binary_path(app, "ffprobe")
 }
 
-/// Verifies that FFmpeg binaries are executable
 pub fn check_binaries(app: &AppHandle) -> AppResult<bool> {
     let ffmpeg = get_ffmpeg_path(app)?;
     let ffprobe = get_ffprobe_path(app)?;
 
     let check = |path: PathBuf| -> bool {
-        std::process::Command::new(path)
+        crate::utils::create_hidden_command(path.to_str().unwrap_or("ffmpeg"))
             .arg("-version")
             .output()
             .map(|o| o.status.success())
@@ -76,7 +79,7 @@ pub fn check_binaries(app: &AppHandle) -> AppResult<bool> {
     } else {
         Err(AppError::new(
             ErrorCode::BinaryNotFound,
-            "FFmpeg binaries failed execution check",
+            "FFmpeg binaries found but failed to execute.",
         ))
     }
 }

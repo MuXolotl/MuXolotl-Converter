@@ -112,6 +112,7 @@
     },
     "windows": [
       {
+        "label": "main",
         "fullscreen": false,
         "resizable": true,
         "title": "MuXolotl-Converter",
@@ -123,7 +124,22 @@
         "decorations": false,
         "transparent": false,
         "maximized": true,
+        "visible": false,
         "fileDropEnabled": true
+      },
+      {
+        "label": "splashscreen",
+        "url": "splashscreen.html",
+        "fullscreen": false,
+        "resizable": false,
+        "title": "MuXolotl Loading",
+        "width": 600,
+        "height": 400,
+        "center": true,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "visible": true
       }
     ]
   }

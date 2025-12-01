@@ -1,4 +1,4 @@
-use crate::utils::{create_async_hidden_command, create_hidden_command};
+use crate::utils::create_hidden_command;
 use serde::{Deserialize, Serialize};
 use tokio::time::{timeout, Duration};
 
@@ -88,30 +88,11 @@ impl GpuInfo {
         }
     }
 
-    /// Returns hwaccel args for FFmpeg
+    /// Returns hwaccel args for FFmpeg.
+    /// Currently returning empty to ensure maximum stability (CPU Decode -> GPU Encode).
+    /// Full HW pipeline requires complex filter graph management (hwupload/hwdownload).
     pub fn hwaccel_args(&self) -> Vec<(&'static str, &'static str)> {
-        if !self.available {
-            return vec![];
-        }
-
-        match self.vendor {
-            GpuVendor::Nvidia => vec![
-                ("-hwaccel", "cuda"),
-                ("-hwaccel_output_format", "cuda"),
-            ],
-            GpuVendor::Intel => vec![
-                ("-hwaccel", "qsv"),
-                ("-hwaccel_output_format", "qsv"),
-            ],
-            GpuVendor::Amd => {
-                #[cfg(target_os = "windows")]
-                return vec![("-hwaccel", "d3d11va")];
-                #[cfg(not(target_os = "windows"))]
-                return vec![("-hwaccel", "auto")];
-            }
-            GpuVendor::Apple => vec![("-hwaccel", "videotoolbox")],
-            GpuVendor::None => vec![],
-        }
+        vec![]
     }
 }
 
