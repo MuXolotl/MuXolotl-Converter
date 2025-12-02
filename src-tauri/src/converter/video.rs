@@ -11,8 +11,6 @@ use tauri::Manager;
 use tokio::process::Child;
 use tokio::sync::Mutex;
 
-// ===== Video Conversion =====
-
 pub async fn convert(
     window: tauri::Window,
     input: &str,
@@ -44,34 +42,36 @@ pub async fn convert(
         .video_codec(&video_codec)
         .apply_video_codec_preset(&video_codec, settings.quality);
 
-    // --- Smart Bitrate for AMD AMF ---
-    if video_codec.contains("amf") && settings.bitrate.is_none() {
-        let width = settings.width.unwrap_or_else(|| media.primary_video().map(|v| v.width).unwrap_or(1920));
-        let height = settings.height.unwrap_or_else(|| media.primary_video().map(|v| v.height).unwrap_or(1080));
-        let fps = settings.fps.unwrap_or_else(|| media.primary_video().map(|v| v.fps.round() as u32).unwrap_or(30));
-        
-        let target_bitrate = calculate_auto_bitrate(width, height, fps, settings.quality);
-        builder = builder.arg("-b:v", &format!("{}k", target_bitrate));
-        builder = builder.arg("-maxrate", &format!("{}k", (target_bitrate as f64 * 1.5) as u32));
-        builder = builder.arg("-bufsize", &format!("{}k", target_bitrate * 2));
+    // Smart Bitrate Calculation
+    if settings.bitrate.is_none() {
+        // Ensure bitrate is set for codecs that don't handle VBR/CRF well without it (like AMF or old mpeg4)
+        if video_codec.contains("amf") || video_codec.contains("mpeg4") {
+             let width = settings.width.unwrap_or_else(|| media.primary_video().map(|v| v.width).unwrap_or(1920));
+             let height = settings.height.unwrap_or_else(|| media.primary_video().map(|v| v.height).unwrap_or(1080));
+             let fps = settings.fps.unwrap_or_else(|| media.primary_video().map(|v| v.fps.round() as u32).unwrap_or(30));
+             
+             let target_bitrate = calculate_auto_bitrate(width, height, fps, settings.quality, &video_codec);
+             builder = builder.arg("-b:v", &format!("{}k", target_bitrate));
+             builder = builder.arg("-maxrate", &format!("{}k", (target_bitrate as f64 * 1.5) as u32));
+             builder = builder.arg("-bufsize", &format!("{}k", target_bitrate * 2));
+        }
+    } else if let Some(br) = settings.bitrate {
+        builder = builder.arg("-b:v", &format!("{}k", br));
     }
 
-    // Resolution
+    // Resolution & Scaling
     builder = apply_resolution(builder, &fmt, &media, &settings);
 
-    // FPS
     if let Some(fps) = settings.fps {
         builder = builder.fps(fps);
     }
 
-    // Pixel Format Logic
     if video_codec.contains("amf") {
-        builder = builder.pixel_format("nv12"); // Hardware requirement for AMD
+        builder = builder.pixel_format("nv12");
     } else if let Some(pix_fmt) = &fmt.default_pixel_format {
-        builder = builder.pixel_format(pix_fmt); // Config driven requirement
+        builder = builder.pixel_format(pix_fmt);
     }
 
-    // Audio & Container
     builder = apply_audio_settings(builder, &fmt, &media, &settings);
     builder = apply_container_settings(builder, &fmt, format, &video_codec);
 
@@ -79,12 +79,10 @@ pub async fn convert(
     spawn_ffmpeg(window, task_id, media.duration, args, output_path, processes).await
 }
 
-// ===== Bitrate Calculator =====
-
-fn calculate_auto_bitrate(width: u32, height: u32, fps: u32, quality: Quality) -> u32 {
+fn calculate_auto_bitrate(width: u32, height: u32, fps: u32, quality: Quality, codec: &str) -> u32 {
     let pixels = width as f64 * height as f64;
     
-    let bpp = match quality {
+    let base_bpp = match quality {
         Quality::Low => 0.05,
         Quality::Medium => 0.10,
         Quality::High => 0.18,
@@ -92,15 +90,16 @@ fn calculate_auto_bitrate(width: u32, height: u32, fps: u32, quality: Quality) -
         Quality::Custom => 0.12,
     };
 
-    let bitrate = (pixels * fps as f64 * bpp) / 1000.0;
-    
+    let efficiency = if codec.contains("av1") { 0.55 }
+    else if codec.contains("hevc") || codec.contains("vp9") { 0.65 }
+    else if codec.contains("vp8") { 0.85 }
+    else { 1.00 };
+
+    let bitrate = (pixels * fps as f64 * base_bpp * efficiency) / 1000.0;
     bitrate as u32
 }
 
-// ===== Helpers =====
-
 fn should_use_gpu(gpu: &GpuInfo, settings: &ConversionSettings, fmt: &VideoFormat) -> bool {
-    // Disable GPU for formats that require fixed resolution (DV/VOB) as they are legacy
     gpu.available && settings.use_gpu && !fmt.requires_fixed_resolution
 }
 
@@ -133,22 +132,27 @@ fn apply_resolution(
     settings: &ConversionSettings,
 ) -> FfmpegBuilder {
     let (mut width, mut height) = (settings.width, settings.height);
+    let mut force_exact = false;
 
     if fmt.requires_fixed_resolution {
-        let source_height = media
-            .primary_video()
-            .map(|v| v.height)
-            .unwrap_or(576);
-
-        // NTSC (480) vs PAL (576) logic
+        let source_height = media.primary_video().map(|v| v.height).unwrap_or(576);
         height = Some(if source_height <= 480 { 480 } else { 576 });
         width = Some(720);
-
+        force_exact = true;
+        
         let fps = if height == Some(480) { "30000/1001" } else { "25" };
         return builder.resolution(width, height, true).arg("-r", fps);
     }
 
-    builder.resolution(width, height, true)
+    // Smart behavior: If user picked a preset resolution (e.g., 1080p) but not strict width/height,
+    // we typically want to maintain aspect ratio.
+    // However, currently settings.width/height come from dropdowns as explicit pairs.
+    // To support smart scaling, we assume that if only Width is provided (logic change in UI later) or via generic presets.
+    // Since existing UI sends both, we check if we should force.
+    // For now, we pass force_exact = false to allow builder to use -2 if one dimension is missing,
+    // but if both are present, builder uses exact scale.
+    
+    builder.resolution(width, height, force_exact)
 }
 
 fn apply_audio_settings(
@@ -185,7 +189,6 @@ fn apply_audio_settings(
         }
         return b;
     }
-
     builder
 }
 

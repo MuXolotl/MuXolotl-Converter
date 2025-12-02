@@ -30,13 +30,13 @@ impl ValidationResult {
     fn check_stability(&mut self, stability: Stability, extension: &str) {
         match stability {
             Stability::Problematic => {
-                self.error(format!("Format '{}' is problematic and may fail", extension));
+                self.error(format!("Format '{}' is problematic/legacy", extension));
             }
             Stability::Experimental => {
                 self.warn(format!("Format '{}' is experimental", extension));
             }
             Stability::RequiresSetup => {
-                self.warn(format!("Format '{}' may require additional setup", extension));
+                self.warn(format!("Format '{}' may require external libs", extension));
             }
             Stability::Stable => {}
         }
@@ -74,34 +74,28 @@ fn validate_audio(
     result.check_stability(fmt.stability.clone(), &fmt.extension);
     result.suggested_params.extend(fmt.special_params.clone());
 
-    // Lossy/Lossless conversion warnings
     if let Some(input_fmt) = audio::get_format(input_format) {
         if input_fmt.lossy && !fmt.lossy {
-            result.warn("Converting lossy to lossless won't improve quality");
+            result.warn("Lossy source -> Lossless output (wasted space)");
         } else if !input_fmt.lossy && fmt.lossy {
-            result.warn("Converting lossless to lossy will reduce quality permanently");
+            result.warn("Lossless source -> Lossy output (quality loss)");
         }
     }
 
-    // Sample rate validation
     if let Some(sr) = settings.get("sampleRate").and_then(|v| v.as_u64()) {
         let sr = sr as u32;
         if !fmt.supports_sample_rate(sr) {
             result.warn(format!(
-                "{}Hz not optimal for {}. Recommended: {}Hz",
+                "{}Hz unsupported for {}. Closest: {}Hz",
                 sr, fmt.extension, fmt.recommended_sample_rate
             ));
         }
     }
 
-    // Channel validation
     if let Some(ch) = settings.get("channels").and_then(|v| v.as_u64()) {
         let ch = ch as u32;
         if !fmt.supports_channels(ch) {
-            result.error(format!(
-                "{} doesn't support {} channels. Supported: {:?}",
-                fmt.extension, ch, fmt.channels_support
-            ));
+            result.error(format!("{} does not support {} channels", fmt.extension, ch));
         }
     }
 }
@@ -120,35 +114,34 @@ fn validate_video(
     result.suggested_params.extend(fmt.special_params.clone());
 
     // Resolution validation
-    if let Some((max_w, max_h)) = fmt.max_resolution {
-        let w = settings.get("width").and_then(|v| v.as_u64());
-        let h = settings.get("height").and_then(|v| v.as_u64());
+    let w = settings.get("width").and_then(|v| v.as_u64());
+    let h = settings.get("height").and_then(|v| v.as_u64());
 
-        if let (Some(w), Some(h)) = (w, h) {
+    if let (Some(w), Some(h)) = (w, h) {
+        if fmt.requires_fixed_resolution {
+            // Standard definition check
+            if w != 720 || (h != 576 && h != 480) {
+                result.error(format!("{} requires 720x576 (PAL) or 720x480 (NTSC)", fmt.extension));
+            }
+        } else if let Some((max_w, max_h)) = fmt.max_resolution {
             if w > max_w as u64 || h > max_h as u64 {
-                if fmt.requires_fixed_resolution {
-                    result.error(format!(
-                        "{} requires exactly {}x{} resolution",
-                        fmt.extension, max_w, max_h
-                    ));
-                } else {
-                    result.warn(format!(
-                        "Resolution exceeds recommended max {}x{} for {}",
-                        max_w, max_h, fmt.extension
-                    ));
-                }
+                result.error(format!(
+                    "Resolution {}x{} exceeds limits for {} (Max: {}x{})",
+                    w, h, fmt.extension, max_w, max_h
+                ));
             }
         }
     }
 
-    // Video codec validation
-    if let Some(codec) = settings.get("videoCodec").and_then(|s| s.as_str()) {
-        if !fmt.supports_video_codec(codec) {
-            result.error(format!(
-                "{} doesn't support video codec '{}'",
-                fmt.extension, codec
-            ));
-            result.alternative_codec = fmt.get_default_video_codec().map(|s| s.to_string());
+    // Bitrate safety check
+    if let Some(br) = settings.get("bitrate").and_then(|v| v.as_u64()) {
+        // 50Mbps is a reasonable safety cap for standard formats to prevent accidental huge files
+        // unless it's Pro format like ProRes/DNxHD (not fully handled here yet)
+        if br > 50_000 {
+            result.warn("Very high bitrate selected (>50 Mbps). Ensure disk space.");
+        }
+        if br < 100 {
+            result.warn("Very low bitrate (<100 kbps) for video. Expect blockiness.");
         }
     }
 }

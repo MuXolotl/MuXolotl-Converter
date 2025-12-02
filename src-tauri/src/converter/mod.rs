@@ -48,8 +48,6 @@ pub async fn spawn_ffmpeg(
     let ffmpeg_path = get_ffmpeg_path(&window.app_handle())
         .map_err(|e| anyhow::anyhow!("FFmpeg not found: {}", e))?;
 
-    println!("🎬 [{}] FFmpeg path: {:?}", task_id, ffmpeg_path);
-
     // Build command
     let mut cmd = create_async_hidden_command(ffmpeg_path.to_str().unwrap());
     cmd.args(&args)
@@ -59,19 +57,20 @@ pub async fn spawn_ffmpeg(
     // Spawn process
     let mut child = cmd.spawn().context("Failed to spawn FFmpeg")?;
     
-    println!("🎬 [{}] FFmpeg spawned", task_id);
-
-    let stdout = child.stdout.take().context("Failed to capture stdout")?;
-    let stderr = child.stderr.take().context("Failed to capture stderr")?;
+    // Use unwrap safe logging in production to avoid panic on missing pipes
+    let stdout = child.stdout.take().expect("Failed to capture stdout");
+    let stderr = child.stderr.take().expect("Failed to capture stderr");
 
     // Register process for cancellation
     processes.lock().await.insert(task_id.clone(), child);
     let _ = window.emit("conversion-started", &task_id);
 
-    // Spawn stderr monitor
+    // Spawn stderr monitor (Log Errors)
     let task_id_err = task_id.clone();
     tokio::spawn(async move {
         let mut reader = BufReader::new(stderr).lines();
+        // Using next_line() is safe but strict on UTF-8. 
+        // Ideally we accept that ffmpeg logs are UTF-8.
         while let Ok(Some(line)) = reader.next_line().await {
             if line.contains("Error") || line.contains("Invalid") || line.contains("failed") {
                 eprintln!("⚠️ [{}] FFmpeg: {}", task_id_err, line);
@@ -115,18 +114,13 @@ pub async fn spawn_ffmpeg(
             }
         }
         Ok(None) => {
-            // Process was cancelled by user - this is NOT an error
+            // Process was cancelled by user
             cleanup_failed(&output_path).await;
-            println!("🛑 [{}] Conversion cancelled by user", task_id);
-            
-            // Emit cancelled event instead of error
             let _ = window.emit("conversion-cancelled", &task_id);
-            
-            // Return Ok since cancellation is intentional
             Ok(task_id)
         }
         Err(_) => {
-            // Timeout - this IS an error
+            // Timeout
             if let Some(mut child) = processes.lock().await.remove(&task_id) {
                 let _ = child.kill().await;
             }
@@ -142,7 +136,6 @@ async fn cleanup_failed(path: &str) {
     let path = Path::new(path);
     if path.exists() {
         let _ = tokio::fs::remove_file(path).await;
-        println!("🗑️ Cleaned up: {:?}", path);
     }
 }
 

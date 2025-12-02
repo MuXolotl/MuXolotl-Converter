@@ -32,25 +32,25 @@ fn main() {
             active_processes: Arc::new(Mutex::new(HashMap::new())),
         })
         .invoke_handler(tauri::generate_handler![
-            // Window
+            // ===== Window =====
             commands::window_minimize,
             commands::window_maximize,
             commands::window_close,
             commands::window_is_maximized,
-            commands::close_splash, // Handles showing and maximizing main window
-            // System
+            commands::close_splash,
+            // ===== System =====
             commands::check_ffmpeg,
             commands::detect_gpu,
             commands::open_folder,
-            // Media
+            // ===== Media =====
             commands::detect_media_type,
-            // Formats
+            // ===== Formats =====
             commands::get_audio_formats,
             commands::get_video_formats,
             commands::get_recommended_formats,
-            // Validation
+            // ===== Validation =====
             commands::validate_conversion,
-            // Conversion
+            // ===== Conversion =====
             commands::convert_audio,
             commands::convert_video,
             commands::extract_audio,
@@ -65,6 +65,7 @@ fn main() {
                 window.on_window_event(move |event| {
                     if let tauri::WindowEvent::CloseRequested { .. } = event {
                         let procs = processes.clone();
+                        // Spawn thread to kill children immediately on exit
                         std::thread::spawn(move || {
                             tauri::async_runtime::block_on(async {
                                 let mut map = procs.lock().await;

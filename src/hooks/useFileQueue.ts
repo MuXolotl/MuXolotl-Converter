@@ -10,11 +10,12 @@ import {
 } from '@/utils';
 import type { FileItem } from '@/types';
 
-const AUTOSAVE_INTERVAL = 5000;
+const AUTOSAVE_DEBOUNCE_MS = 2000;
 
 export function useFileQueue(outputFolder: string) {
   const [files, setFiles] = useState<FileItem[]>([]);
   const filesRef = useRef<FileItem[]>(files);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Keep ref in sync
   useEffect(() => {
@@ -29,16 +30,26 @@ export function useFileQueue(outputFolder: string) {
     }
   }, []);
 
-  // Autosave
+  // Smart Autosave (Debounced)
+  // Triggers save only when 'files' changes, but waits for inactivity
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (filesRef.current.length > 0) {
-        saveQueue(filesRef.current);
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    saveTimeoutRef.current = setTimeout(() => {
+      if (files.length > 0) {
+        saveQueue(files);
+      } else {
+        // If queue is empty, we might want to clear storage too, or keep it empty
+        clearStorageQueue(); 
       }
-    }, AUTOSAVE_INTERVAL);
-    
-    return () => clearInterval(interval);
-  }, []);
+    }, AUTOSAVE_DEBOUNCE_MS);
+
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
+  }, [files]);
 
   // Update output paths when folder changes
   useEffect(() => {
