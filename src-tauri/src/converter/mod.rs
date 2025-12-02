@@ -20,9 +20,7 @@ use tokio::time::{timeout, Duration};
 
 const CONVERSION_TIMEOUT: Duration = Duration::from_secs(3600); // 1 hour
 
-// ============================================================================
-// Progress Event
-// ============================================================================
+// ===== Progress Event =====
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConversionProgress {
@@ -35,9 +33,7 @@ pub struct ConversionProgress {
     pub total_time: f64,
 }
 
-// ============================================================================
-// FFmpeg Spawner
-// ============================================================================
+// ===== FFmpeg Spawner =====
 
 pub async fn spawn_ffmpeg(
     window: tauri::Window,

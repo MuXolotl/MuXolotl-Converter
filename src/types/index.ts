@@ -1,6 +1,4 @@
-// ============================================================================
-// GPU
-// ============================================================================
+// ===== GPU =====
 
 export type GpuVendor = 'nvidia' | 'intel' | 'amd' | 'apple' | 'none';
 
@@ -13,9 +11,7 @@ export interface GpuInfo {
   available: boolean;
 }
 
-// ============================================================================
-// Media
-// ============================================================================
+// ===== Media =====
 
 export type MediaType = 'audio' | 'video' | 'unknown';
 
@@ -43,9 +39,7 @@ export interface MediaInfo {
   audio_streams: AudioStream[];
 }
 
-// ============================================================================
-// Formats
-// ============================================================================
+// ===== Formats =====
 
 export type Stability = 'stable' | 'requiressetup' | 'experimental' | 'problematic';
 export type Category = 'popular' | 'standard' | 'specialized' | 'legacy' | 'exotic';
@@ -98,9 +92,7 @@ export interface ValidationResult {
   alternative_codec: string | null;
 }
 
-// ============================================================================
-// Conversion
-// ============================================================================
+// ===== Conversion =====
 
 export type ConversionStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
 export type Quality = 'low' | 'medium' | 'high' | 'ultra' | 'custom';
@@ -154,9 +146,7 @@ export interface FileItem {
   addedAt: number;
 }
 
-// ============================================================================
-// Context
-// ============================================================================
+// ===== Context =====
 
 export interface ConversionContextType {
   isConverting: boolean;

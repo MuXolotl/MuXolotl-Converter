@@ -119,7 +119,7 @@ const Queue: React.FC<QueueProps> = ({
                 onFilesAdded={onFilesAdded}
                 currentCount={files.length}
                 maxCount={MAX_QUEUE_SIZE}
-                compact // New prop we'll add to DropZone
+                compact
               />
            </div>
         )}

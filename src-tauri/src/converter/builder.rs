@@ -20,9 +20,7 @@ impl FfmpegBuilder {
         }
     }
 
-    // ========================================================================
-    // Basic Options
-    // ========================================================================
+    // ===== Basic Options =====
 
     pub fn input_file(mut self) -> Self {
         self.args.push("-i".to_string());
@@ -46,9 +44,7 @@ impl FfmpegBuilder {
         self
     }
 
-    // ========================================================================
-    // Key-Value Arguments
-    // ========================================================================
+    // ===== Key-Value Arguments =====
 
     pub fn arg(mut self, key: &str, value: &str) -> Self {
         self.args.push(key.to_string());
@@ -66,9 +62,7 @@ impl FfmpegBuilder {
         self
     }
 
-    // ========================================================================
-    // Stream Control
-    // ========================================================================
+    // ===== Stream Control =====
 
     pub fn disable_video(self) -> Self {
         self.flag("-vn")
@@ -90,9 +84,7 @@ impl FfmpegBuilder {
         self.arg("-f", container)
     }
 
-    // ========================================================================
-    // Audio Settings
-    // ========================================================================
+    // ===== Audio Settings =====
 
     pub fn audio_bitrate(self, kbps: u32) -> Self {
         self.arg("-b:a", &format!("{}k", kbps))
@@ -106,9 +98,7 @@ impl FfmpegBuilder {
         self.arg("-ac", &count.to_string())
     }
 
-    // ========================================================================
-    // Video Settings
-    // ========================================================================
+    // ===== Video Settings =====
 
     pub fn fps(self, fps: u32) -> Self {
         self.arg("-r", &fps.to_string())
@@ -128,9 +118,7 @@ impl FfmpegBuilder {
         self
     }
 
-    // ========================================================================
-    // GPU Acceleration
-    // ========================================================================
+    // ===== GPU Acceleration =====
 
     pub fn hwaccel(mut self, gpu: &GpuInfo) -> Self {
         for (key, value) in gpu.hwaccel_args() {
@@ -140,9 +128,7 @@ impl FfmpegBuilder {
         self
     }
 
-    // ========================================================================
-    // Metadata
-    // ========================================================================
+    // ===== Metadata =====
 
     pub fn metadata(mut self, meta: &Option<FileMetadata>) -> Self {
         let args = meta
@@ -154,9 +140,7 @@ impl FfmpegBuilder {
         self
     }
 
-    // ========================================================================
-    // Codec-Specific Presets
-    // ========================================================================
+    // ===== Codec-Specific Presets =====
 
     pub fn x264_preset(self, quality: Quality) -> Self {
         self.arg("-preset", quality.video_preset())
@@ -252,9 +236,7 @@ impl FfmpegBuilder {
         }
     }
 
-    // ========================================================================
-    // Build
-    // ========================================================================
+    // ===== Build =====
 
     pub fn build(mut self) -> (Vec<String>, String) {
         // Apply video filters if any

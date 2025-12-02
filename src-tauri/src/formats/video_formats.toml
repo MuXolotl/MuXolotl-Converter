@@ -1,6 +1,4 @@
-# ========================================
-# POPULAR FORMATS
-# ========================================
+# ===== POPULAR FORMATS =====
 
 [[format]]
 extension = "mp4"
@@ -85,9 +83,7 @@ typical_use = "Social media, memes"
 max_resolution = []
 special_params = []
 
-# ========================================
-# STANDARD FORMATS
-# ========================================
+# ===== STANDARD FORMATS =====
 
 [[format]]
 extension = "m4v"
@@ -169,9 +165,7 @@ typical_use = "DVB, IPTV"
 max_resolution = []
 special_params = []
 
-# ========================================
-# SPECIALIZED FORMATS
-# ========================================
+# ===== SPECIALIZED FORMATS =====
 
 [[format]]
 extension = "ogv"
@@ -240,9 +234,7 @@ max_resolution = []
 special_params = []
 default_pixel_format = "yuv420p"
 
-# ========================================
-# LEGACY FORMATS
-# ========================================
+# ===== LEGACY FORMATS =====
 
 [[format]]
 extension = "vob"
@@ -284,9 +276,7 @@ typical_use = "Legacy collections"
 max_resolution = []
 special_params = ["-vtag", "DIVX"]
 
-# ========================================
-# EXOTIC FORMATS
-# ========================================
+# ===== EXOTIC FORMATS =====
 
 [[format]]
 extension = "nut"

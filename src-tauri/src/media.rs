@@ -2,9 +2,7 @@ use crate::utils::create_hidden_command;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-// ============================================================================
-// Types
-// ============================================================================
+// ===== Types =====
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -65,9 +63,7 @@ impl MediaInfo {
     }
 }
 
-// ============================================================================
-// Detection
-// ============================================================================
+// ===== Detection =====
 
 pub async fn detect_media_type(app_handle: &tauri::AppHandle, path: &str) -> Result<MediaInfo> {
     let ffprobe_path = crate::get_ffprobe_path(app_handle)

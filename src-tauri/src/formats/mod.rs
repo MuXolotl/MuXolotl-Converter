@@ -4,9 +4,7 @@ pub mod video;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 
-// ============================================================================
-// Common Types
-// ============================================================================
+// ===== Common Types =====
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -58,9 +56,7 @@ impl Stability {
     }
 }
 
-// ============================================================================
-// Sorting Helper
-// ============================================================================
+// ===== Sorting Helper =====
 
 pub fn sort_formats_by_category<T, F>(formats: &mut [T], get_category: F)
 where

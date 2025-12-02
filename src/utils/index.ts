@@ -1,8 +1,6 @@
 import type { FileItem, FileSettings, MediaType, ConversionStatus } from '@/types';
 
-// ============================================================================
-// ID Generation
-// ============================================================================
+// ===== ID Generation =====
 
 let idCounter = 0;
 
@@ -11,9 +9,7 @@ export function generateFileId(): string {
   return `${Date.now()}_${idCounter}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-// ============================================================================
-// Path Utilities
-// ============================================================================
+// ===== Path Utilities =====
 
 export function generateOutputPath(file: FileItem, folder: string): string {
   const lastDot = file.name.lastIndexOf('.');
@@ -33,9 +29,7 @@ export function truncatePath(path: string, maxLength = 30): string {
   return `${parts[0]}/.../${parts[parts.length - 1]}`;
 }
 
-// ============================================================================
-// Formatting
-// ============================================================================
+// ===== Formatting =====
 
 export function formatFileSize(bytes: number): string {
   if (bytes === 0) return '0 B';
@@ -73,9 +67,7 @@ export function formatETA(seconds: number | null | undefined): string {
   return `${h}h ${m % 60}m`;
 }
 
-// ============================================================================
-// Defaults
-// ============================================================================
+// ===== Defaults =====
 
 export function getDefaultFormat(mediaType: MediaType | string): string {
   return mediaType === 'audio' ? 'mp3' : 'mp4';
@@ -91,9 +83,7 @@ export function getDefaultSettings(gpuAvailable = false): FileSettings {
   };
 }
 
-// ============================================================================
-// Sorting
-// ============================================================================
+// ===== Sorting =====
 
 const STATUS_PRIORITY: Record<ConversionStatus, number> = {
   processing: 0,
@@ -118,9 +108,7 @@ export function sortFilesByStatus(files: FileItem[]): FileItem[] {
   });
 }
 
-// ============================================================================
-// Queue Statistics
-// ============================================================================
+// ===== Queue Statistics =====
 
 export function getQueueStats(files: FileItem[]) {
   return {
@@ -132,9 +120,7 @@ export function getQueueStats(files: FileItem[]) {
   };
 }
 
-// ============================================================================
-// Storage
-// ============================================================================
+// ===== Storage =====
 
 const STORAGE_KEYS = {
   queue: 'muxolotl_queue',

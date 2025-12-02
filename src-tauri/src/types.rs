@@ -1,8 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-// ============================================================================
-// Quality
-// ============================================================================
+// ===== Quality =====
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
@@ -47,9 +45,7 @@ impl Quality {
     }
 }
 
-// ============================================================================
-// Metadata
-// ============================================================================
+// ===== Metadata =====
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FileMetadata {
@@ -90,9 +86,7 @@ impl FileMetadata {
     }
 }
 
-// ============================================================================
-// Conversion Settings
-// ============================================================================
+// ===== Conversion Settings =====
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConversionSettings {

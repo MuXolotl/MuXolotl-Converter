@@ -10,7 +10,7 @@ interface DropZoneProps {
   onFilesAdded: (files: FileItem[]) => void;
   currentCount: number;
   maxCount: number;
-  compact?: boolean; // New prop
+  compact?: boolean;
 }
 
 const DropZone: React.FC<DropZoneProps> = ({ 

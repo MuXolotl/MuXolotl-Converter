@@ -44,10 +44,6 @@ pub fn get_binary_path(app_handle: &AppHandle, name: &str) -> AppResult<PathBuf>
             }
         }
     }
-
-    // Removed 'which' dependency block to fix build error.
-    // Relative paths above are sufficient for 99% of cases.
-
     Err(AppError::new(
         ErrorCode::BinaryNotFound,
         format!("Binary '{}' not found. Expected: {}", name, full_name),

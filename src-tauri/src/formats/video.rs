@@ -3,9 +3,7 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-// ============================================================================
-// Types
-// ============================================================================
+// ===== Types =====
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum FormatCompatibility {
@@ -142,9 +140,7 @@ impl VideoFormat {
     }
 }
 
-// ============================================================================
-// Codec Helpers
-// ============================================================================
+// ===== Codec Helpers =====
 
 fn codec_matches(container_codec: &str, actual_codec: &str) -> bool {
     if container_codec == actual_codec {
@@ -181,9 +177,7 @@ fn get_gpu_codec(codec: &str, vendor: &str) -> Option<String> {
     Some(result.to_string())
 }
 
-// ============================================================================
-// TOML Parsing
-// ============================================================================
+// ===== TOML Parsing =====
 
 #[derive(Debug, Deserialize)]
 struct TomlVideoFormat {
@@ -233,9 +227,7 @@ impl From<TomlVideoFormat> for VideoFormat {
     }
 }
 
-// ============================================================================
-// Static Cache
-// ============================================================================
+// ===== Static Cache =====
 
 lazy_static! {
     static ref VIDEO_FORMATS: HashMap<String, VideoFormat> = {

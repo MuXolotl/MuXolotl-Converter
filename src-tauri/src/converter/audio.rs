@@ -10,9 +10,7 @@ use tauri::Manager;
 use tokio::process::Child;
 use tokio::sync::Mutex;
 
-// ============================================================================
-// Audio Conversion
-// ============================================================================
+// ===== Audio Conversion =====
 
 pub async fn convert(
     window: tauri::Window,
@@ -52,9 +50,7 @@ pub async fn convert(
     spawn_ffmpeg(window, task_id, media.duration, args, output_path, processes).await
 }
 
-// ============================================================================
-// Audio Extraction from Video
-// ============================================================================
+// ===== Audio Extraction from Video =====
 
 pub async fn extract_from_video(
     window: tauri::Window,
@@ -95,9 +91,7 @@ pub async fn extract_from_video(
     spawn_ffmpeg(window, task_id, media.duration, args, output_path, processes).await
 }
 
-// ============================================================================
-// Helpers
-// ============================================================================
+// ===== Helpers =====
 
 fn apply_audio_settings(
     builder: FfmpegBuilder,

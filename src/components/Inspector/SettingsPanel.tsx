@@ -129,7 +129,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ file, activeTab, disabled
         </>
       )}
 
-      {/* METADATA TAB (Placeholder for Phase 4) */}
+      {/* METADATA TAB (Placeholder) */}
       {activeTab === 'metadata' && (
         <div className="text-center py-8 text-white/30 text-xs">
             Metadata editing coming soon...

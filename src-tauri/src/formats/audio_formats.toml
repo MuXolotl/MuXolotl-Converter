@@ -1,6 +1,4 @@
-# ========================================
-# POPULAR FORMATS
-# ========================================
+# ===== POPULAR FORMATS =====
 
 [[format]]
 extension = "mp3"
@@ -128,9 +126,7 @@ channels_support = [1, 2, 6, 8]
 special_params = []
 compatible_sources = ["opus"]
 
-# ========================================
-# STANDARD FORMATS
-# ========================================
+# ===== STANDARD FORMATS =====
 
 [[format]]
 extension = "alac"
@@ -222,9 +218,7 @@ channels_support = [1, 2, 6, 8]
 special_params = []
 compatible_sources = ["wavpack"]
 
-# ========================================
-# SPECIALIZED FORMATS
-# ========================================
+# ===== SPECIALIZED FORMATS =====
 
 [[format]]
 extension = "tta"
@@ -298,9 +292,7 @@ channels_support = [1]
 special_params = ["-ar", "8000"]
 compatible_sources = ["amr"]
 
-# ========================================
-# LEGACY FORMATS
-# ========================================
+# ===== LEGACY FORMATS =====
 
 [[format]]
 extension = "au"
@@ -356,9 +348,7 @@ channels_support = [2]
 special_params = []
 compatible_sources = []
 
-# ========================================
-# EXOTIC FORMATS
-# ========================================
+# ===== EXOTIC FORMATS =====
 
 [[format]]
 extension = "mka"

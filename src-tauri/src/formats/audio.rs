@@ -3,9 +3,7 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-// ============================================================================
-// AudioFormat
-// ============================================================================
+// ===== AudioFormat =====
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AudioFormat {
@@ -106,9 +104,7 @@ impl AudioFormat {
     }
 }
 
-// ============================================================================
-// TOML Parsing
-// ============================================================================
+// ===== TOML Parsing =====
 
 #[derive(Debug, Deserialize)]
 struct TomlAudioFormat {
@@ -171,9 +167,7 @@ impl From<TomlAudioFormat> for AudioFormat {
     }
 }
 
-// ============================================================================
-// Static Cache
-// ============================================================================
+// ===== Static Cache =====
 
 lazy_static! {
     static ref AUDIO_FORMATS: HashMap<String, AudioFormat> = {

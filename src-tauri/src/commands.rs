@@ -16,9 +16,7 @@ static GPU_CACHE: OnceCell<GpuInfo> = OnceCell::const_new();
 static AUDIO_FORMATS_CACHE: OnceCell<Vec<audio::AudioFormat>> = OnceCell::const_new();
 static VIDEO_FORMATS_CACHE: OnceCell<Vec<video::VideoFormat>> = OnceCell::const_new();
 
-// ============================================================================
-// Window Commands
-// ============================================================================
+// ===== Window Commands =====
 
 #[tauri::command]
 pub async fn window_minimize(window: tauri::Window) -> Result<(), String> {
@@ -60,9 +58,7 @@ pub async fn close_splash(window: tauri::Window) {
     }
 }
 
-// ============================================================================
-// System Commands
-// ============================================================================
+// ===== System Commands =====
 
 #[tauri::command]
 pub async fn check_ffmpeg(app: tauri::AppHandle) -> Result<bool, String> {
@@ -82,9 +78,7 @@ pub fn open_folder(path: String) -> Result<(), String> {
     utils::open_path(&path)
 }
 
-// ============================================================================
-// Media Commands
-// ============================================================================
+// ===== Media Commands =====
 
 #[tauri::command]
 pub async fn detect_media_type(
@@ -96,9 +90,7 @@ pub async fn detect_media_type(
         .map_err(|e| e.to_string())
 }
 
-// ============================================================================
-// Format Commands
-// ============================================================================
+// ===== Format Commands =====
 
 #[tauri::command]
 pub async fn get_audio_formats() -> Vec<audio::AudioFormat> {
@@ -195,9 +187,7 @@ struct CategoryResult {
     problematic: Vec<String>,
 }
 
-// ============================================================================
-// Validation Commands
-// ============================================================================
+// ===== Validation Commands =====
 
 #[tauri::command]
 pub fn validate_conversion(
@@ -209,9 +199,7 @@ pub fn validate_conversion(
     validator::validate_conversion(&input_format, &output_format, &media_type, settings)
 }
 
-// ============================================================================
-// Conversion Commands
-// ============================================================================
+// ===== Conversion Commands =====
 
 #[tauri::command]
 pub async fn convert_audio(
@@ -292,9 +280,7 @@ pub async fn cancel_conversion(state: State<'_, AppState>, task_id: String) -> R
     Ok(())
 }
 
-// ============================================================================
-// Cache Initialization
-// ============================================================================
+// ===== Cache Initialization =====
 
 pub async fn init_caches(window: &tauri::Window) {
     let gpu = GPU_CACHE

@@ -1,6 +1,4 @@
-// ============================================================================
-// Conversion Options
-// ============================================================================
+// ===== Conversion Options =====
 
 export const QUALITY_OPTIONS = [
   { value: 'low', label: 'Low' },
@@ -34,9 +32,7 @@ export const VIDEO_FPS = [
   { value: '60', label: '60 FPS' },
 ] as const;
 
-// ============================================================================
-// File Handling
-// ============================================================================
+// ===== File Handling =====
 
 export const MAX_QUEUE_SIZE = 50;
 
@@ -49,9 +45,7 @@ export const MEDIA_EXTENSIONS = [
   'm4v', 'ogv', '3gp', 'mxf', 'f4v', 'vob', 'rm', 'divx', 'nut', 'y4m', 'dv',
 ] as const;
 
-// ============================================================================
-// UI Constants
-// ============================================================================
+// ===== UI Constants =====
 
 export const STABILITY_CONFIG = {
   stable: { icon: '✓', color: 'text-green-400' },

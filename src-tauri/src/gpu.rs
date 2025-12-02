@@ -5,9 +5,7 @@ use tokio::time::{timeout, Duration};
 const GPU_DETECT_TIMEOUT: Duration = Duration::from_secs(10);
 const ENCODER_CHECK_TIMEOUT: Duration = Duration::from_secs(5);
 
-// ============================================================================
-// Types
-// ============================================================================
+// ===== Types =====
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -96,9 +94,7 @@ impl GpuInfo {
     }
 }
 
-// ============================================================================
-// Detection
-// ============================================================================
+// ===== Detection =====
 
 pub async fn detect_gpu() -> GpuInfo {
     // Try NVIDIA first (most common for encoding)
@@ -198,9 +194,7 @@ async fn detect_apple() -> Option<GpuInfo> {
     Some(GpuInfo::apple(name))
 }
 
-// ============================================================================
-// Helpers
-// ============================================================================
+// ===== Helpers =====
 
 async fn check_encoder(encoder: &str) -> bool {
     let encoder = encoder.to_string();

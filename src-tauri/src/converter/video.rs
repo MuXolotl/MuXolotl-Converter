@@ -11,9 +11,7 @@ use tauri::Manager;
 use tokio::process::Child;
 use tokio::sync::Mutex;
 
-// ============================================================================
-// Video Conversion
-// ============================================================================
+// ===== Video Conversion =====
 
 pub async fn convert(
     window: tauri::Window,
@@ -81,9 +79,7 @@ pub async fn convert(
     spawn_ffmpeg(window, task_id, media.duration, args, output_path, processes).await
 }
 
-// ============================================================================
-// Bitrate Calculator
-// ============================================================================
+// ===== Bitrate Calculator =====
 
 fn calculate_auto_bitrate(width: u32, height: u32, fps: u32, quality: Quality) -> u32 {
     let pixels = width as f64 * height as f64;
@@ -101,9 +97,7 @@ fn calculate_auto_bitrate(width: u32, height: u32, fps: u32, quality: Quality) -
     bitrate as u32
 }
 
-// ============================================================================
-// Helpers
-// ============================================================================
+// ===== Helpers =====
 
 fn should_use_gpu(gpu: &GpuInfo, settings: &ConversionSettings, fmt: &VideoFormat) -> bool {
     // Disable GPU for formats that require fixed resolution (DV/VOB) as they are legacy
