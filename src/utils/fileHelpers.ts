@@ -8,13 +8,9 @@ export async function processFilePaths(paths: string[]): Promise<FileItem[]> {
   const results: FileItem[] = [];
   const errors: string[] = [];
 
-  // Process in batches to avoid blocking UI
   for (let i = 0; i < paths.length; i += BATCH_SIZE) {
     const batch = paths.slice(i, i + BATCH_SIZE);
-
-    const batchResults = await Promise.allSettled(
-      batch.map(path => processFile(path))
-    );
+    const batchResults = await Promise.allSettled(batch.map(processFile));
 
     for (const result of batchResults) {
       if (result.status === 'fulfilled') {
@@ -42,7 +38,7 @@ async function processFile(path: string): Promise<FileItem> {
     name,
     mediaInfo,
     outputFormat: getDefaultFormat(mediaInfo.media_type),
-    settings: getDefaultSettings(false),
+    settings: getDefaultSettings(),
     status: 'pending',
     progress: null,
     error: null,

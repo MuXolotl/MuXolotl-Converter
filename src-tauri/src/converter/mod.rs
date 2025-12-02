@@ -18,9 +18,7 @@ use tokio::process::Child;
 use tokio::sync::Mutex;
 use tokio::time::{timeout, Duration};
 
-const CONVERSION_TIMEOUT: Duration = Duration::from_secs(3600); // 1 hour
-
-// ===== Progress Event =====
+const CONVERSION_TIMEOUT: Duration = Duration::from_secs(3600);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConversionProgress {
@@ -33,8 +31,6 @@ pub struct ConversionProgress {
     pub total_time: f64,
 }
 
-// ===== FFmpeg Spawner =====
-
 pub async fn spawn_ffmpeg(
     window: tauri::Window,
     task_id: String,
@@ -43,42 +39,32 @@ pub async fn spawn_ffmpeg(
     output_path: String,
     processes: Arc<Mutex<HashMap<String, Child>>>,
 ) -> Result<String> {
-    println!("🎬 [{}] FFmpeg args: {:?}", task_id, args);
-
     let ffmpeg_path = get_ffmpeg_path(&window.app_handle())
         .map_err(|e| anyhow::anyhow!("FFmpeg not found: {}", e))?;
 
-    // Build command
     let mut cmd = create_async_hidden_command(ffmpeg_path.to_str().unwrap());
     cmd.args(&args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
-    // Spawn process
     let mut child = cmd.spawn().context("Failed to spawn FFmpeg")?;
-    
-    // Use unwrap safe logging in production to avoid panic on missing pipes
+
     let stdout = child.stdout.take().expect("Failed to capture stdout");
     let stderr = child.stderr.take().expect("Failed to capture stderr");
 
-    // Register process for cancellation
     processes.lock().await.insert(task_id.clone(), child);
     let _ = window.emit("conversion-started", &task_id);
 
-    // Spawn stderr monitor (Log Errors)
     let task_id_err = task_id.clone();
     tokio::spawn(async move {
         let mut reader = BufReader::new(stderr).lines();
-        // Using next_line() is safe but strict on UTF-8. 
-        // Ideally we accept that ffmpeg logs are UTF-8.
         while let Ok(Some(line)) = reader.next_line().await {
             if line.contains("Error") || line.contains("Invalid") || line.contains("failed") {
-                eprintln!("⚠️ [{}] FFmpeg: {}", task_id_err, line);
+                eprintln!("[FFmpeg Error] {}: {}", task_id_err, line);
             }
         }
     });
 
-    // Progress monitoring
     let window_progress = window.clone();
     let task_id_progress = task_id.clone();
     let processes_monitor = processes.clone();
@@ -96,14 +82,11 @@ pub async fn spawn_ffmpeg(
         processes_monitor.lock().await.remove(&task_id_progress)
     };
 
-    // Execute with timeout
     match timeout(CONVERSION_TIMEOUT, monitor_future).await {
         Ok(Some(mut child)) => {
             let status = child.wait().await?;
-            println!("🎬 [{}] FFmpeg exited with: {:?}", task_id, status);
 
             if status.success() {
-                println!("✅ [{}] Conversion completed", task_id);
                 let _ = window.emit("conversion-completed", &task_id);
                 Ok(task_id)
             } else {
@@ -114,13 +97,11 @@ pub async fn spawn_ffmpeg(
             }
         }
         Ok(None) => {
-            // Process was cancelled by user
             cleanup_failed(&output_path).await;
             let _ = window.emit("conversion-cancelled", &task_id);
             Ok(task_id)
         }
         Err(_) => {
-            // Timeout
             if let Some(mut child) = processes.lock().await.remove(&task_id) {
                 let _ = child.kill().await;
             }
@@ -140,7 +121,6 @@ async fn cleanup_failed(path: &str) {
 }
 
 fn emit_error(window: &tauri::Window, task_id: &str, error: &str) {
-    println!("❌ [{}] Error: {}", task_id, error);
     let _ = window.emit(
         "conversion-error",
         serde_json::json!({

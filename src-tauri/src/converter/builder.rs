@@ -19,8 +19,6 @@ impl FfmpegBuilder {
         }
     }
 
-    // ===== Basic Options =====
-
     pub fn input_file(mut self) -> Self {
         self.args.push("-i".to_string());
         self.args.push(self.input.to_string_lossy().to_string());
@@ -43,8 +41,6 @@ impl FfmpegBuilder {
         self
     }
 
-    // ===== Key-Value Arguments =====
-
     pub fn arg(mut self, key: &str, value: &str) -> Self {
         self.args.push(key.to_string());
         self.args.push(value.to_string());
@@ -60,8 +56,6 @@ impl FfmpegBuilder {
         self.args.extend_from_slice(args);
         self
     }
-
-    // ===== Stream Control =====
 
     pub fn disable_video(self) -> Self {
         self.flag("-vn")
@@ -83,8 +77,6 @@ impl FfmpegBuilder {
         self.arg("-f", container)
     }
 
-    // ===== Audio Settings =====
-
     pub fn audio_bitrate(self, kbps: u32) -> Self {
         self.arg("-b:a", &format!("{}k", kbps))
     }
@@ -97,25 +89,16 @@ impl FfmpegBuilder {
         self.arg("-ac", &count.to_string())
     }
 
-    // ===== Video Settings =====
-
     pub fn fps(self, fps: u32) -> Self {
         self.arg("-r", &fps.to_string())
     }
 
-    /// Smart resolution scaling.
-    /// If `force_exact` is false, it maintains aspect ratio using -2 for the other dimension.
     pub fn resolution(mut self, width: Option<u32>, height: Option<u32>, force_exact: bool) -> Self {
         match (width, height) {
             (Some(w), Some(h)) => {
                 if force_exact {
-                    // Force exact dimensions (might stretch)
                     self.filters.push(format!("scale={}:{}", w, h));
                 } else {
-                    // Fit within w/h maintaining aspect ratio (letterboxing logic requires more complex filter)
-                    // For converter, usually we want to scale 'width' OR 'height'.
-                    // Here we assume 'force_exact=false' means "scale width, adjust height automatically"
-                    // Using -2 ensures divisible by 2 (required by many codecs)
                     self.filters.push(format!("scale={}:-2", w));
                 }
             }
@@ -135,8 +118,6 @@ impl FfmpegBuilder {
         self
     }
 
-    // ===== GPU Acceleration =====
-
     pub fn hwaccel(mut self, gpu: &GpuInfo) -> Self {
         for (key, value) in gpu.hwaccel_args() {
             self.args.push(key.to_string());
@@ -145,19 +126,14 @@ impl FfmpegBuilder {
         self
     }
 
-    // ===== Metadata =====
-
     pub fn metadata(mut self, meta: &Option<FileMetadata>) -> Self {
         let args = meta
             .as_ref()
             .map(|m| m.to_ffmpeg_args())
             .unwrap_or_else(|| vec!["-map_metadata".to_string(), "-1".to_string()]);
-
         self.args.extend(args);
         self
     }
-
-    // ===== Codec-Specific Presets =====
 
     pub fn x264_preset(self, quality: Quality) -> Self {
         self.arg("-preset", quality.video_preset())
@@ -170,32 +146,27 @@ impl FfmpegBuilder {
     }
 
     pub fn nvenc_preset(self, quality: Quality) -> Self {
-        // Improved NVENC settings
         let preset = match quality {
-            Quality::Low => "p2",    // Faster
-            Quality::Medium => "p4", // Balanced
-            Quality::High => "p6",   // Quality
-            Quality::Ultra => "p7",  // Max Quality
+            Quality::Low => "p2",
+            Quality::Medium => "p4",
+            Quality::High => "p6",
+            Quality::Ultra => "p7",
             Quality::Custom => "p4",
         };
-        
-        let cq = quality.video_crf(); // Reusing generic CRF map for VBR CQ
 
         self.arg("-preset", preset)
-            .arg("-rc", "vbr")      // Variable Bitrate
-            .arg("-cq", cq)         // Constant Quality target
-            .arg("-spatial-aq", "1") // Spatial Adaptive Quantization (better details)
+            .arg("-rc", "vbr")
+            .arg("-cq", quality.video_crf())
+            .arg("-spatial-aq", "1")
     }
 
     pub fn qsv_preset(self, quality: Quality) -> Self {
-        // Intel QSV
         self.arg("-preset", "medium")
             .arg("-global_quality", quality.video_crf())
             .arg("-look_ahead", "1")
     }
 
     pub fn amf_preset(self, quality: Quality) -> Self {
-        // AMD AMF
         let (usage, qual_profile) = match quality {
             Quality::Low => ("transcoding", "speed"),
             Quality::Medium => ("transcoding", "balanced"),
@@ -206,14 +177,11 @@ impl FfmpegBuilder {
 
         self.arg("-usage", usage)
             .arg("-quality", qual_profile)
-            // AMF often needs explicit profile to avoid errors on some cards
-            .arg("-profile:v", "main") 
+            .arg("-profile:v", "main")
     }
 
     pub fn videotoolbox_preset(self) -> Self {
-        // macOS
-        self.arg("-profile:v", "high")
-            .arg("-allow_sw", "1")
+        self.arg("-profile:v", "high").arg("-allow_sw", "1")
     }
 
     pub fn vpx_preset(self, quality: Quality, is_vp9: bool) -> Self {
@@ -223,7 +191,7 @@ impl FfmpegBuilder {
             Quality::Ultra => "15",
             _ => "31",
         };
-        // cpu-used: 0 (slowest/best) to 5 (fastest)
+
         let cpu = match quality {
             Quality::Low => "5",
             Quality::High => "1",
@@ -247,6 +215,7 @@ impl FfmpegBuilder {
             Quality::Ultra => "12000k",
             _ => "6000k",
         };
+
         self.arg("-b:v", bitrate)
             .arg("-maxrate", bitrate)
             .arg("-bufsize", "4M")
@@ -266,8 +235,6 @@ impl FfmpegBuilder {
             _ => self,
         }
     }
-
-    // ===== Build =====
 
     pub fn build(mut self) -> (Vec<String>, String) {
         if !self.filters.is_empty() {

@@ -11,12 +11,9 @@ use serde_json::{json, Value};
 use tauri::{Manager, State};
 use tokio::sync::OnceCell;
 
-// Caches
 static GPU_CACHE: OnceCell<GpuInfo> = OnceCell::const_new();
 static AUDIO_FORMATS_CACHE: OnceCell<Vec<audio::AudioFormat>> = OnceCell::const_new();
 static VIDEO_FORMATS_CACHE: OnceCell<Vec<video::VideoFormat>> = OnceCell::const_new();
-
-// ===== Window Commands =====
 
 #[tauri::command]
 pub async fn window_minimize(window: tauri::Window) -> Result<(), String> {
@@ -44,21 +41,15 @@ pub async fn window_is_maximized(window: tauri::Window) -> Result<bool, String> 
 
 #[tauri::command]
 pub async fn close_splash(window: tauri::Window) {
-    // 1. Prepare main window
     if let Some(main) = window.get_window("main") {
-        // Force maximize before showing to ensure full screen
-        let _ = main.maximize(); 
+        let _ = main.maximize();
         let _ = main.show();
         let _ = main.set_focus();
     }
-    
-    // 2. Close splashscreen
     if let Some(splash) = window.get_window("splashscreen") {
         let _ = splash.close();
     }
 }
-
-// ===== System Commands =====
 
 #[tauri::command]
 pub async fn check_ffmpeg(app: tauri::AppHandle) -> Result<bool, String> {
@@ -78,8 +69,6 @@ pub fn open_folder(path: String) -> Result<(), String> {
     utils::open_path(&path)
 }
 
-// ===== Media Commands =====
-
 #[tauri::command]
 pub async fn detect_media_type(
     app_handle: tauri::AppHandle,
@@ -89,8 +78,6 @@ pub async fn detect_media_type(
         .await
         .map_err(|e| e.to_string())
 }
-
-// ===== Format Commands =====
 
 #[tauri::command]
 pub async fn get_audio_formats() -> Vec<audio::AudioFormat> {
@@ -129,6 +116,15 @@ pub async fn get_recommended_formats(
     }
 }
 
+#[derive(Default, serde::Serialize)]
+struct CategoryResult {
+    fast: Vec<String>,
+    safe: Vec<String>,
+    setup: Vec<String>,
+    experimental: Vec<String>,
+    problematic: Vec<String>,
+}
+
 fn categorize_video_formats(
     formats: &[video::VideoFormat],
     video_codec: &str,
@@ -160,7 +156,6 @@ fn categorize_audio_formats(formats: &[audio::AudioFormat], audio_codec: &str) -
 
     for fmt in formats {
         let ext = fmt.extension.clone();
-
         match fmt.stability {
             Stability::Stable => {
                 if fmt.can_copy_codec(audio_codec) {
@@ -178,17 +173,6 @@ fn categorize_audio_formats(formats: &[audio::AudioFormat], audio_codec: &str) -
     json!(result)
 }
 
-#[derive(Default, serde::Serialize)]
-struct CategoryResult {
-    fast: Vec<String>,
-    safe: Vec<String>,
-    setup: Vec<String>,
-    experimental: Vec<String>,
-    problematic: Vec<String>,
-}
-
-// ===== Validation Commands =====
-
 #[tauri::command]
 pub fn validate_conversion(
     input_format: String,
@@ -198,8 +182,6 @@ pub fn validate_conversion(
 ) -> ValidationResult {
     validator::validate_conversion(&input_format, &output_format, &media_type, settings)
 }
-
-// ===== Conversion Commands =====
 
 #[tauri::command]
 pub async fn convert_audio(
@@ -211,7 +193,6 @@ pub async fn convert_audio(
     settings: Value,
 ) -> Result<String, String> {
     let settings: ConversionSettings = serde_json::from_value(settings).map_err(|e| e.to_string())?;
-
     converter::audio::convert(
         window,
         &input,
@@ -235,7 +216,6 @@ pub async fn convert_video(
     settings: Value,
 ) -> Result<String, String> {
     let settings: ConversionSettings = serde_json::from_value(settings).map_err(|e| e.to_string())?;
-
     converter::video::convert(
         window,
         &input,
@@ -259,7 +239,6 @@ pub async fn extract_audio(
     settings: Value,
 ) -> Result<String, String> {
     let settings: ConversionSettings = serde_json::from_value(settings).map_err(|e| e.to_string())?;
-
     converter::audio::extract_from_video(
         window,
         &input,
@@ -279,8 +258,6 @@ pub async fn cancel_conversion(state: State<'_, AppState>, task_id: String) -> R
     }
     Ok(())
 }
-
-// ===== Cache Initialization =====
 
 pub async fn init_caches(window: &tauri::Window) {
     let gpu = GPU_CACHE

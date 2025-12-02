@@ -10,8 +10,6 @@ use tauri::Manager;
 use tokio::process::Child;
 use tokio::sync::Mutex;
 
-// ===== Audio Conversion =====
-
 pub async fn convert(
     window: tauri::Window,
     input: &str,
@@ -21,7 +19,6 @@ pub async fn convert(
     processes: Arc<Mutex<HashMap<String, Child>>>,
 ) -> Result<String> {
     let task_id = settings.task_id();
-    
     let fmt = audio::get_format(format).context(format!("Unknown audio format: {}", format))?;
     let media = media::detect_media_type(&window.app_handle(), input).await?;
 
@@ -41,8 +38,6 @@ pub async fn convert(
     spawn_ffmpeg(window, task_id, media.duration, args, output_path, processes).await
 }
 
-// ===== Audio Extraction from Video =====
-
 pub async fn extract_from_video(
     window: tauri::Window,
     input: &str,
@@ -52,7 +47,6 @@ pub async fn extract_from_video(
     processes: Arc<Mutex<HashMap<String, Child>>>,
 ) -> Result<String> {
     let task_id = settings.task_id();
-    
     let fmt = audio::get_format(format).context(format!("Unknown audio format: {}", format))?;
     let media = media::detect_media_type(&window.app_handle(), input).await?;
 
@@ -68,12 +62,10 @@ pub async fn extract_from_video(
         .disable_video()
         .metadata(&settings.metadata);
 
-    // Smart Copy Logic
     let source_codec = &media.audio_streams[0].codec;
     if settings.copy_audio && fmt.can_copy_codec(source_codec) {
         builder = builder.audio_codec("copy");
     } else {
-        // Re-encode
         builder = builder.audio_codec(&fmt.codec);
         builder = apply_audio_settings(builder, &fmt, &settings);
         builder = apply_container_and_params(builder, &fmt);
@@ -83,20 +75,16 @@ pub async fn extract_from_video(
     spawn_ffmpeg(window, task_id, media.duration, args, output_path, processes).await
 }
 
-// ===== Helpers =====
-
 fn apply_audio_settings(
     builder: FfmpegBuilder,
     fmt: &AudioFormat,
     settings: &ConversionSettings,
 ) -> FfmpegBuilder {
-    // Sample Rate & Channels
     let sample_rate = fmt.best_sample_rate(settings.sample_rate());
     let channels = fmt.best_channels(settings.channels());
 
     let mut builder = builder.sample_rate(sample_rate).channels(channels);
 
-    // Quality / Bitrate Control
     if fmt.lossy {
         builder = apply_lossy_settings(builder, fmt, settings);
     } else {
@@ -113,10 +101,8 @@ fn apply_lossy_settings(
 ) -> FfmpegBuilder {
     let quality = settings.quality.as_str();
 
-    // Handle specific codec quirks
     match fmt.codec.as_str() {
         "libvorbis" => {
-            // Vorbis uses -q:a (0-10)
             let q = match quality {
                 "low" => "3",
                 "medium" => "5",
@@ -127,19 +113,17 @@ fn apply_lossy_settings(
             builder.arg("-q:a", q)
         }
         "libopus" => {
-            // Opus prefers VBR
             let bitrate = settings
                 .bitrate
                 .or_else(|| fmt.get_bitrate_for_quality(quality))
-                .unwrap_or(128); // Opus default
+                .unwrap_or(128);
             builder.arg("-vbr", "on").audio_bitrate(bitrate)
         }
-        "aac" | "libmp3lame" | _ => {
-            // Standard CBR/ABR
+        _ => {
             let bitrate = settings
                 .bitrate
                 .or_else(|| fmt.get_bitrate_for_quality(quality))
-                .unwrap_or(192); // Good standard default
+                .unwrap_or(192);
             builder.audio_bitrate(bitrate)
         }
     }
@@ -154,12 +138,11 @@ fn apply_lossless_settings(
 
     match fmt.codec.as_str() {
         "flac" | "wavpack" => {
-            // Compression level (0-12 for FLAC in ffmpeg, usually mapped 0-8)
             let level = match quality {
-                "low" => "0",     // Fast, larger file
-                "medium" => "5",  // Default
-                "high" => "8",    // Slow, smaller file
-                "ultra" => "12",  // Maximum (if supported)
+                "low" => "0",
+                "medium" => "5",
+                "high" => "8",
+                "ultra" => "12",
                 _ => "5",
             };
             builder.arg("-compression_level", level)
@@ -170,10 +153,8 @@ fn apply_lossless_settings(
 
 fn apply_container_and_params(builder: FfmpegBuilder, fmt: &AudioFormat) -> FfmpegBuilder {
     let mut builder = builder;
-
     if let Some(container) = &fmt.container {
         builder = builder.format(container);
     }
-
     builder.args_vec(&fmt.special_params)
 }

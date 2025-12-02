@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, createContext } from 'react';
 import { invoke } from '@tauri-apps/api/tauri';
 import { useGpu } from '@/hooks/useGpu';
 import { useFileQueue } from '@/hooks/useFileQueue';
@@ -16,18 +16,32 @@ import ErrorModal from '@/components/ErrorModal';
 import FeedbackModal from '@/components/FeedbackModal';
 import Footer from '@/components/Footer';
 
-export const ConversionContext = React.createContext<ConversionContextType | null>(null);
+export const ConversionContext = createContext<ConversionContextType | null>(null);
 
 interface ErrorState {
   title: string;
   message: string;
   details?: string;
-  fileInfo?: { name: string; path: string; format: string; outputFormat: string; duration?: number; size?: number; };
-  settings?: { quality: string; useGpu: boolean; sampleRate?: number; channels?: number; width?: number; height?: number; };
+  fileInfo?: {
+    name: string;
+    path: string;
+    format: string;
+    outputFormat: string;
+    duration?: number;
+    size?: number;
+  };
+  settings?: {
+    quality: string;
+    useGpu: boolean;
+    sampleRate?: number;
+    channels?: number;
+    width?: number;
+    height?: number;
+  };
   gpuInfo?: GpuInfo;
 }
 
-const App: React.FC = () => {
+export default function App() {
   const [ffmpegReady, setFfmpegReady] = useState<boolean | null>(null);
   const [outputFolder, setOutputFolder] = useState('');
   const [isLoaded, setIsLoaded] = useState(false);
@@ -38,7 +52,7 @@ const App: React.FC = () => {
 
   const { gpuInfo, isLoading: gpuLoading } = useGpu();
   const queue = useFileQueue(outputFolder);
-  
+
   const handleError = useCallback((file: FileItem, error: string) => {
     setErrorModal({
       title: 'Conversion Failed',
@@ -57,7 +71,13 @@ const App: React.FC = () => {
     });
   }, [gpuInfo]);
 
-  const conversion = useConversion(queue.updateFile, gpuInfo, queue.filesRef, outputFolder, handleError);
+  const conversion = useConversion(
+    queue.updateFile,
+    gpuInfo,
+    queue.filesRef,
+    outputFolder,
+    handleError
+  );
 
   useEffect(() => {
     const init = async () => {
@@ -67,18 +87,19 @@ const App: React.FC = () => {
         const saved = loadOutputFolder();
         if (saved) setOutputFolder(saved);
         setIsLoaded(true);
-        setTimeout(() => invoke('close_splash').catch(console.error), 500);
-      } catch (e) {
-        console.error(e);
+        setTimeout(() => invoke('close_splash').catch(() => {}), 500);
+      } catch {
         setFfmpegReady(false);
         setIsLoaded(true);
-        invoke('close_splash').catch(console.error);
+        invoke('close_splash').catch(() => {});
       }
     };
     init();
   }, []);
 
-  useEffect(() => { if (isLoaded) saveOutputFolder(outputFolder); }, [outputFolder, isLoaded]);
+  useEffect(() => {
+    if (isLoaded) saveOutputFolder(outputFolder);
+  }, [outputFolder, isLoaded]);
 
   const selectedFile = useMemo(() => {
     if (selectedIds.size === 0) return null;
@@ -94,20 +115,47 @@ const App: React.FC = () => {
     setSelectedIds(prev => {
       if (multi) {
         const next = new Set(prev);
-        if (next.has(id)) next.delete(id); else next.add(id);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
         return next;
       }
       return new Set([id]);
     });
   }, []);
 
-  const handleSelectAll = useCallback(() => setSelectedIds(new Set(queue.files.map(f => f.id))), [queue.files]);
+  const handleSelectAll = useCallback(() => {
+    setSelectedIds(new Set(queue.files.map(f => f.id)));
+  }, [queue.files]);
+
   const handleDeselectAll = useCallback(() => setSelectedIds(new Set()), []);
-  const handleRemove = useCallback((id: string) => { queue.removeFile(id); setSelectedIds(prev => { const n = new Set(prev); n.delete(id); return n; }); }, [queue]);
-  const handleRemoveSelected = useCallback(() => { selectedIds.forEach(id => queue.removeFile(id)); setSelectedIds(new Set()); }, [selectedIds, queue]);
+
+  const handleRemove = useCallback((id: string) => {
+    queue.removeFile(id);
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }, [queue]);
+
+  const handleRemoveSelected = useCallback(() => {
+    selectedIds.forEach(id => queue.removeFile(id));
+    setSelectedIds(new Set());
+  }, [selectedIds, queue]);
 
   if (ffmpegReady === null) return null;
-  if (ffmpegReady === false) return <div>FFmpeg Missing</div>; // Simplified error state for brevity
+
+  if (ffmpegReady === false) {
+    return (
+      <div className="h-screen w-screen bg-[#0f172a] text-white flex items-center justify-center">
+        <div className="text-center p-8">
+          <div className="text-6xl mb-4">⚠️</div>
+          <h1 className="text-xl font-bold mb-2">FFmpeg Not Found</h1>
+          <p className="text-white/60">Please ensure FFmpeg binaries are installed.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <ConversionContext.Provider value={conversion}>
@@ -150,14 +198,25 @@ const App: React.FC = () => {
                 }
               />
             </div>
-            <Footer isOpen={isConsoleOpen} onToggle={() => setIsConsoleOpen(!isConsoleOpen)} lastFile={queue.files[0]} />
+            <Footer
+              isOpen={isConsoleOpen}
+              onToggle={() => setIsConsoleOpen(!isConsoleOpen)}
+              lastFile={queue.files[0]}
+            />
           </div>
         </div>
-        <ErrorModal isOpen={!!errorModal} error={errorModal} onClose={() => setErrorModal(null)} />
-        <FeedbackModal isOpen={feedbackOpen} onClose={() => setFeedbackOpen(false)} gpuInfo={gpuInfo} stats={queue.stats} />
+        <ErrorModal
+          isOpen={!!errorModal}
+          error={errorModal}
+          onClose={() => setErrorModal(null)}
+        />
+        <FeedbackModal
+          isOpen={feedbackOpen}
+          onClose={() => setFeedbackOpen(false)}
+          gpuInfo={gpuInfo}
+          stats={queue.stats}
+        />
       </div>
     </ConversionContext.Provider>
   );
-};
-
-export default App;
+}

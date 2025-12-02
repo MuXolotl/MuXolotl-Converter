@@ -1,4 +1,4 @@
-import React from 'react';
+import { memo } from 'react';
 import { AlertTriangle, XCircle, Info } from 'lucide-react';
 import type { ValidationResult } from '@/types';
 
@@ -6,7 +6,7 @@ interface ValidationBannerProps {
   validation: ValidationResult;
 }
 
-const ValidationBanner: React.FC<ValidationBannerProps> = ({ validation }) => {
+function ValidationBanner({ validation }: ValidationBannerProps) {
   const hasErrors = validation.errors.length > 0;
   const hasWarnings = validation.warnings.length > 0;
 
@@ -22,7 +22,7 @@ const ValidationBanner: React.FC<ValidationBannerProps> = ({ validation }) => {
           <span>{error}</span>
         </div>
       ))}
-      
+
       {validation.warnings.map((warning, i) => (
         <div key={`w-${i}`} className="flex items-start gap-2 text-xs text-yellow-400">
           <AlertTriangle size={14} className="shrink-0 mt-0.5" />
@@ -38,6 +38,6 @@ const ValidationBanner: React.FC<ValidationBannerProps> = ({ validation }) => {
       )}
     </div>
   );
-};
+}
 
-export default React.memo(ValidationBanner);
+export default memo(ValidationBanner);

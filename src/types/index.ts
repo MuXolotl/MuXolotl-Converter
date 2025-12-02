@@ -1,5 +1,3 @@
-// ===== GPU =====
-
 export type GpuVendor = 'nvidia' | 'intel' | 'amd' | 'apple' | 'none';
 
 export interface GpuInfo {
@@ -10,8 +8,6 @@ export interface GpuInfo {
   decoder: string | null;
   available: boolean;
 }
-
-// ===== Media =====
 
 export type MediaType = 'audio' | 'video' | 'unknown';
 
@@ -38,8 +34,6 @@ export interface MediaInfo {
   video_streams: VideoStream[];
   audio_streams: AudioStream[];
 }
-
-// ===== Formats =====
 
 export type Stability = 'stable' | 'requiressetup' | 'experimental' | 'problematic';
 export type Category = 'popular' | 'standard' | 'specialized' | 'legacy' | 'exotic';
@@ -91,8 +85,6 @@ export interface ValidationResult {
   suggested_params: string[];
   alternative_codec: string | null;
 }
-
-// ===== Conversion =====
 
 export type ConversionStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
 export type Quality = 'low' | 'medium' | 'high' | 'ultra' | 'custom';
@@ -146,8 +138,6 @@ export interface FileItem {
   addedAt: number;
 }
 
-// ===== Context =====
-
 export interface ConversionContextType {
   isConverting: boolean;
   activeCount: number;
@@ -156,4 +146,18 @@ export interface ConversionContextType {
   cancelConversion: (fileId: string) => Promise<void>;
   cancelAll: () => Promise<void>;
   updateFile: (fileId: string, updates: Partial<FileItem>) => void;
+}
+
+export interface QueueStats {
+  total: number;
+  pending: number;
+  processing: number;
+  completed: number;
+  failed: number;
+}
+
+export interface SystemInfo {
+  os: string;
+  platform: string;
+  language: string;
 }

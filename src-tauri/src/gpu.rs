@@ -5,8 +5,6 @@ use tokio::time::{timeout, Duration};
 const GPU_DETECT_TIMEOUT: Duration = Duration::from_secs(10);
 const ENCODER_CHECK_TIMEOUT: Duration = Duration::from_secs(5);
 
-// ===== Types =====
-
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum GpuVendor {
@@ -86,95 +84,58 @@ impl GpuInfo {
         }
     }
 
-    /// Returns hwaccel args for FFmpeg.
-    /// Currently returning empty to ensure maximum stability (CPU Decode -> GPU Encode).
-    /// Full HW pipeline requires complex filter graph management (hwupload/hwdownload).
+    /// Returns hwaccel args for FFmpeg (currently empty for stability)
     pub fn hwaccel_args(&self) -> Vec<(&'static str, &'static str)> {
         vec![]
     }
 }
 
-// ===== Detection =====
-
 pub async fn detect_gpu() -> GpuInfo {
-    // Try NVIDIA first (most common for encoding)
     if let Some(gpu) = detect_nvidia().await {
         return gpu;
     }
-
-    // Try AMD
     if let Some(gpu) = detect_amd().await {
         return gpu;
     }
-
-    // Try Intel
     if let Some(gpu) = detect_intel().await {
         return gpu;
     }
-
-    // Try Apple (macOS only)
     #[cfg(target_os = "macos")]
     if let Some(gpu) = detect_apple().await {
         return gpu;
     }
-
-    #[cfg(debug_assertions)]
-    eprintln!("⚠️ No GPU with encoding support detected, using CPU");
 
     GpuInfo::default()
 }
 
 async fn detect_nvidia() -> Option<GpuInfo> {
     let output = run_command_timeout("nvidia-smi", &["--query-gpu=name", "--format=csv,noheader"]).await?;
-    
+
     if !output.status.success() {
         return None;
     }
 
     let name = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if name.is_empty() {
+    if name.is_empty() || !check_encoder("h264_nvenc").await {
         return None;
     }
-
-    if !check_encoder("h264_nvenc").await {
-        #[cfg(debug_assertions)]
-        eprintln!("⚠️ NVIDIA GPU '{}' found but h264_nvenc not available", name);
-        return None;
-    }
-
-    #[cfg(debug_assertions)]
-    println!("✅ Detected NVIDIA GPU: {}", name);
 
     Some(GpuInfo::nvidia(name))
 }
 
 async fn detect_amd() -> Option<GpuInfo> {
     let name = get_gpu_name(&["amd", "radeon"]).await?;
-
     if !check_encoder("h264_amf").await {
-        #[cfg(debug_assertions)]
-        eprintln!("⚠️ AMD GPU '{}' found but h264_amf not available", name);
         return None;
     }
-
-    #[cfg(debug_assertions)]
-    println!("✅ Detected AMD GPU: {}", name);
-
     Some(GpuInfo::amd(name))
 }
 
 async fn detect_intel() -> Option<GpuInfo> {
     let name = get_gpu_name(&["intel", "hd graphics", "uhd graphics", "iris"]).await?;
-
     if !check_encoder("h264_qsv").await {
-        #[cfg(debug_assertions)]
-        eprintln!("⚠️ Intel GPU '{}' found but h264_qsv not available", name);
         return None;
     }
-
-    #[cfg(debug_assertions)]
-    println!("✅ Detected Intel GPU: {}", name);
-
     Some(GpuInfo::intel(name))
 }
 
@@ -183,18 +144,9 @@ async fn detect_apple() -> Option<GpuInfo> {
     if !check_encoder("h264_videotoolbox").await {
         return None;
     }
-
-    let name = get_gpu_name(&["apple"])
-        .await
-        .unwrap_or_else(|| "Apple GPU".to_string());
-
-    #[cfg(debug_assertions)]
-    println!("✅ Detected Apple GPU: {}", name);
-
+    let name = get_gpu_name(&["apple"]).await.unwrap_or_else(|| "Apple GPU".to_string());
     Some(GpuInfo::apple(name))
 }
-
-// ===== Helpers =====
 
 async fn check_encoder(encoder: &str) -> bool {
     let encoder = encoder.to_string();

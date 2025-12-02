@@ -3,8 +3,6 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-// ===== AudioFormat =====
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AudioFormat {
     pub extension: String,
@@ -25,7 +23,6 @@ pub struct AudioFormat {
     pub recommended_sample_rate: u32,
     pub channels_support: Vec<u32>,
     pub special_params: Vec<String>,
-    // New: List of codecs that can be copied directly into this format
     #[serde(default)]
     pub compatible_sources: Vec<String>,
 }
@@ -58,19 +55,14 @@ impl AudioFormat {
         })
     }
 
-    /// Checks if source codec can be copied without re-encoding
-    /// Logic is now fully config-driven via 'compatible_sources' in TOML
     pub fn can_copy_codec(&self, source_codec: &str) -> bool {
         let source = source_codec.to_lowercase();
         let target = self.codec.to_lowercase();
 
-        // 1. Same codec is usually copyable
         if source == target {
             return true;
         }
 
-        // 2. Check compatibility list from config
-        // "*" means accepts anything (like MKA)
         if self.compatible_sources.contains(&"*".to_string()) {
             return true;
         }
@@ -78,7 +70,6 @@ impl AudioFormat {
         self.compatible_sources.iter().any(|s| source.contains(s))
     }
 
-    /// Returns best sample rate from supported list
     pub fn best_sample_rate(&self, requested: u32) -> u32 {
         if self.supports_sample_rate(requested) {
             requested
@@ -87,12 +78,10 @@ impl AudioFormat {
         }
     }
 
-    /// Returns best channel count from supported list
     pub fn best_channels(&self, requested: u32) -> u32 {
         if self.supports_channels(requested) {
             requested
         } else {
-            // Prefer stereo, then mono, then first supported
             self.channels_support
                 .iter()
                 .find(|&&c| c == 2)
@@ -103,8 +92,6 @@ impl AudioFormat {
         }
     }
 }
-
-// ===== TOML Parsing =====
 
 #[derive(Debug, Deserialize)]
 struct TomlAudioFormat {
@@ -139,11 +126,7 @@ impl From<TomlAudioFormat> for AudioFormat {
             name: t.name,
             category: t.category,
             codec: t.codec,
-            container: if t.container.is_empty() {
-                None
-            } else {
-                Some(t.container)
-            },
+            container: if t.container.is_empty() { None } else { Some(t.container) },
             stability: t.stability,
             description: t.description,
             typical_use: t.typical_use,
@@ -153,11 +136,7 @@ impl From<TomlAudioFormat> for AudioFormat {
             } else {
                 None
             },
-            recommended_bitrate: if t.recommended_bitrate == 0 {
-                None
-            } else {
-                Some(t.recommended_bitrate)
-            },
+            recommended_bitrate: if t.recommended_bitrate == 0 { None } else { Some(t.recommended_bitrate) },
             sample_rates: t.sample_rates,
             recommended_sample_rate: t.recommended_sample_rate,
             channels_support: t.channels_support,
@@ -167,19 +146,12 @@ impl From<TomlAudioFormat> for AudioFormat {
     }
 }
 
-// ===== Static Cache =====
-
 lazy_static! {
     static ref AUDIO_FORMATS: HashMap<String, AudioFormat> = {
         let toml_str = include_str!("audio_formats.toml");
-        let parsed: AudioFormatsToml =
-            toml::from_str(toml_str).expect("Failed to parse audio_formats.toml");
+        let parsed: AudioFormatsToml = toml::from_str(toml_str).expect("Failed to parse audio_formats.toml");
 
-        parsed
-            .format
-            .into_iter()
-            .map(|f| (f.extension.clone(), f.into()))
-            .collect()
+        parsed.format.into_iter().map(|f| (f.extension.clone(), f.into())).collect()
     };
 }
 

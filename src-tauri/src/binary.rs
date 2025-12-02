@@ -2,7 +2,6 @@ use crate::error::{AppError, AppResult, ErrorCode};
 use std::path::PathBuf;
 use tauri::AppHandle;
 
-/// Platform-specific binary suffix
 fn get_binary_suffix() -> &'static str {
     #[cfg(target_os = "windows")]
     return "-x86_64-pc-windows-msvc.exe";
@@ -17,12 +16,10 @@ fn get_binary_suffix() -> &'static str {
     return "-x86_64-unknown-linux-gnu";
 }
 
-/// Resolves the path to a bundled binary
 pub fn get_binary_path(app_handle: &AppHandle, name: &str) -> AppResult<PathBuf> {
     let suffix = get_binary_suffix();
     let full_name = format!("{}{}", name, suffix);
 
-    // 1. Try Tauri resource resolver (Production Bundle)
     let resource_path = format!("binaries/{}", full_name);
     if let Some(path) = app_handle.path_resolver().resolve_resource(&resource_path) {
         if path.exists() {
@@ -30,9 +27,8 @@ pub fn get_binary_path(app_handle: &AppHandle, name: &str) -> AppResult<PathBuf>
         }
     }
 
-    // 2. Development/Manual fallback paths
     if let Ok(cwd) = std::env::current_dir() {
-        let candidates = vec![
+        let candidates = [
             cwd.join("binaries").join(&full_name),
             cwd.join("src-tauri").join("binaries").join(&full_name),
             cwd.join("..").join("src-tauri").join("binaries").join(&full_name),
@@ -44,10 +40,12 @@ pub fn get_binary_path(app_handle: &AppHandle, name: &str) -> AppResult<PathBuf>
             }
         }
     }
+
     Err(AppError::new(
         ErrorCode::BinaryNotFound,
         format!("Binary '{}' not found. Expected: {}", name, full_name),
-    ).with_details("Please ensure FFmpeg binaries are placed in src-tauri/binaries/"))
+    )
+    .with_details("Please ensure FFmpeg binaries are placed in src-tauri/binaries/"))
 }
 
 pub fn get_ffmpeg_path(app: &AppHandle) -> AppResult<PathBuf> {

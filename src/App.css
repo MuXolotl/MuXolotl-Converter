@@ -30,20 +30,28 @@ body {
   height: 100vh;
 }
 
-/* Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
-::-webkit-scrollbar-track { background: transparent; }
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 ::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.1);
   border-radius: 4px;
 }
-::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
-::-webkit-scrollbar-corner { background: transparent; }
 
-/* Glass / Panel */
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 .glass {
   background: rgba(30, 41, 59, 0.95);
   border: 1px solid var(--border-color);
@@ -51,76 +59,56 @@ body {
   -webkit-backdrop-filter: blur(10px);
 }
 
-/* Utilities */
-.gradient-text { color: white; }
-.bg-gradient-main { background: var(--bg-dark); }
-.bg-gradient-primary { background: var(--accent-color); }
+.gradient-text {
+  color: white;
+}
 
-/* Drag Region */
-[data-tauri-drag-region] { -webkit-app-region: drag; }
+.bg-gradient-main {
+  background: var(--bg-dark);
+}
+
+.bg-gradient-primary {
+  background: var(--accent-color);
+}
+
+[data-tauri-drag-region] {
+  -webkit-app-region: drag;
+}
+
 [data-tauri-drag-region] button,
 [data-tauri-drag-region] a,
-[data-tauri-drag-region] input { -webkit-app-region: no-drag; }
+[data-tauri-drag-region] input {
+  -webkit-app-region: no-drag;
+}
 
-/* Inputs */
 select option {
   background-color: var(--bg-panel);
   color: white;
   padding: 8px;
 }
-select:focus { outline: none; }
 
-/* Animations */
-@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-.animate-spin { animation: spin 1s linear infinite; }
-@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-.animate-pulse { animation: pulse 2s ease-in-out infinite; }
-
-/* Table Styles */
-.pro-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-  table-layout: fixed;
+select:focus {
+  outline: none;
 }
 
-.pro-table th {
-  padding: 10px 12px;
-  font-weight: 600;
-  color: #94a3b8;
-  border-bottom: 1px solid var(--border-color);
-  background: rgba(15, 23, 42, 0.8);
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
-.pro-table td {
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--border-color);
-  color: #e2e8f0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  vertical-align: middle;
+.animate-spin {
+  animation: spin 1s linear infinite;
 }
 
-.pro-table tr:hover td {
-  background-color: rgba(255, 255, 255, 0.03);
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
-.pro-table tr.selected td {
-  background-color: rgba(59, 130, 246, 0.15);
+.animate-pulse {
+  animation: pulse 2s ease-in-out infinite;
 }
 
-.pro-table tr.selected td:first-child {
-  box-shadow: inset 3px 0 0 var(--accent-color);
-}
-
-/* Checkbox */
 input[type="checkbox"] {
   appearance: none;
   -webkit-appearance: none;
@@ -134,10 +122,12 @@ input[type="checkbox"] {
   display: grid;
   place-content: center;
 }
+
 input[type="checkbox"]:checked {
   background-color: var(--accent-color);
   border-color: var(--accent-color);
 }
+
 input[type="checkbox"]:checked::before {
   content: "";
   width: 10px;
@@ -148,7 +138,6 @@ input[type="checkbox"]:checked::before {
   background-position: center;
 }
 
-/* Console / Terminal extra styles if needed */
 .console-font {
-    font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+  font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
 }

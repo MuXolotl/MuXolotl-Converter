@@ -38,24 +38,6 @@ impl AppError {
         self
     }
 
-    pub fn binary_not_found(name: &str) -> Self {
-        Self::new(
-            ErrorCode::BinaryNotFound,
-            format!("Binary '{}' not found", name),
-        )
-    }
-
-    pub fn invalid_path(path: &str) -> Self {
-        Self::new(ErrorCode::InvalidPath, format!("Invalid path: {}", path))
-    }
-
-    pub fn unsupported_format(format: &str) -> Self {
-        Self::new(
-            ErrorCode::UnsupportedFormat,
-            format!("Unsupported format: {}", format),
-        )
-    }
-
     pub fn conversion_failed(reason: &str) -> Self {
         Self::new(ErrorCode::ConversionFailed, reason)
     }
@@ -87,7 +69,6 @@ impl From<serde_json::Error> for AppError {
     }
 }
 
-// For Tauri command returns
 impl From<AppError> for String {
     fn from(err: AppError) -> Self {
         serde_json::to_string(&err).unwrap_or_else(|_| err.message)

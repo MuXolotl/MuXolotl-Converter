@@ -1,4 +1,4 @@
-import React from 'react';
+import { memo } from 'react';
 import { Cpu, Zap } from 'lucide-react';
 import type { GpuInfo } from '@/types';
 
@@ -7,7 +7,7 @@ interface GpuIndicatorProps {
   compact?: boolean;
 }
 
-const GpuIndicator: React.FC<GpuIndicatorProps> = ({ gpuInfo, compact = false }) => {
+function GpuIndicator({ gpuInfo, compact = false }: GpuIndicatorProps) {
   if (compact) {
     return (
       <div className="flex items-center gap-1.5 text-xs">
@@ -47,6 +47,6 @@ const GpuIndicator: React.FC<GpuIndicatorProps> = ({ gpuInfo, compact = false })
       )}
     </div>
   );
-};
+}
 
-export default React.memo(GpuIndicator);
+export default memo(GpuIndicator);

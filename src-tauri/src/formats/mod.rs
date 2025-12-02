@@ -4,8 +4,6 @@ pub mod video;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 
-// ===== Common Types =====
-
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum Category {
@@ -48,15 +46,6 @@ pub enum Stability {
     Experimental,
     Problematic,
 }
-
-impl Stability {
-    #[allow(dead_code)]
-    pub fn is_safe(&self) -> bool {
-        matches!(self, Stability::Stable | Stability::RequiresSetup)
-    }
-}
-
-// ===== Sorting Helper =====
 
 pub fn sort_formats_by_category<T, F>(formats: &mut [T], get_category: F)
 where

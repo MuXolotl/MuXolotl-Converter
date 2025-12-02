@@ -35,23 +35,16 @@ class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="w-screen h-screen bg-gradient-main flex items-center justify-center p-8">
+        <div className="w-screen h-screen bg-[#0f172a] flex items-center justify-center p-8">
           <div className="glass max-w-lg w-full p-8 text-center">
             <AlertTriangle size={48} className="text-red-500 mx-auto mb-4" />
-            
-            <h1 className="text-2xl font-bold text-white mb-2">
-              Something went wrong
-            </h1>
-            
-            <p className="text-white/60 mb-6">
-              An unexpected error occurred. Your files are safe.
-            </p>
+
+            <h1 className="text-2xl font-bold text-white mb-2">Something went wrong</h1>
+            <p className="text-white/60 mb-6">An unexpected error occurred. Your files are safe.</p>
 
             {this.state.error && (
               <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 mb-6 text-left">
-                <p className="text-red-400 font-mono text-sm break-all">
-                  {this.state.error.message}
-                </p>
+                <p className="text-red-400 font-mono text-sm break-all">{this.state.error.message}</p>
               </div>
             )}
 
@@ -60,13 +53,11 @@ class ErrorBoundary extends Component<Props, State> {
                 onClick={this.handleReset}
                 className="px-5 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white font-medium flex items-center gap-2 transition-colors"
               >
-                <RefreshCw size={16} />
-                Try Again
+                <RefreshCw size={16} /> Try Again
               </button>
-              
               <button
                 onClick={this.handleReload}
-                className="px-5 py-2 bg-gradient-primary rounded-lg text-white font-medium transition-shadow hover:shadow-lg"
+                className="px-5 py-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg text-white font-medium transition-shadow hover:shadow-lg"
               >
                 Reload App
               </button>

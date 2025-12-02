@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { memo, useState, useCallback, useRef, useEffect } from 'react';
 
 interface SplitPaneProps {
   left: React.ReactNode;
@@ -8,13 +8,7 @@ interface SplitPaneProps {
   maxLeftWidth?: number;
 }
 
-const SplitPane: React.FC<SplitPaneProps> = ({
-  left,
-  right,
-  initialLeftWidth,
-  minLeftWidth = 300,
-  maxLeftWidth = 800,
-}) => {
+function SplitPane({ left, right, initialLeftWidth, minLeftWidth = 300, maxLeftWidth = 800 }: SplitPaneProps) {
   const [leftWidth, setLeftWidth] = useState(initialLeftWidth);
   const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -29,7 +23,6 @@ const SplitPane: React.FC<SplitPaneProps> = ({
 
     const handleMouseMove = (e: MouseEvent) => {
       if (!containerRef.current) return;
-      
       const rect = containerRef.current.getBoundingClientRect();
       const newWidth = Math.max(minLeftWidth, Math.min(maxLeftWidth, e.clientX - rect.left));
       setLeftWidth(newWidth);
@@ -52,25 +45,20 @@ const SplitPane: React.FC<SplitPaneProps> = ({
 
   return (
     <div ref={containerRef} className="flex h-full w-full overflow-hidden">
-      {/* Left Panel */}
       <div style={{ width: leftWidth }} className="h-full shrink-0 overflow-hidden">
         {left}
       </div>
-
-      {/* Divider */}
       <div
         onMouseDown={handleMouseDown}
         className={`w-1 h-full cursor-col-resize flex-shrink-0 transition-colors ${
           isDragging ? 'bg-purple-500' : 'bg-white/10 hover:bg-purple-500/50'
         }`}
       />
-
-      {/* Right Panel */}
       <div className="flex-1 h-full min-w-0 overflow-hidden">
         {right}
       </div>
     </div>
   );
-};
+}
 
-export default SplitPane;
+export default memo(SplitPane);

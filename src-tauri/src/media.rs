@@ -2,8 +2,6 @@ use crate::utils::create_hidden_command;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
-// ===== Types =====
-
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum MediaType {
@@ -48,22 +46,10 @@ impl MediaInfo {
         self.audio_streams.first()
     }
 
-    #[allow(dead_code)]
-    pub fn video_codec(&self) -> Option<&str> {
-        self.primary_video().map(|v| v.codec.as_str())
-    }
-
     pub fn audio_codec(&self) -> Option<&str> {
         self.primary_audio().map(|a| a.codec.as_str())
     }
-
-    #[allow(dead_code)]
-    pub fn resolution(&self) -> Option<(u32, u32)> {
-        self.primary_video().map(|v| (v.width, v.height))
-    }
 }
-
-// ===== Detection =====
 
 pub async fn detect_media_type(app_handle: &tauri::AppHandle, path: &str) -> Result<MediaInfo> {
     let ffprobe_path = crate::get_ffprobe_path(app_handle)
@@ -85,16 +71,11 @@ pub async fn detect_media_type(app_handle: &tauri::AppHandle, path: &str) -> Res
         .context("Failed to execute ffprobe")?;
 
     if !output.status.success() {
-        anyhow::bail!(
-            "FFprobe failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
+        anyhow::bail!("FFprobe failed: {}", String::from_utf8_lossy(&output.stderr));
     }
 
     let json_str = String::from_utf8(output.stdout).context("Invalid UTF-8 in ffprobe output")?;
-
-    let probe: serde_json::Value =
-        serde_json::from_str(&json_str).context("Failed to parse ffprobe JSON")?;
+    let probe: serde_json::Value = serde_json::from_str(&json_str).context("Failed to parse ffprobe JSON")?;
 
     parse_probe_result(&probe, path)
 }
@@ -164,10 +145,7 @@ fn parse_video_stream(stream: &serde_json::Value) -> Option<VideoStream> {
         width: stream.get("width")?.as_u64()? as u32,
         height: stream.get("height")?.as_u64()? as u32,
         fps: parse_framerate(stream.get("r_frame_rate")?.as_str()?),
-        bitrate: stream
-            .get("bit_rate")
-            .and_then(|b| b.as_str())
-            .and_then(|s| s.parse().ok()),
+        bitrate: stream.get("bit_rate").and_then(|b| b.as_str()).and_then(|s| s.parse().ok()),
     })
 }
 
@@ -176,10 +154,7 @@ fn parse_audio_stream(stream: &serde_json::Value) -> Option<AudioStream> {
         codec: stream.get("codec_name")?.as_str()?.to_string(),
         sample_rate: stream.get("sample_rate")?.as_str()?.parse().ok()?,
         channels: stream.get("channels")?.as_u64()? as u32,
-        bitrate: stream
-            .get("bit_rate")
-            .and_then(|b| b.as_str())
-            .and_then(|s| s.parse().ok()),
+        bitrate: stream.get("bit_rate").and_then(|b| b.as_str()).and_then(|s| s.parse().ok()),
     })
 }
 

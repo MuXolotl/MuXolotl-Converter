@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/tauri';
+import { APP_CONFIG } from '@/config';
 import { generateOutputPath } from '@/utils';
 import type { FileItem, ConversionProgress, GpuInfo, ConversionContextType } from '@/types';
-
-const PROGRESS_THROTTLE_MS = 100;
 
 export function useConversion(
   updateFile: (id: string, updates: Partial<FileItem>) => void,
@@ -15,33 +14,27 @@ export function useConversion(
 ): ConversionContextType {
   const [activeCount, setActiveCount] = useState(0);
   const unlistenRef = useRef<UnlistenFn[]>([]);
-  const throttleTimers = useRef<Map<string, number>>(new Map());
+  const lastUpdateRef = useRef<Map<string, number>>(new Map());
 
-  // Setup event listeners
   useEffect(() => {
     const setup = async () => {
       const listeners = await Promise.all([
-        // Progress updates
         listen<ConversionProgress>('conversion-progress', e => {
           const { task_id, percent } = e.payload;
           const now = Date.now();
-          const lastUpdate = throttleTimers.current.get(task_id) || 0;
-          
-          if (now - lastUpdate < PROGRESS_THROTTLE_MS && percent > 0 && percent < 100) {
+          const lastUpdate = lastUpdateRef.current.get(task_id) || 0;
+
+          if (now - lastUpdate < APP_CONFIG.limits.progressThrottleMs && percent > 0 && percent < 100) {
             return;
           }
 
-          throttleTimers.current.set(task_id, now);
-          updateFile(task_id, { 
-            status: 'processing', 
-            progress: e.payload 
-          });
+          lastUpdateRef.current.set(task_id, now);
+          updateFile(task_id, { status: 'processing', progress: e.payload });
         }),
 
-        // Completed successfully
         listen<string>('conversion-completed', e => {
           const taskId = e.payload;
-          throttleTimers.current.delete(taskId);
+          lastUpdateRef.current.delete(taskId);
           updateFile(taskId, {
             status: 'completed',
             progress: null,
@@ -50,11 +43,9 @@ export function useConversion(
           setActiveCount(c => Math.max(0, c - 1));
         }),
 
-        // Cancelled by user - NOT an error
         listen<string>('conversion-cancelled', e => {
           const taskId = e.payload;
-          throttleTimers.current.delete(taskId);
-          console.log('[Conversion] Cancelled:', taskId);
+          lastUpdateRef.current.delete(taskId);
           updateFile(taskId, {
             status: 'cancelled',
             progress: null,
@@ -63,20 +54,18 @@ export function useConversion(
           setActiveCount(c => Math.max(0, c - 1));
         }),
 
-        // Error - show error modal
         listen<{ task_id: string; error: string }>('conversion-error', e => {
           const { task_id, error } = e.payload;
-          throttleTimers.current.delete(task_id);
-          
-          // Find the file for error callback
+          lastUpdateRef.current.delete(task_id);
+
           const file = filesRef.current.find(f => f.id === task_id);
           if (file && onError) {
             onError(file, error);
           }
-          
+
           updateFile(task_id, {
             status: 'failed',
-            error: error,
+            error,
             progress: null,
             completedAt: Date.now(),
           });
@@ -91,35 +80,27 @@ export function useConversion(
 
     return () => {
       unlistenRef.current.forEach(fn => fn());
-      throttleTimers.current.clear();
+      lastUpdateRef.current.clear();
     };
   }, [updateFile, filesRef, onError]);
 
   const startConversion = useCallback(async (file: FileItem) => {
     if (!outputFolder) {
-      const error = 'No output folder selected. Please select an output folder first.';
+      const error = 'No output folder selected';
       updateFile(file.id, { status: 'failed', error });
-      if (onError) onError(file, error);
+      onError?.(file, error);
       return;
     }
 
     if (!file.mediaInfo) {
-      const error = 'File has no media information. The file might be corrupted.';
+      const error = 'File has no media information';
       updateFile(file.id, { status: 'failed', error });
-      if (onError) onError(file, error);
+      onError?.(file, error);
       return;
     }
 
     try {
       const outputPath = generateOutputPath(file, outputFolder);
-      
-      console.log('[Conversion] Starting:', {
-        id: file.id,
-        input: file.path,
-        output: outputPath,
-        format: file.outputFormat,
-      });
-
       setActiveCount(c => c + 1);
 
       updateFile(file.id, {
@@ -139,17 +120,9 @@ export function useConversion(
 
       const isAudio = file.mediaInfo.media_type === 'audio';
       const extractAudio = file.settings.extractAudioOnly;
-      
-      let command: string;
-      if (isAudio) {
-        command = 'convert_audio';
-      } else if (extractAudio) {
-        command = 'extract_audio';
-      } else {
-        command = 'convert_video';
-      }
 
-      // Build settings with snake_case only
+      const command = isAudio ? 'convert_audio' : extractAudio ? 'extract_audio' : 'convert_video';
+
       const settings = {
         task_id: file.id,
         quality: file.settings.quality,
@@ -181,22 +154,14 @@ export function useConversion(
       await invoke(command, params);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      console.error('[Conversion] Error:', errorMessage);
-      
-      updateFile(file.id, { 
-        status: 'failed', 
-        error: errorMessage,
-        progress: null,
-      });
-      
-      if (onError) onError(file, errorMessage);
+      updateFile(file.id, { status: 'failed', error: errorMessage, progress: null });
+      onError?.(file, errorMessage);
       setActiveCount(c => Math.max(0, c - 1));
     }
   }, [gpuInfo, updateFile, outputFolder, onError]);
 
   const startAll = useCallback(async () => {
     if (!outputFolder) return;
-
     const pending = filesRef.current.filter(f => f.status === 'pending');
     for (const file of pending) {
       await startConversion(file);
@@ -205,18 +170,10 @@ export function useConversion(
 
   const cancelConversion = useCallback(async (id: string) => {
     try {
-      console.log('[Conversion] Requesting cancel:', id);
       await invoke('cancel_conversion', { taskId: id });
-      // Status will be updated by the 'conversion-cancelled' event listener
-    } catch (e) {
-      console.error('[Conversion] Cancel failed:', e);
-      // If cancel command fails, update status manually
-      throttleTimers.current.delete(id);
-      updateFile(id, { 
-        status: 'cancelled', 
-        progress: null,
-        completedAt: Date.now(),
-      });
+    } catch {
+      lastUpdateRef.current.delete(id);
+      updateFile(id, { status: 'cancelled', progress: null, completedAt: Date.now() });
       setActiveCount(c => Math.max(0, c - 1));
     }
   }, [updateFile]);

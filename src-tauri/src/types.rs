@@ -1,7 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-// ===== Quality =====
-
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum Quality {
@@ -45,8 +43,6 @@ impl Quality {
     }
 }
 
-// ===== Metadata =====
-
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FileMetadata {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -86,17 +82,14 @@ impl FileMetadata {
     }
 }
 
-// ===== Conversion Settings =====
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConversionSettings {
-    // Use only snake_case
     #[serde(default)]
     pub task_id: Option<String>,
-    
+
     #[serde(default)]
     pub quality: Quality,
-    
+
     pub bitrate: Option<u32>,
     pub sample_rate: Option<u32>,
     pub channels: Option<u32>,
@@ -105,16 +98,16 @@ pub struct ConversionSettings {
     pub fps: Option<u32>,
     pub video_codec: Option<String>,
     pub audio_codec: Option<String>,
-    
+
     #[serde(default)]
     pub use_gpu: bool,
-    
+
     #[serde(default)]
     pub copy_audio: bool,
-    
+
     #[serde(default)]
     pub extract_audio_only: bool,
-    
+
     pub metadata: Option<FileMetadata>,
 }
 
@@ -142,10 +135,13 @@ impl Default for ConversionSettings {
 impl ConversionSettings {
     pub fn task_id(&self) -> String {
         self.task_id.clone().unwrap_or_else(|| {
-            format!("task_{}", std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_millis())
+            format!(
+                "task_{}",
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis()
+            )
         })
     }
 
@@ -155,13 +151,5 @@ impl ConversionSettings {
 
     pub fn channels(&self) -> u32 {
         self.channels.unwrap_or(2)
-    }
-
-    #[allow(dead_code)]
-    pub fn metadata_args(&self) -> Vec<String> {
-        self.metadata
-            .as_ref()
-            .map(|m| m.to_ffmpeg_args())
-            .unwrap_or_else(|| vec!["-map_metadata".to_string(), "-1".to_string()])
     }
 }

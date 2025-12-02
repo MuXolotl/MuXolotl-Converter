@@ -32,7 +32,6 @@ export function useGpu() {
       }
     };
 
-    // Listen for GPU detection event (from backend init)
     const unlisten = listen<GpuInfo>('gpu-detected', event => {
       if (mounted) {
         setGpuInfo(event.payload);

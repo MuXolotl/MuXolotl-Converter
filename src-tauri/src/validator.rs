@@ -113,15 +113,16 @@ fn validate_video(
     result.check_stability(fmt.stability.clone(), &fmt.extension);
     result.suggested_params.extend(fmt.special_params.clone());
 
-    // Resolution validation
     let w = settings.get("width").and_then(|v| v.as_u64());
     let h = settings.get("height").and_then(|v| v.as_u64());
 
     if let (Some(w), Some(h)) = (w, h) {
         if fmt.requires_fixed_resolution {
-            // Standard definition check
             if w != 720 || (h != 576 && h != 480) {
-                result.error(format!("{} requires 720x576 (PAL) or 720x480 (NTSC)", fmt.extension));
+                result.error(format!(
+                    "{} requires 720x576 (PAL) or 720x480 (NTSC)",
+                    fmt.extension
+                ));
             }
         } else if let Some((max_w, max_h)) = fmt.max_resolution {
             if w > max_w as u64 || h > max_h as u64 {
@@ -133,10 +134,7 @@ fn validate_video(
         }
     }
 
-    // Bitrate safety check
     if let Some(br) = settings.get("bitrate").and_then(|v| v.as_u64()) {
-        // 50Mbps is a reasonable safety cap for standard formats to prevent accidental huge files
-        // unless it's Pro format like ProRes/DNxHD (not fully handled here yet)
         if br > 50_000 {
             result.warn("Very high bitrate selected (>50 Mbps). Ensure disk space.");
         }

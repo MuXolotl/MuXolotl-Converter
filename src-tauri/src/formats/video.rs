@@ -3,8 +3,6 @@ use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-// ===== Types =====
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum FormatCompatibility {
     Fast,
@@ -27,9 +25,9 @@ pub struct VideoFormat {
     pub typical_use: String,
     pub max_resolution: Option<(u32, u32)>,
     #[serde(default)]
-    pub requires_fixed_resolution: bool, // New: for VOB/DV
+    pub requires_fixed_resolution: bool,
     #[serde(default)]
-    pub default_pixel_format: Option<String>, // New: for yuv420p enforcement
+    pub default_pixel_format: Option<String>,
     pub special_params: Vec<String>,
 }
 
@@ -48,10 +46,6 @@ impl VideoFormat {
                     || (c == "opus" && codec.contains("opus"))
                     || (c == "vorbis" && codec.contains("vorbis"))
             })
-    }
-
-    pub fn get_default_video_codec(&self) -> Option<&str> {
-        self.video_codecs.first().map(|s| s.as_str())
     }
 
     pub fn get_recommended_video_codec(&self, gpu_vendor: &str, use_gpu: bool) -> Option<String> {
@@ -97,7 +91,6 @@ impl VideoFormat {
 
     pub fn is_resolution_compatible(&self, width: u32, height: u32) -> bool {
         if self.requires_fixed_resolution {
-            // Simplified check, strict logic is in converter
             return width == 720 && (height == 576 || height == 480);
         }
         match self.max_resolution {
@@ -121,16 +114,15 @@ impl VideoFormat {
         }
 
         if let (Some(w), Some(h)) = (width, height) {
-            if !self.is_resolution_compatible(w, h) {
-                if self.requires_fixed_resolution {
-                    return FormatCompatibility::Setup;
-                }
+            if !self.is_resolution_compatible(w, h) && self.requires_fixed_resolution {
+                return FormatCompatibility::Setup;
             }
         }
 
         let video_ok = self.supports_video_codec(video_codec);
-        let audio_ok =
-            audio_codec.is_empty() || self.audio_codecs.is_empty() || self.supports_audio_codec(audio_codec);
+        let audio_ok = audio_codec.is_empty()
+            || self.audio_codecs.is_empty()
+            || self.supports_audio_codec(audio_codec);
 
         if video_ok && audio_ok {
             FormatCompatibility::Fast
@@ -139,8 +131,6 @@ impl VideoFormat {
         }
     }
 }
-
-// ===== Codec Helpers =====
 
 fn codec_matches(container_codec: &str, actual_codec: &str) -> bool {
     if container_codec == actual_codec {
@@ -176,8 +166,6 @@ fn get_gpu_codec(codec: &str, vendor: &str) -> Option<String> {
     };
     Some(result.to_string())
 }
-
-// ===== TOML Parsing =====
 
 #[derive(Debug, Deserialize)]
 struct TomlVideoFormat {
@@ -227,19 +215,12 @@ impl From<TomlVideoFormat> for VideoFormat {
     }
 }
 
-// ===== Static Cache =====
-
 lazy_static! {
     static ref VIDEO_FORMATS: HashMap<String, VideoFormat> = {
         let toml_str = include_str!("video_formats.toml");
-        let parsed: VideoFormatsToml =
-            toml::from_str(toml_str).expect("Failed to parse video_formats.toml");
+        let parsed: VideoFormatsToml = toml::from_str(toml_str).expect("Failed to parse video_formats.toml");
 
-        parsed
-            .format
-            .into_iter()
-            .map(|f| (f.extension.clone(), f.into()))
-            .collect()
+        parsed.format.into_iter().map(|f| (f.extension.clone(), f.into())).collect()
     };
 }
 

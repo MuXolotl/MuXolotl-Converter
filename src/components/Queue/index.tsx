@@ -1,8 +1,8 @@
-import React from 'react';
-import { useAutoAnimate } from '@formkit/auto-animate/react';
+import { memo, useCallback, useMemo } from 'react';
+import { FixedSizeList as List } from 'react-window';
+import { APP_CONFIG } from '@/config';
 import DropZone from '@/components/DropZone';
 import QueueItem from './QueueItem';
-import { MAX_QUEUE_SIZE } from '@/constants';
 import type { FileItem } from '@/types';
 
 interface QueueProps {
@@ -16,7 +16,10 @@ interface QueueProps {
   onFilesAdded: (files: FileItem[]) => void;
 }
 
-const Queue: React.FC<QueueProps> = ({
+const ROW_HEIGHT = 56;
+const HEADER_HEIGHT = 40;
+
+function Queue({
   files,
   selectedIds,
   onSelect,
@@ -25,10 +28,8 @@ const Queue: React.FC<QueueProps> = ({
   onRemove,
   onRemoveSelected,
   onFilesAdded,
-}) => {
-  const [parent] = useAutoAnimate();
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+}: QueueProps) {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Delete' || e.key === 'Backspace') {
       onRemoveSelected();
     }
@@ -39,93 +40,103 @@ const Queue: React.FC<QueueProps> = ({
     if (e.key === 'Escape') {
       onDeselectAll();
     }
-  };
+  }, [onRemoveSelected, onSelectAll, onDeselectAll]);
 
-  // Shared column widths configuration
-  // Total should be roughly 100%, but fixed pixels mixed with % is safer
-  const renderColGroup = () => (
-    <colgroup>
-      <col style={{ width: '40px' }} />  {/* # */}
-      <col style={{ width: '35%' }} />   {/* Name */}
-      <col style={{ width: '15%' }} />   {/* Format */}
-      <col style={{ width: '15%' }} />   {/* Size/Dur */}
-      <col style={{ width: '25%' }} />   {/* Status */}
-      <col style={{ width: '50px' }} />  {/* Action */}
-    </colgroup>
-  );
+  const itemData = useMemo(() => ({
+    files,
+    selectedIds,
+    onSelect,
+    onRemove,
+  }), [files, selectedIds, onSelect, onRemove]);
 
-  // Empty state
   if (files.length === 0) {
     return (
       <div className="h-full flex flex-col items-center justify-center p-8 bg-[#1e293b]/30">
         <DropZone
           onFilesAdded={onFilesAdded}
           currentCount={0}
-          maxCount={MAX_QUEUE_SIZE}
+          maxCount={APP_CONFIG.limits.maxQueueSize}
         />
       </div>
     );
   }
 
   return (
-    <div 
+    <div
       className="h-full flex flex-col bg-[#1e293b]/30 outline-none"
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      onClick={() => onDeselectAll()}
+      onClick={onDeselectAll}
     >
-      {/* Table Header - Fixed */}
-      <div className="shrink-0 bg-[#0f172a] border-b border-white/10 select-none">
-        <table className="pro-table">
-          {renderColGroup()}
-          <thead>
-            <tr>
-              <th className="text-center">#</th>
-              <th className="text-left">File Name</th>
-              <th className="text-left pl-4">Format</th>
-              <th className="text-right pr-4">Size / Dur</th>
-              <th className="text-left pl-4">Status</th>
-              <th className="text-center"></th>
-            </tr>
-          </thead>
-        </table>
+      <QueueHeader />
+
+      <div className="flex-1 min-h-0">
+        <List
+          height={window.innerHeight - 200}
+          itemCount={files.length}
+          itemSize={ROW_HEIGHT}
+          width="100%"
+          itemData={itemData}
+          overscanCount={5}
+        >
+          {VirtualizedRow}
+        </List>
       </div>
 
-      {/* Scrollable Table Body */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
-        <table className="pro-table">
-          {renderColGroup()}
-          <tbody ref={parent}>
-            {files.map((file, index) => (
-              <QueueItem
-                key={file.id}
-                index={index}
-                file={file}
-                isSelected={selectedIds.has(file.id)}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSelect(file.id, e.ctrlKey || e.metaKey);
-                }}
-                onRemove={() => onRemove(file.id)}
-              />
-            ))}
-          </tbody>
-        </table>
-        
-        {/* Compact Drop zone at the bottom */}
-        {files.length < MAX_QUEUE_SIZE && (
-           <div className="p-2 opacity-60 hover:opacity-100 transition-opacity">
-              <DropZone
-                onFilesAdded={onFilesAdded}
-                currentCount={files.length}
-                maxCount={MAX_QUEUE_SIZE}
-                compact
-              />
-           </div>
-        )}
+      {files.length < APP_CONFIG.limits.maxQueueSize && (
+        <div className="p-2 opacity-60 hover:opacity-100 transition-opacity shrink-0">
+          <DropZone
+            onFilesAdded={onFilesAdded}
+            currentCount={files.length}
+            maxCount={APP_CONFIG.limits.maxQueueSize}
+            compact
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QueueHeader() {
+  return (
+    <div className="shrink-0 bg-[#0f172a] border-b border-white/10 select-none">
+      <div className="grid grid-cols-[40px_1fr_120px_100px_140px_50px] gap-2 px-3 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+        <div className="text-center">#</div>
+        <div>File Name</div>
+        <div className="pl-2">Format</div>
+        <div className="text-right pr-2">Size / Dur</div>
+        <div className="pl-2">Status</div>
+        <div />
       </div>
     </div>
   );
-};
+}
 
-export default React.memo(Queue);
+interface RowData {
+  files: FileItem[];
+  selectedIds: Set<string>;
+  onSelect: (id: string, multi: boolean) => void;
+  onRemove: (id: string) => void;
+}
+
+function VirtualizedRow({ index, style, data }: { index: number; style: React.CSSProperties; data: RowData }) {
+  const { files, selectedIds, onSelect, onRemove } = data;
+  const file = files[index];
+
+  return (
+    <div style={style}>
+      <QueueItem
+        file={file}
+        index={index}
+        isSelected={selectedIds.has(file.id)}
+        onClick={(e) => {
+          e.stopPropagation();
+          onSelect(file.id, e.ctrlKey || e.metaKey);
+        }}
+        onRemove={() => onRemove(file.id)}
+      />
+    </div>
+  );
+}
+
+export default memo(Queue);

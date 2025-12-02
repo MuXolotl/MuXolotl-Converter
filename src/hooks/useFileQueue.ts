@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { MAX_QUEUE_SIZE } from '@/constants';
+import { APP_CONFIG } from '@/config';
 import {
   generateOutputPath,
   saveQueue,
@@ -8,21 +8,17 @@ import {
   sortFilesByStatus,
   getQueueStats,
 } from '@/utils';
-import type { FileItem } from '@/types';
-
-const AUTOSAVE_DEBOUNCE_MS = 2000;
+import type { FileItem, QueueStats } from '@/types';
 
 export function useFileQueue(outputFolder: string) {
   const [files, setFiles] = useState<FileItem[]>([]);
   const filesRef = useRef<FileItem[]>(files);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Keep ref in sync
   useEffect(() => {
     filesRef.current = files;
   }, [files]);
 
-  // Load saved queue on mount
   useEffect(() => {
     const loaded = loadQueue();
     if (loaded.length > 0) {
@@ -30,8 +26,6 @@ export function useFileQueue(outputFolder: string) {
     }
   }, []);
 
-  // Smart Autosave (Debounced)
-  // Triggers save only when 'files' changes, but waits for inactivity
   useEffect(() => {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
@@ -41,17 +35,15 @@ export function useFileQueue(outputFolder: string) {
       if (files.length > 0) {
         saveQueue(files);
       } else {
-        // If queue is empty, we might want to clear storage too, or keep it empty
-        clearStorageQueue(); 
+        clearStorageQueue();
       }
-    }, AUTOSAVE_DEBOUNCE_MS);
+    }, APP_CONFIG.limits.autosaveDebounceMs);
 
     return () => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
   }, [files]);
 
-  // Update output paths when folder changes
   useEffect(() => {
     if (!outputFolder) return;
 
@@ -67,7 +59,7 @@ export function useFileQueue(outputFolder: string) {
 
   const addFiles = useCallback((newFiles: FileItem[]) => {
     setFiles(current => {
-      const available = MAX_QUEUE_SIZE - current.length;
+      const available = APP_CONFIG.limits.maxQueueSize - current.length;
       if (available <= 0) return current;
 
       const existingPaths = new Set(current.map(f => f.path));
@@ -75,7 +67,6 @@ export function useFileQueue(outputFolder: string) {
       const toAdd = unique.slice(0, available);
 
       if (toAdd.length === 0) return current;
-
       return [...toAdd, ...current];
     });
   }, []);
@@ -85,9 +76,7 @@ export function useFileQueue(outputFolder: string) {
   }, []);
 
   const updateFile = useCallback((id: string, updates: Partial<FileItem>) => {
-    setFiles(prev =>
-      prev.map(f => (f.id === id ? { ...f, ...updates } : f))
-    );
+    setFiles(prev => prev.map(f => (f.id === id ? { ...f, ...updates } : f)));
   }, []);
 
   const retryFile = useCallback((id: string) => {
@@ -109,11 +98,8 @@ export function useFileQueue(outputFolder: string) {
   }, []);
 
   const sortedFiles = useMemo(() => sortFilesByStatus(files), [files]);
-  const stats = useMemo(() => getQueueStats(files), [files]);
-  const pendingFiles = useMemo(
-    () => files.filter(f => f.status === 'pending'),
-    [files]
-  );
+  const stats: QueueStats = useMemo(() => getQueueStats(files), [files]);
+  const pendingFiles = useMemo(() => files.filter(f => f.status === 'pending'), [files]);
 
   return {
     files,

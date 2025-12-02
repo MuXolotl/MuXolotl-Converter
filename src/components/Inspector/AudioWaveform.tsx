@@ -1,14 +1,12 @@
-import React, { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 
-const AudioWaveform: React.FC = () => {
-  // Random bars but consistent for component lifecycle
+function AudioWaveform() {
   const bars = useMemo(() => {
     const count = 16;
     const result: number[] = [];
     for (let i = 0; i < count; i++) {
-      // Create a nice sine-like wave
-      const val = Math.sin(i * 0.5) * 0.5 + 0.5; // Base shape
-      const noise = Math.random() * 0.3; // Add randomness
+      const val = Math.sin(i * 0.5) * 0.5 + 0.5;
+      const noise = Math.random() * 0.3;
       result.push(Math.max(0.2, Math.min(1, val + noise)));
     }
     return result;
@@ -21,8 +19,8 @@ const AudioWaveform: React.FC = () => {
           key={i}
           className="w-1 bg-gradient-to-t from-blue-600 to-cyan-400 rounded-full opacity-80"
           style={{
-            height: `${height * 70}%`, 
-            animation: `wave 1.2s ease-in-out infinite alternate`,
+            height: `${height * 70}%`,
+            animation: 'wave 1.2s ease-in-out infinite alternate',
             animationDelay: `${i * 0.05}s`,
           }}
         />
@@ -35,6 +33,6 @@ const AudioWaveform: React.FC = () => {
       `}</style>
     </div>
   );
-};
+}
 
-export default React.memo(AudioWaveform);
+export default memo(AudioWaveform);
