@@ -16,12 +16,7 @@ function SettingsPanel({ file, activeTab, disabled, onChange }: SettingsPanelPro
 
   if (activeTab === 'general') {
     return (
-      <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
-        <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg mb-4">
-          <div className="text-[10px] uppercase text-blue-400 font-bold tracking-wider mb-1">Optimization</div>
-          <p className="text-xs text-blue-200/70">Select a quality preset. "Custom" allows manual bitrate control.</p>
-        </div>
-
+      <div className="space-y-4">
         <SettingRow label="Quality Preset">
           <Select
             value={file.settings.quality}
@@ -32,16 +27,19 @@ function SettingsPanel({ file, activeTab, disabled, onChange }: SettingsPanelPro
         </SettingRow>
 
         {isVideo && (
-          <div className="mt-4 pt-4 border-t border-white/5">
-            <label className="flex items-center gap-3 cursor-pointer group p-2 hover:bg-white/5 rounded transition-colors">
+          <div className="pt-4 border-t border-white/5">
+            <label className="flex items-start gap-3 cursor-pointer group p-2 hover:bg-white/5 rounded transition-colors">
               <input
                 type="checkbox"
                 checked={file.settings.extractAudioOnly}
                 onChange={e => onChange({ extractAudioOnly: e.target.checked })}
                 disabled={disabled}
+                className="mt-0.5 shrink-0"
               />
-              <div>
-                <div className="text-sm font-medium text-white group-hover:text-blue-400 transition-colors">Extract Audio</div>
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-white group-hover:text-blue-400 transition-colors">
+                  Extract Audio
+                </div>
                 <div className="text-xs text-white/40">Convert video file to audio only</div>
               </div>
             </label>
@@ -53,7 +51,7 @@ function SettingsPanel({ file, activeTab, disabled, onChange }: SettingsPanelPro
 
   if (activeTab === 'video' && !extractAudio) {
     return (
-      <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
+      <div className="space-y-4">
         <SettingRow label="Resolution">
           <Select
             value={file.settings.width && file.settings.height ? `${file.settings.width}x${file.settings.height}` : 'original'}
@@ -85,7 +83,7 @@ function SettingsPanel({ file, activeTab, disabled, onChange }: SettingsPanelPro
 
   if (activeTab === 'audio') {
     return (
-      <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
+      <div className="space-y-4">
         <SettingRow label="Sample Rate">
           <Select
             value={file.settings.sampleRate?.toString() || '44100'}
@@ -124,7 +122,7 @@ function SettingsPanel({ file, activeTab, disabled, onChange }: SettingsPanelPro
 
   if (activeTab === 'metadata') {
     return (
-      <div className="text-center py-8 text-white/30 text-xs">
+      <div className="flex items-center justify-center py-8 text-white/30 text-xs">
         Metadata editing coming soon...
       </div>
     );
