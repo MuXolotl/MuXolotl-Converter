@@ -37,14 +37,21 @@ if (!fileExists(versionFilePath)) {
 }
 
 const version = readUtf8(versionFilePath).trim();
-if (!/^\d+\.\d+\.\d+$/.test(version)) {
+if (!/^\d+\.\d+\.\d+(-(b|beta)\d*)?$/.test(version)) {
   console.error(`❌ Invalid version format in VERSION file: "${version}"`);
-  console.error('Expected format: X.Y.Z (e.g., 1.0.0)');
+  console.error('Expected formats:');
+  console.error('  - Stable:  X.Y.Z (e.g., 1.0.0)');
+  console.error('  - Beta:    X.Y.Z-b or X.Y.Z-b1 (e.g., 1.1.0-b, 1.1.0-b2)');
+  console.error('  - Beta:    X.Y.Z-beta or X.Y.Z-beta1 (e.g., 1.1.0-beta, 1.1.0-beta2)');
   process.exit(1);
 }
 
-console.log(`\n📦 Synchronizing version: ${version}\n`);
+const isBeta = /-(b|beta)\d*$/.test(version);
+const releaseType = isBeta ? '🧪 Beta' : '🚀 Stable';
 
+console.log(`\n📦 Synchronizing version: ${version} (${releaseType})\n`);
+
+// package.json
 (() => {
   const packageJsonPath = path.join(rootDir, 'package.json');
   if (!fileExists(packageJsonPath)) {
@@ -57,6 +64,7 @@ console.log(`\n📦 Synchronizing version: ${version}\n`);
   logOk('Updated package.json');
 })();
 
+// Cargo.toml
 (() => {
   const cargoTomlPath = path.join(rootDir, 'src-tauri', 'Cargo.toml');
   if (!fileExists(cargoTomlPath)) {
@@ -82,6 +90,7 @@ console.log(`\n📦 Synchronizing version: ${version}\n`);
   }
 })();
 
+// tauri.conf.json
 (() => {
   const tauriConfPath = path.join(rootDir, 'src-tauri', 'tauri.conf.json');
   if (!fileExists(tauriConfPath)) {
@@ -117,6 +126,7 @@ console.log(`\n📦 Synchronizing version: ${version}\n`);
   }
 })();
 
+// README.md badge
 (() => {
   const readmePath = path.join(rootDir, 'README.md');
   if (!fileExists(readmePath)) {
@@ -125,8 +135,9 @@ console.log(`\n📦 Synchronizing version: ${version}\n`);
   }
 
   const readme = readUtf8(readmePath);
-  const badgeRegex = /(https:\/\/img\.shields\.io\/badge\/version-)(\d+\.\d+\.\d+)(-[a-z0-9._-]+\.svg)/gi;
-  const updatedReadme = readme.replace(badgeRegex, `$1${version}$3`);
+  const badgeRegex = /(https:\/\/img\.shields\.io\/badge\/version-)([0-9]+\.[0-9]+\.[0-9]+(?:--?(?:b|beta)[0-9]*)?)(-[a-z0-9._-]+\.svg)/gi;
+  const badgeVersion = version.replace(/-/g, '--');
+  const updatedReadme = readme.replace(badgeRegex, `$1${badgeVersion}$3`);
 
   if (updatedReadme === readme) {
     logWarn('No shields.io version badge found in README.md — skipping badge update');
