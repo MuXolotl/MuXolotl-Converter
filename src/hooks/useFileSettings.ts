@@ -11,7 +11,7 @@ export function useFileSettings(file: FileItem | null) {
   const mountedRef = useRef(true);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const isVideo = file?.mediaInfo?.media_type === 'video';
+  // const isVideo = file?.mediaInfo?.media_type === 'video';
   const isAudio = file?.mediaInfo?.media_type === 'audio';
   const extractAudio = file?.settings.extractAudioOnly;
 

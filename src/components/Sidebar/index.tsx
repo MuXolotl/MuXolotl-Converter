@@ -26,7 +26,7 @@ function Sidebar({ onFeedbackClick }: SidebarProps) {
 }
 
 interface NavButtonProps {
-  icon: React.FC<{ size?: number; strokeWidth?: number }>;
+  icon: React.ElementType;
   active?: boolean;
   onClick?: () => void;
   title: string;

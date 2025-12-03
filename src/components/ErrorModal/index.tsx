@@ -2,7 +2,7 @@ import { memo, useState, useCallback } from 'react';
 import { X, Copy, Check, ExternalLink, Bug, Info, Settings, Monitor, HardDrive } from 'lucide-react';
 import { APP_CONFIG } from '@/config';
 import { getSystemInfo } from '@/utils';
-import type { GpuInfo, SystemInfo } from '@/types';
+import type { GpuInfo } from '@/types';
 
 interface ErrorInfo {
   title: string;

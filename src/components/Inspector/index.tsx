@@ -74,6 +74,10 @@ function InspectorContent({ file, outputFolder, context, onRetry }: InspectorCon
   const isProcessing = file.status === 'processing';
   const canConvert = file.status === 'pending' && !!outputFolder;
 
+  const codecName = isAudio 
+    ? (file.mediaInfo?.audio_streams?.[0]?.codec || 'N/A') 
+    : (file.mediaInfo?.video_streams?.[0]?.codec || 'N/A');
+
   useEffect(() => {
     setActiveTab('general');
   }, [file.id, isExtracting]);
@@ -118,10 +122,7 @@ function InspectorContent({ file, outputFolder, context, onRetry }: InspectorCon
             <div className="w-px h-4 bg-white/5" />
             <StatItem 
               label="Codec" 
-              value={(isAudio 
-                ? file.mediaInfo?.audio_streams[0]?.codec 
-                : file.mediaInfo?.video_streams[0]?.codec || 'N/A'
-              ).toUpperCase()} 
+              value={codecName.toUpperCase()} 
             />
           </div>
 
