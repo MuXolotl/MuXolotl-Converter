@@ -46,10 +46,26 @@ if (!/^\d+\.\d+\.\d+(-(b|beta)\d*)?$/.test(version)) {
   process.exit(1);
 }
 
-const isBeta = /-(b|beta)\d*$/.test(version);
-const releaseType = isBeta ? '🧪 Beta' : '🚀 Stable';
+let buildVersion;
+let isBeta = false;
+let betaNum = 0;
 
-console.log(`\n📦 Synchronizing version: ${version} (${releaseType})\n`);
+const betaMatch = version.match(/^(\d+\.\d+\.\d+)-(b|beta)(\d*)$/);
+if (betaMatch) {
+  isBeta = true;
+  const baseVersion = betaMatch[1];
+  betaNum = betaMatch[3] ? parseInt(betaMatch[3], 10) : 1;
+  // For MSI: 1.1.0-b1 → 1.1.0.1
+  buildVersion = `${baseVersion}.${betaNum}`;
+} else {
+  // Stable: 1.1.0 → 1.1.0.0
+  buildVersion = `${version}.0`;
+}
+
+const releaseType = isBeta ? `🧪 Beta ${betaNum || ''}`.trim() : '🚀 Stable';
+
+console.log(`\n📦 Version: ${version} (${releaseType})`);
+console.log(`🔧 Build version: ${buildVersion}\n`);
 
 // package.json
 (() => {
@@ -61,7 +77,7 @@ console.log(`\n📦 Synchronizing version: ${version} (${releaseType})\n`);
   const packageJson = JSON.parse(readUtf8(packageJsonPath));
   packageJson.version = version;
   writeJson(packageJsonPath, packageJson);
-  logOk('Updated package.json');
+  logOk(`Updated package.json → ${version}`);
 })();
 
 // Cargo.toml
@@ -73,20 +89,20 @@ console.log(`\n📦 Synchronizing version: ${version} (${releaseType})\n`);
   }
   let cargoToml = readUtf8(cargoTomlPath);
   const inPackageRegex = /(\[package\][\s\S]*?^version\s*=\s*")([^"]+)(")/m;
-  let replaced = cargoToml.replace(inPackageRegex, `$1${version}$3`);
+  let replaced = cargoToml.replace(inPackageRegex, `$1${buildVersion}$3`);
 
   if (replaced === cargoToml) {
     const fallbackRegex = /^(\s*version\s*=\s*")[^"]+(")\s*$/m;
-    const fallback = cargoToml.replace(fallbackRegex, `$1${version}$2`);
+    const fallback = cargoToml.replace(fallbackRegex, `$1${buildVersion}$2`);
     if (fallback === cargoToml) {
       logWarn('Could not find version field to update in src-tauri/Cargo.toml');
     } else {
       writeUtf8(cargoTomlPath, fallback);
-      logOk('Updated src-tauri/Cargo.toml (fallback)');
+      logOk(`Updated src-tauri/Cargo.toml → ${buildVersion} (fallback)`);
     }
   } else {
     writeUtf8(cargoTomlPath, replaced);
-    logOk('Updated src-tauri/Cargo.toml');
+    logOk(`Updated src-tauri/Cargo.toml → ${buildVersion}`);
   }
 })();
 
@@ -101,15 +117,15 @@ console.log(`\n📦 Synchronizing version: ${version} (${releaseType})\n`);
 
   let updated = false;
   if (tauriConf.package && typeof tauriConf.package === 'object') {
-    if (tauriConf.package.version !== version) {
-      tauriConf.package.version = version;
+    if (tauriConf.package.version !== buildVersion) {
+      tauriConf.package.version = buildVersion;
       updated = true;
     }
   }
 
   if (Object.prototype.hasOwnProperty.call(tauriConf, 'version')) {
-    if (tauriConf.version !== version) {
-      tauriConf.version = version;
+    if (tauriConf.version !== buildVersion) {
+      tauriConf.version = buildVersion;
       updated = true;
     }
   }
@@ -122,7 +138,7 @@ console.log(`\n📦 Synchronizing version: ${version} (${releaseType})\n`);
     }
   } else {
     writeJson(tauriConfPath, tauriConf);
-    logOk('Updated src-tauri/tauri.conf.json');
+    logOk(`Updated src-tauri/tauri.conf.json → ${buildVersion}`);
   }
 })();
 
@@ -135,17 +151,19 @@ console.log(`\n📦 Synchronizing version: ${version} (${releaseType})\n`);
   }
 
   const readme = readUtf8(readmePath);
-  const badgeRegex = /(https:\/\/img\.shields\.io\/badge\/version-)([0-9]+\.[0-9]+\.[0-9]+(?:--?(?:b|beta)[0-9]*)?)(-[a-z0-9._-]+\.svg)/gi;
   const badgeVersion = version.replace(/-/g, '--');
+  const badgeRegex = /(https:\/\/img\.shields\.io\/badge\/version-)([0-9]+\.[0-9]+\.[0-9]+(?:--?(?:b|beta)[0-9]*)?)(-[a-z0-9._-]+\.svg)/gi;
   const updatedReadme = readme.replace(badgeRegex, `$1${badgeVersion}$3`);
 
   if (updatedReadme === readme) {
     logWarn('No shields.io version badge found in README.md — skipping badge update');
   } else {
     writeUtf8(readmePath, updatedReadme);
-    logOk('Updated README.md version badge');
+    logOk(`Updated README.md version badge → ${version}`);
   }
 })();
 
-console.log(`\n🎉 All files synchronized to version ${version}`);
-console.log(`\n📝 Git tag will be created automatically by GitHub Actions: v${version}\n`);
+console.log(`\n🎉 All files synchronized!`);
+console.log(`   Display version: ${version}`);
+console.log(`   Build version:   ${buildVersion}`);
+console.log(`\n📝 Git tag: v${version}\n`);
