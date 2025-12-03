@@ -6,7 +6,7 @@
 
 [![License: GPL v2](https://img.shields.io/badge/License-GPLv2.0-blue.svg)](https://www.gnu.org/licenses/gpl-2.0)
 [![License: LGPL v2.1](https://img.shields.io/badge/License-LGPLv2.1-blue.svg)](https://www.gnu.org/licenses/lgpl-2.1)
-[![Version](https://img.shields.io/badge/version-1.0.2-green.svg)](https://github.com/MuXolotl/MuXolotl-Converter/releases)
+[![Version](https://img.shields.io/badge/version-1.1.0--b-green.svg)](https://github.com/MuXolotl/MuXolotl-Converter/releases)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/MuXolotl/MuXolotl-Converter)
 [![Built with Tauri](https://img.shields.io/badge/Tauri-1.8.3-blue?logo=tauri)](https://tauri.app/)
 [![React](https://img.shields.io/badge/React-18.3-61DAFB?logo=react)](https://react.dev/)
