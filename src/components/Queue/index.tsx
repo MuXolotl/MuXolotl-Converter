@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo } from 'react';
+import { memo, useCallback, useMemo, useRef, useEffect, useState } from 'react';
 import { FixedSizeList as List } from 'react-window';
 import { APP_CONFIG } from '@/config';
 import DropZone from '@/components/DropZone';
@@ -16,8 +16,7 @@ interface QueueProps {
   onFilesAdded: (files: FileItem[]) => void;
 }
 
-const ROW_HEIGHT = 56;
-const HEADER_HEIGHT = 40;
+const ROW_HEIGHT = 48;
 
 function Queue({
   files,
@@ -29,6 +28,26 @@ function Queue({
   onRemoveSelected,
   onFilesAdded,
 }: QueueProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [listHeight, setListHeight] = useState(300);
+
+  useEffect(() => {
+    const updateHeight = () => {
+      if (containerRef.current) {
+        setListHeight(containerRef.current.offsetHeight);
+      }
+    };
+
+    updateHeight();
+    
+    const observer = new ResizeObserver(updateHeight);
+    if (containerRef.current) {
+      observer.observe(containerRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, []);
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Delete' || e.key === 'Backspace') {
       onRemoveSelected();
@@ -51,7 +70,7 @@ function Queue({
 
   if (files.length === 0) {
     return (
-      <div className="h-full flex flex-col items-center justify-center p-8 bg-[#1e293b]/30">
+      <div className="h-full flex flex-col items-center justify-center p-4 bg-[#1e293b]/30">
         <DropZone
           onFilesAdded={onFilesAdded}
           currentCount={0}
@@ -70,9 +89,9 @@ function Queue({
     >
       <QueueHeader />
 
-      <div className="flex-1 min-h-0">
+      <div ref={containerRef} className="flex-1 min-h-0">
         <List
-          height={window.innerHeight - 200}
+          height={listHeight}
           itemCount={files.length}
           itemSize={ROW_HEIGHT}
           width="100%"
@@ -99,14 +118,13 @@ function Queue({
 
 function QueueHeader() {
   return (
-    <div className="shrink-0 bg-[#0f172a] border-b border-white/10 select-none">
-      <div className="grid grid-cols-[40px_1fr_120px_100px_140px_50px] gap-2 px-3 py-2.5 text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
-        <div className="text-center">#</div>
-        <div>File Name</div>
-        <div className="pl-2">Format</div>
-        <div className="text-right pr-2">Size / Dur</div>
-        <div className="pl-2">Status</div>
-        <div />
+    <div className="shrink-0 bg-[#0f172a] border-b border-white/10 select-none px-2 py-1.5">
+      <div className="flex items-center gap-2 text-[9px] font-semibold text-slate-500 uppercase tracking-wider">
+        <div className="w-6 text-center">#</div>
+        <div className="flex-1 min-w-0">File</div>
+        <div className="w-16">Format</div>
+        <div className="w-20">Status</div>
+        <div className="w-6" />
       </div>
     </div>
   );

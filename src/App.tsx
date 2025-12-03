@@ -161,9 +161,9 @@ export default function App() {
     <ConversionContext.Provider value={conversion}>
       <div className="h-screen w-screen bg-[#0f172a] text-white flex flex-col overflow-hidden">
         <TitleBar />
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden min-h-0">
           <Sidebar onFeedbackClick={() => setFeedbackOpen(true)} />
-          <div className="flex-1 h-full overflow-hidden flex flex-col">
+          <div className="flex-1 h-full overflow-hidden flex flex-col min-w-0">
             <Toolbar
               stats={queue.stats}
               gpuInfo={gpuInfo}
@@ -171,11 +171,11 @@ export default function App() {
               outputFolder={outputFolder}
               onFolderChange={setOutputFolder}
             />
-            <div className="flex-1 min-h-0 relative">
+            <div className="flex-1 min-h-0">
               <SplitPane
-                initialLeftWidth={Math.min(window.innerWidth * 0.80, 1000)}
-                minLeftWidth={600}
-                maxLeftWidth={1400}
+                minLeftWidth={350}
+                minRightWidth={280}
+                defaultLeftRatio={0.6}
                 left={
                   <Queue
                     files={queue.sortedFiles}
