@@ -42,30 +42,18 @@ if (!/^\d+\.\d+\.\d+(-(b|beta)\d*)?$/.test(version)) {
   console.error('Expected formats:');
   console.error('  - Stable:  X.Y.Z (e.g., 1.0.0)');
   console.error('  - Beta:    X.Y.Z-b or X.Y.Z-b1 (e.g., 1.1.0-b, 1.1.0-b2)');
-  console.error('  - Beta:    X.Y.Z-beta or X.Y.Z-beta1 (e.g., 1.1.0-beta, 1.1.0-beta2)');
   process.exit(1);
 }
 
-let buildVersion;
-let isBeta = false;
-let betaNum = 0;
+const betaMatch = version.match(/^(\d+\.\d+\.\d+)(-(b|beta)(\d*))?$/);
+const baseVersion = betaMatch[1]; // 1.1.0
+const isBeta = !!betaMatch[2];
+const betaNum = betaMatch[4] || '';
 
-const betaMatch = version.match(/^(\d+\.\d+\.\d+)-(b|beta)(\d*)$/);
-if (betaMatch) {
-  isBeta = true;
-  const baseVersion = betaMatch[1];
-  betaNum = betaMatch[3] ? parseInt(betaMatch[3], 10) : 1;
-  // For MSI: 1.1.0-b1 → 1.1.0.1
-  buildVersion = `${baseVersion}.${betaNum}`;
-} else {
-  // Stable: 1.1.0 → 1.1.0.0
-  buildVersion = `${version}.0`;
-}
+const releaseType = isBeta ? `🧪 Beta${betaNum ? ' ' + betaNum : ''}` : '🚀 Stable';
 
-const releaseType = isBeta ? `🧪 Beta ${betaNum || ''}`.trim() : '🚀 Stable';
-
-console.log(`\n📦 Version: ${version} (${releaseType})`);
-console.log(`🔧 Build version: ${buildVersion}\n`);
+console.log(`\n📦 Display version: ${version} (${releaseType})`);
+console.log(`🔧 Build version: ${baseVersion}\n`);
 
 // package.json
 (() => {
@@ -89,20 +77,20 @@ console.log(`🔧 Build version: ${buildVersion}\n`);
   }
   let cargoToml = readUtf8(cargoTomlPath);
   const inPackageRegex = /(\[package\][\s\S]*?^version\s*=\s*")([^"]+)(")/m;
-  let replaced = cargoToml.replace(inPackageRegex, `$1${buildVersion}$3`);
+  let replaced = cargoToml.replace(inPackageRegex, `$1${baseVersion}$3`);
 
   if (replaced === cargoToml) {
     const fallbackRegex = /^(\s*version\s*=\s*")[^"]+(")\s*$/m;
-    const fallback = cargoToml.replace(fallbackRegex, `$1${buildVersion}$2`);
+    const fallback = cargoToml.replace(fallbackRegex, `$1${baseVersion}$2`);
     if (fallback === cargoToml) {
       logWarn('Could not find version field to update in src-tauri/Cargo.toml');
     } else {
       writeUtf8(cargoTomlPath, fallback);
-      logOk(`Updated src-tauri/Cargo.toml → ${buildVersion} (fallback)`);
+      logOk(`Updated src-tauri/Cargo.toml → ${baseVersion}`);
     }
   } else {
     writeUtf8(cargoTomlPath, replaced);
-    logOk(`Updated src-tauri/Cargo.toml → ${buildVersion}`);
+    logOk(`Updated src-tauri/Cargo.toml → ${baseVersion}`);
   }
 })();
 
@@ -117,15 +105,15 @@ console.log(`🔧 Build version: ${buildVersion}\n`);
 
   let updated = false;
   if (tauriConf.package && typeof tauriConf.package === 'object') {
-    if (tauriConf.package.version !== buildVersion) {
-      tauriConf.package.version = buildVersion;
+    if (tauriConf.package.version !== baseVersion) {
+      tauriConf.package.version = baseVersion;
       updated = true;
     }
   }
 
   if (Object.prototype.hasOwnProperty.call(tauriConf, 'version')) {
-    if (tauriConf.version !== buildVersion) {
-      tauriConf.version = buildVersion;
+    if (tauriConf.version !== baseVersion) {
+      tauriConf.version = baseVersion;
       updated = true;
     }
   }
@@ -138,7 +126,7 @@ console.log(`🔧 Build version: ${buildVersion}\n`);
     }
   } else {
     writeJson(tauriConfPath, tauriConf);
-    logOk(`Updated src-tauri/tauri.conf.json → ${buildVersion}`);
+    logOk(`Updated src-tauri/tauri.conf.json → ${baseVersion}`);
   }
 })();
 
@@ -165,5 +153,5 @@ console.log(`🔧 Build version: ${buildVersion}\n`);
 
 console.log(`\n🎉 All files synchronized!`);
 console.log(`   Display version: ${version}`);
-console.log(`   Build version:   ${buildVersion}`);
+console.log(`   Build version:   ${baseVersion}`);
 console.log(`\n📝 Git tag: v${version}\n`);
