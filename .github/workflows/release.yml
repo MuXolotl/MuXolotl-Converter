@@ -7,6 +7,12 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      force_prerelease:
+        description: 'Force pre-release (ignore VERSION format)'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -18,18 +24,55 @@ jobs:
     outputs:
       version: ${{ steps.read_version.outputs.version }}
       tag_name: ${{ steps.read_version.outputs.tag_name }}
+      is_prerelease: ${{ steps.read_version.outputs.is_prerelease }}
+      release_name: ${{ steps.read_version.outputs.release_name }}
+      version_label: ${{ steps.read_version.outputs.version_label }}
     
     steps:
       - name: 📥 Checkout repository
         uses: actions/checkout@v4
 
-      - name: 📖 Read VERSION file
+      - name: 📖 Read VERSION file and detect release type
         id: read_version
         run: |
           VERSION=$(cat VERSION | tr -d '[:space:]')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "tag_name=v$VERSION" >> $GITHUB_OUTPUT
+          
+          # Определяем тип: бета если есть -b или -beta (с опциональным номером)
+          if [[ "$VERSION" =~ -(b|beta)[0-9]*$ ]]; then
+            IS_PRERELEASE="true"
+            
+            # Извлекаем номер беты для красивого названия
+            if [[ "$VERSION" =~ -(b|beta)([0-9]+)$ ]]; then
+              BETA_NUM="${BASH_REMATCH[2]}"
+              LABEL="Beta $BETA_NUM"
+            else
+              LABEL="Beta"
+            fi
+            
+            RELEASE_NAME="MuXolotl Converter v$VERSION ($LABEL)"
+            echo "🧪 Detected BETA: $VERSION"
+          else
+            IS_PRERELEASE="false"
+            LABEL="Stable"
+            RELEASE_NAME="MuXolotl Converter v$VERSION"
+            echo "🚀 Detected STABLE: $VERSION"
+          fi
+          
+          # Принудительный пре-релиз через workflow_dispatch
+          if [ "${{ inputs.force_prerelease }}" == "true" ]; then
+            IS_PRERELEASE="true"
+            echo "⚠️ Forced pre-release via workflow input"
+          fi
+          
+          echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
+          echo "release_name=$RELEASE_NAME" >> $GITHUB_OUTPUT
+          echo "version_label=$LABEL" >> $GITHUB_OUTPUT
+          
           echo "📦 Version: $VERSION"
+          echo "🏷️ Label: $LABEL"
+          echo "🔖 Pre-release: $IS_PRERELEASE"
 
       - name: 📦 Setup Node.js
         uses: actions/setup-node@v4
@@ -294,15 +337,17 @@ jobs:
           
           echo "✅ Artifact processing complete"
 
-      - name: 📤 Upload release artifacts
+      # Релиз для СТАБИЛЬНОЙ версии
+      - name: 📤 Upload STABLE release
+        if: needs.prepare.outputs.is_prerelease == 'false'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.prepare.outputs.tag_name }}
-          name: "MuXolotl Converter v${{ needs.prepare.outputs.version }}"
+          name: ${{ needs.prepare.outputs.release_name }}
           body: |
             <div align="center">
 
-            # 🦎 MuXolotl-Converter v1.0.2
+            # 🦎 MuXolotl Converter v${{ needs.prepare.outputs.version }}
 
             **High-Performance Audio & Video Converter**
 
@@ -312,11 +357,11 @@ jobs:
 
             | OS | Link to installer file | FFmpeg Binaries |
             |-|-|-|
-            | Windows Installer ***(Recommended)*** | [**MuXolotl-Converter-1.0.2-windows-x64-setup.msi**](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/v1.0.2/MuXolotl-Converter-1.0.2-windows-x64-setup.msi) | [ffmpeg-windows-x64.zip](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/v1.0.2/ffmpeg-windows-x64.zip) |
-            | Windows Portable | [**MuXolotl-Converter-1.0.2-windows-x64-portable.exe**](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/v1.0.2/MuXolotl-Converter-1.0.2-windows-x64-portable.exe) | [ffmpeg-windows-x64.zip](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/v1.0.2/ffmpeg-windows-x64.zip) |
-            | macOS Intel (x64) | [**MuXolotl-Converter-1.0.2-macos-intel.dmg**](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/v1.0.2/MuXolotl-Converter-1.0.2-macos-intel.dmg) | [ffmpeg-macos-intel.zip](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/v1.0.2/ffmpeg-macos-intel.zip) |
-            | macOS  Apple Silicon (M1/M2/M3) | [**MuXolotl-Converter-1.0.2-macos-apple-silicon.dmg**](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/v1.0.2/MuXolotl-Converter-1.0.2-macos-apple-silicon.dmg) | [ffmpeg-macos-arm64.zip](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/v1.0.2/ffmpeg-macos-arm64.zip) |
-            | Linux (Debian/Ubuntu) | [**MuXolotl-Converter-1.0.2-linux-x64.deb**](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/v1.0.2/MuXolotl-Converter-1.0.2-linux-x64.deb) | [ffmpeg-linux-x64.tar.gz](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/v1.0.2/ffmpeg-linux-x64.tar.gz) |
+            | Windows Installer ***(Recommended)*** | [**MuXolotl-Converter-${{ needs.prepare.outputs.version }}-windows-x64-setup.msi**](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/${{ needs.prepare.outputs.tag_name }}/MuXolotl-Converter-${{ needs.prepare.outputs.version }}-windows-x64-setup.msi) | [ffmpeg-windows-x64.zip](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/${{ needs.prepare.outputs.tag_name }}/ffmpeg-windows-x64.zip) |
+            | Windows Portable | [**MuXolotl-Converter-${{ needs.prepare.outputs.version }}-windows-x64-portable.exe**](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/${{ needs.prepare.outputs.tag_name }}/MuXolotl-Converter-${{ needs.prepare.outputs.version }}-windows-x64-portable.exe) | [ffmpeg-windows-x64.zip](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/${{ needs.prepare.outputs.tag_name }}/ffmpeg-windows-x64.zip) |
+            | macOS Intel (x64) | [**MuXolotl-Converter-${{ needs.prepare.outputs.version }}-macos-intel.dmg**](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/${{ needs.prepare.outputs.tag_name }}/MuXolotl-Converter-${{ needs.prepare.outputs.version }}-macos-intel.dmg) | [ffmpeg-macos-intel.zip](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/${{ needs.prepare.outputs.tag_name }}/ffmpeg-macos-intel.zip) |
+            | macOS Apple Silicon (M1/M2/M3) | [**MuXolotl-Converter-${{ needs.prepare.outputs.version }}-macos-apple-silicon.dmg**](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/${{ needs.prepare.outputs.tag_name }}/MuXolotl-Converter-${{ needs.prepare.outputs.version }}-macos-apple-silicon.dmg) | [ffmpeg-macos-arm64.zip](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/${{ needs.prepare.outputs.tag_name }}/ffmpeg-macos-arm64.zip) |
+            | Linux (Debian/Ubuntu) | [**MuXolotl-Converter-${{ needs.prepare.outputs.version }}-linux-x64.deb**](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/${{ needs.prepare.outputs.tag_name }}/MuXolotl-Converter-${{ needs.prepare.outputs.version }}-linux-x64.deb) | [ffmpeg-linux-x64.tar.gz](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/${{ needs.prepare.outputs.tag_name }}/ffmpeg-linux-x64.tar.gz) |
 
             ---
 
@@ -326,6 +371,61 @@ jobs:
             </div>
           draft: false
           prerelease: false
+          files: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/msi/MuXolotl-Converter-${{ needs.prepare.outputs.version }}-windows-x64-setup.msi
+            src-tauri/target/${{ matrix.target }}/release/bundle/nsis/MuXolotl-Converter-${{ needs.prepare.outputs.version }}-windows-x64-portable.exe
+            src-tauri/target/${{ matrix.target }}/release/bundle/deb/MuXolotl-Converter-${{ needs.prepare.outputs.version }}-linux-x64.deb
+            src-tauri/target/${{ matrix.target }}/release/bundle/dmg/MuXolotl-Converter-${{ needs.prepare.outputs.version }}-macos-intel.dmg
+            src-tauri/target/${{ matrix.target }}/release/bundle/dmg/MuXolotl-Converter-${{ needs.prepare.outputs.version }}-macos-apple-silicon.dmg
+            ffmpeg-windows-x64.zip
+            ffmpeg-linux-x64.tar.gz
+            ffmpeg-macos-intel.zip
+            ffmpeg-macos-arm64.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Релиз для БЕТА версии
+      - name: 📤 Upload BETA release
+        if: needs.prepare.outputs.is_prerelease == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag_name }}
+          name: ${{ needs.prepare.outputs.release_name }}
+          body: |
+            <div align="center">
+
+            # 🧪 MuXolotl Converter v${{ needs.prepare.outputs.version }}
+
+            ### ⚠️ This is a ${{ needs.prepare.outputs.version_label }} release
+
+            **For testing purposes only. May contain bugs.**
+
+            ---
+
+            ## 📦 Download MuXolotl-Converter (${{ needs.prepare.outputs.version_label }})
+
+            | OS | Link to installer file | FFmpeg Binaries |
+            |-|-|-|
+            | Windows Installer ***(Recommended)*** | [**MuXolotl-Converter-${{ needs.prepare.outputs.version }}-windows-x64-setup.msi**](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/${{ needs.prepare.outputs.tag_name }}/MuXolotl-Converter-${{ needs.prepare.outputs.version }}-windows-x64-setup.msi) | [ffmpeg-windows-x64.zip](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/${{ needs.prepare.outputs.tag_name }}/ffmpeg-windows-x64.zip) |
+            | Windows Portable | [**MuXolotl-Converter-${{ needs.prepare.outputs.version }}-windows-x64-portable.exe**](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/${{ needs.prepare.outputs.tag_name }}/MuXolotl-Converter-${{ needs.prepare.outputs.version }}-windows-x64-portable.exe) | [ffmpeg-windows-x64.zip](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/${{ needs.prepare.outputs.tag_name }}/ffmpeg-windows-x64.zip) |
+            | macOS Intel (x64) | [**MuXolotl-Converter-${{ needs.prepare.outputs.version }}-macos-intel.dmg**](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/${{ needs.prepare.outputs.tag_name }}/MuXolotl-Converter-${{ needs.prepare.outputs.version }}-macos-intel.dmg) | [ffmpeg-macos-intel.zip](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/${{ needs.prepare.outputs.tag_name }}/ffmpeg-macos-intel.zip) |
+            | macOS Apple Silicon (M1/M2/M3) | [**MuXolotl-Converter-${{ needs.prepare.outputs.version }}-macos-apple-silicon.dmg**](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/${{ needs.prepare.outputs.tag_name }}/MuXolotl-Converter-${{ needs.prepare.outputs.version }}-macos-apple-silicon.dmg) | [ffmpeg-macos-arm64.zip](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/${{ needs.prepare.outputs.tag_name }}/ffmpeg-macos-arm64.zip) |
+            | Linux (Debian/Ubuntu) | [**MuXolotl-Converter-${{ needs.prepare.outputs.version }}-linux-x64.deb**](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/${{ needs.prepare.outputs.tag_name }}/MuXolotl-Converter-${{ needs.prepare.outputs.version }}-linux-x64.deb) | [ffmpeg-linux-x64.tar.gz](https://github.com/MuXolotl/MuXolotl-Converter/releases/download/${{ needs.prepare.outputs.tag_name }}/ffmpeg-linux-x64.tar.gz) |
+
+            ---
+
+            ## 🐛 Found a bug?
+
+            Please [open an issue](https://github.com/MuXolotl/MuXolotl-Converter/issues/new) with details.
+
+            ---
+
+            **License**: GPL v2 / LGPL v2.1  
+            **Built with**: Tauri • React • FFmpeg • Rust
+
+            </div>
+          draft: false
+          prerelease: true
           files: |
             src-tauri/target/${{ matrix.target }}/release/bundle/msi/MuXolotl-Converter-${{ needs.prepare.outputs.version }}-windows-x64-setup.msi
             src-tauri/target/${{ matrix.target }}/release/bundle/nsis/MuXolotl-Converter-${{ needs.prepare.outputs.version }}-windows-x64-portable.exe
