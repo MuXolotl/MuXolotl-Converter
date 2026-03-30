@@ -12,7 +12,7 @@ use tokio::process::Child;
 use tokio::sync::Mutex;
 
 pub async fn convert(
-    window: tauri::Window,
+    window: tauri::WebviewWindow,
     input: &str,
     output: &str,
     format: &str,

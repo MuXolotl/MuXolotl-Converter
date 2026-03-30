@@ -1,6 +1,7 @@
 use crate::error::{AppError, AppResult, ErrorCode};
 use std::path::PathBuf;
 use tauri::AppHandle;
+use tauri::Manager;
 
 fn get_binary_suffix() -> &'static str {
     #[cfg(target_os = "windows")]
@@ -19,9 +20,10 @@ fn get_binary_suffix() -> &'static str {
 pub fn get_binary_path(app_handle: &AppHandle, name: &str) -> AppResult<PathBuf> {
     let suffix = get_binary_suffix();
     let full_name = format!("{}{}", name, suffix);
-
     let resource_path = format!("binaries/{}", full_name);
-    if let Some(path) = app_handle.path_resolver().resolve_resource(&resource_path) {
+
+    if let Ok(resource_dir) = app_handle.path().resource_dir() {
+        let path = resource_dir.join(&resource_path);
         if path.exists() {
             return Ok(path);
         }

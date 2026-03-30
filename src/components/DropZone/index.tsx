@@ -1,10 +1,15 @@
 import { memo, useCallback, useState, useEffect } from 'react';
 import { Upload } from 'lucide-react';
-import { open } from '@tauri-apps/api/dialog';
+import { open } from '@tauri-apps/plugin-dialog';
 import { listen } from '@tauri-apps/api/event';
 import { MEDIA_EXTENSIONS } from '@/constants';
 import { processFilePaths } from '@/utils/fileHelpers';
 import type { FileItem } from '@/types';
+
+interface DragDropPayload {
+  paths: string[];
+  position: { x: number; y: number };
+}
 
 interface DropZoneProps {
   onFilesAdded: (files: FileItem[]) => void;
@@ -36,7 +41,8 @@ function DropZone({ onFilesAdded, currentCount, maxCount, compact = false }: Dro
         filters: [{ name: 'Media Files', extensions: [...MEDIA_EXTENSIONS] }],
       });
       if (selected) {
-        await handlePaths(Array.isArray(selected) ? selected : [selected]);
+        const paths = Array.isArray(selected) ? selected : [selected];
+        await handlePaths(paths);
       }
     } catch (error) {
       console.error('File selection error:', error);
@@ -44,11 +50,12 @@ function DropZone({ onFilesAdded, currentCount, maxCount, compact = false }: Dro
   }, [handlePaths, currentCount, maxCount]);
 
   useEffect(() => {
-    const unlistenDrop = listen<string[]>('tauri://file-drop', async event => {
-      await handlePaths(event.payload);
+    const unlistenDrop = listen<DragDropPayload>('tauri://drag-drop', async event => {
+      setIsDragging(false);
+      await handlePaths(event.payload.paths);
     });
-    const unlistenHover = listen('tauri://file-drop-hover', () => setIsDragging(true));
-    const unlistenCancel = listen('tauri://file-drop-cancelled', () => setIsDragging(false));
+    const unlistenHover = listen<DragDropPayload>('tauri://drag-over', () => setIsDragging(true));
+    const unlistenCancel = listen('tauri://drag-leave', () => setIsDragging(false));
 
     return () => {
       unlistenDrop.then(fn => fn());

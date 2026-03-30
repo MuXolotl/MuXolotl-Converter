@@ -11,7 +11,7 @@ use tokio::process::Child;
 use tokio::sync::Mutex;
 
 pub async fn convert(
-    window: tauri::Window,
+    window: tauri::WebviewWindow,
     input: &str,
     output: &str,
     format: &str,
@@ -39,7 +39,7 @@ pub async fn convert(
 }
 
 pub async fn extract_from_video(
-    window: tauri::Window,
+    window: tauri::WebviewWindow,
     input: &str,
     output: &str,
     format: &str,

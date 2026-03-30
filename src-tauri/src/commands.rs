@@ -8,7 +8,7 @@ use crate::utils;
 use crate::validator::{self, ValidationResult};
 use crate::AppState;
 use serde_json::{json, Value};
-use tauri::{Manager, State};
+use tauri::{Emitter, Manager, State};
 use tokio::sync::OnceCell;
 
 static GPU_CACHE: OnceCell<GpuInfo> = OnceCell::const_new();
@@ -16,12 +16,12 @@ static AUDIO_FORMATS_CACHE: OnceCell<Vec<audio::AudioFormat>> = OnceCell::const_
 static VIDEO_FORMATS_CACHE: OnceCell<Vec<video::VideoFormat>> = OnceCell::const_new();
 
 #[tauri::command]
-pub async fn window_minimize(window: tauri::Window) -> Result<(), String> {
+pub async fn window_minimize(window: tauri::WebviewWindow) -> Result<(), String> {
     window.minimize().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn window_maximize(window: tauri::Window) -> Result<(), String> {
+pub async fn window_maximize(window: tauri::WebviewWindow) -> Result<(), String> {
     if window.is_maximized().unwrap_or(false) {
         window.unmaximize().map_err(|e| e.to_string())
     } else {
@@ -30,23 +30,23 @@ pub async fn window_maximize(window: tauri::Window) -> Result<(), String> {
 }
 
 #[tauri::command]
-pub async fn window_close(window: tauri::Window) -> Result<(), String> {
+pub async fn window_close(window: tauri::WebviewWindow) -> Result<(), String> {
     window.close().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn window_is_maximized(window: tauri::Window) -> Result<bool, String> {
+pub async fn window_is_maximized(window: tauri::WebviewWindow) -> Result<bool, String> {
     window.is_maximized().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
-pub async fn close_splash(window: tauri::Window) {
-    if let Some(main) = window.get_window("main") {
+pub async fn close_splash(window: tauri::WebviewWindow) {
+    if let Some(main) = window.get_webview_window("main") {
         let _ = main.maximize();
         let _ = main.show();
         let _ = main.set_focus();
     }
-    if let Some(splash) = window.get_window("splashscreen") {
+    if let Some(splash) = window.get_webview_window("splashscreen") {
         let _ = splash.close();
     }
 }
@@ -186,7 +186,7 @@ pub fn validate_conversion(
 #[tauri::command]
 pub async fn convert_audio(
     state: State<'_, AppState>,
-    window: tauri::Window,
+    window: tauri::WebviewWindow,
     input: String,
     output: String,
     format: String,
@@ -208,7 +208,7 @@ pub async fn convert_audio(
 #[tauri::command]
 pub async fn convert_video(
     state: State<'_, AppState>,
-    window: tauri::Window,
+    window: tauri::WebviewWindow,
     input: String,
     output: String,
     format: String,
@@ -232,7 +232,7 @@ pub async fn convert_video(
 #[tauri::command]
 pub async fn extract_audio(
     state: State<'_, AppState>,
-    window: tauri::Window,
+    window: tauri::WebviewWindow,
     input: String,
     output: String,
     format: String,
@@ -259,7 +259,7 @@ pub async fn cancel_conversion(state: State<'_, AppState>, task_id: String) -> R
     Ok(())
 }
 
-pub async fn init_caches(window: &tauri::Window) {
+pub async fn init_caches(window: &tauri::WebviewWindow) {
     let gpu = GPU_CACHE
         .get_or_init(|| async { gpu::detect_gpu().await })
         .await;

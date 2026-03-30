@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 import { APP_CONFIG } from '@/config';
 import type { FileItem, AudioFormat, VideoFormat, ValidationResult, RecommendedFormats } from '@/types';
 
@@ -11,7 +11,6 @@ export function useFileSettings(file: FileItem | null) {
   const mountedRef = useRef(true);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // const isVideo = file?.mediaInfo?.media_type === 'video';
   const isAudio = file?.mediaInfo?.media_type === 'audio';
   const extractAudio = file?.settings.extractAudioOnly;
 

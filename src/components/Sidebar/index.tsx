@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { Layers, MessageSquarePlus, Github } from 'lucide-react';
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 import { APP_CONFIG } from '@/config';
 
 interface SidebarProps {

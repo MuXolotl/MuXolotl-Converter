@@ -1,5 +1,5 @@
 import { memo, useState, useEffect, useCallback } from 'react';
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 import { Minus, Square, X, Maximize2 } from 'lucide-react';
 import { APP_CONFIG } from '@/config';
 

@@ -12,7 +12,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::process::Stdio;
 use std::sync::Arc;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Child;
 use tokio::sync::Mutex;
@@ -32,7 +32,7 @@ pub struct ConversionProgress {
 }
 
 pub async fn spawn_ffmpeg(
-    window: tauri::Window,
+    window: tauri::WebviewWindow,
     task_id: String,
     duration: f64,
     args: Vec<String>,
@@ -120,7 +120,7 @@ async fn cleanup_failed(path: &str) {
     }
 }
 
-fn emit_error(window: &tauri::Window, task_id: &str, error: &str) {
+fn emit_error(window: &tauri::WebviewWindow, task_id: &str, error: &str) {
     let _ = window.emit(
         "conversion-error",
         serde_json::json!({

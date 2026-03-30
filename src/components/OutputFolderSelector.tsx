@@ -1,6 +1,6 @@
 import { memo, useCallback } from 'react';
-import { open as openDialog } from '@tauri-apps/api/dialog';
-import { invoke } from '@tauri-apps/api/tauri';
+import { open as openDialog } from '@tauri-apps/plugin-dialog';
+import { invoke } from '@tauri-apps/api/core';
 import { FolderOpen, ExternalLink } from 'lucide-react';
 import { truncatePath } from '@/utils';
 

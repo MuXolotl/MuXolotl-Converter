@@ -104,12 +104,6 @@ console.log(`🔧 Build version: ${baseVersion}\n`);
   const tauriConf = JSON.parse(readUtf8(tauriConfPath));
 
   let updated = false;
-  if (tauriConf.package && typeof tauriConf.package === 'object') {
-    if (tauriConf.package.version !== baseVersion) {
-      tauriConf.package.version = baseVersion;
-      updated = true;
-    }
-  }
 
   if (Object.prototype.hasOwnProperty.call(tauriConf, 'version')) {
     if (tauriConf.version !== baseVersion) {
@@ -118,9 +112,16 @@ console.log(`🔧 Build version: ${baseVersion}\n`);
     }
   }
 
+  if (tauriConf.package && typeof tauriConf.package === 'object') {
+    if (tauriConf.package.version !== baseVersion) {
+      tauriConf.package.version = baseVersion;
+      updated = true;
+    }
+  }
+
   if (!updated) {
-    if (!(tauriConf.package && tauriConf.package.version) && !('version' in tauriConf)) {
-      logWarn('No version field found in src-tauri/tauri.conf.json — consider adding package.version');
+    if (!('version' in tauriConf) && !(tauriConf.package && tauriConf.package.version)) {
+      logWarn('No version field found in src-tauri/tauri.conf.json — consider adding root-level version');
     } else {
       logWarn('tauri.conf.json version already up to date — no changes');
     }

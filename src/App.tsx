@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, createContext } from 'react';
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 import { useGpu } from '@/hooks/useGpu';
 import { useFileQueue } from '@/hooks/useFileQueue';
 import { useConversion } from '@/hooks/useConversion';

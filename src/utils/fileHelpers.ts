@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 import { generateFileId, getDefaultFormat, getDefaultSettings } from '@/utils';
 import type { FileItem, MediaInfo } from '@/types';
 
