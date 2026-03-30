@@ -17,37 +17,89 @@ fn get_binary_suffix() -> &'static str {
     return "-x86_64-unknown-linux-gnu";
 }
 
+fn get_plain_binary_name(name: &str) -> &'static str {
+    #[cfg(target_os = "windows")]
+    match name {
+        "ffmpeg" => return "ffmpeg.exe",
+        "ffprobe" => return "ffprobe.exe",
+        _ => return "",
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    match name {
+        "ffmpeg" => return "ffmpeg",
+        "ffprobe" => return "ffprobe",
+        _ => return "",
+    }
+}
+
 pub fn get_binary_path(app_handle: &AppHandle, name: &str) -> AppResult<PathBuf> {
     let suffix = get_binary_suffix();
     let full_name = format!("{}{}", name, suffix);
-    let resource_path = format!("binaries/{}", full_name);
+    let plain_name = get_plain_binary_name(name);
 
+    let mut candidates: Vec<PathBuf> = Vec::new();
+
+    // 1. Tauri resource directory (production bundles: macOS .app, Linux .deb/AppImage)
     if let Ok(resource_dir) = app_handle.path().resource_dir() {
-        let path = resource_dir.join(&resource_path);
-        if path.exists() {
-            return Ok(path);
+        candidates.push(resource_dir.join("binaries").join(&full_name));
+        candidates.push(resource_dir.join(&full_name));
+        if !plain_name.is_empty() {
+            candidates.push(resource_dir.join("binaries").join(plain_name));
+            candidates.push(resource_dir.join(plain_name));
         }
     }
 
-    if let Ok(cwd) = std::env::current_dir() {
-        let candidates = [
-            cwd.join("binaries").join(&full_name),
-            cwd.join("src-tauri").join("binaries").join(&full_name),
-            cwd.join("..").join("src-tauri").join("binaries").join(&full_name),
-        ];
-
-        for path in candidates {
-            if path.exists() {
-                return Ok(path);
+    // 2. Next to the executable itself (Windows NSIS/MSI install)
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            candidates.push(exe_dir.join(&full_name));
+            candidates.push(exe_dir.join("binaries").join(&full_name));
+            if !plain_name.is_empty() {
+                candidates.push(exe_dir.join(plain_name));
+                candidates.push(exe_dir.join("binaries").join(plain_name));
             }
         }
     }
 
+    // 3. Current working directory (dev mode)
+    if let Ok(cwd) = std::env::current_dir() {
+        candidates.push(cwd.join("binaries").join(&full_name));
+        candidates.push(cwd.join("src-tauri").join("binaries").join(&full_name));
+        candidates.push(
+            cwd.join("..")
+                .join("src-tauri")
+                .join("binaries")
+                .join(&full_name),
+        );
+        if !plain_name.is_empty() {
+            candidates.push(cwd.join("binaries").join(plain_name));
+        }
+    }
+
+    for path in &candidates {
+        if path.exists() {
+            return Ok(path.clone());
+        }
+    }
+
+    let searched = candidates
+        .iter()
+        .map(|p| p.display().to_string())
+        .collect::<Vec<_>>()
+        .join("; ");
+
     Err(AppError::new(
         ErrorCode::BinaryNotFound,
-        format!("Binary '{}' not found. Expected: {}", name, full_name),
+        format!(
+            "Binary '{}' not found. Searched: {}",
+            name, searched
+        ),
     )
-    .with_details("Please ensure FFmpeg binaries are placed in src-tauri/binaries/"))
+    .with_details(format!(
+        "Expected filename: '{}' or '{}'. Searched paths: {}",
+        full_name, plain_name, searched
+    )))
 }
 
 pub fn get_ffmpeg_path(app: &AppHandle) -> AppResult<PathBuf> {

@@ -41,8 +41,15 @@ interface ErrorState {
   gpuInfo?: GpuInfo;
 }
 
+interface FfmpegError {
+  code?: string;
+  message: string;
+  details?: string;
+}
+
 export default function App() {
   const [ffmpegReady, setFfmpegReady] = useState<boolean | null>(null);
+  const [ffmpegError, setFfmpegError] = useState<FfmpegError | null>(null);
   const [outputFolder, setOutputFolder] = useState('');
   const [isLoaded, setIsLoaded] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -88,8 +95,19 @@ export default function App() {
         if (saved) setOutputFolder(saved);
         setIsLoaded(true);
         setTimeout(() => invoke('close_splash').catch(() => {}), 500);
-      } catch {
+      } catch (err: unknown) {
         setFfmpegReady(false);
+
+        // err from Tauri is a JSON string with { code, message, details }
+        let parsed: FfmpegError = { message: String(err) };
+        if (typeof err === 'string') {
+          try {
+            parsed = JSON.parse(err) as FfmpegError;
+          } catch {
+            parsed = { message: err };
+          }
+        }
+        setFfmpegError(parsed);
         setIsLoaded(true);
         invoke('close_splash').catch(() => {});
       }
@@ -148,10 +166,24 @@ export default function App() {
   if (ffmpegReady === false) {
     return (
       <div className="h-screen w-screen bg-[#0f172a] text-white flex items-center justify-center">
-        <div className="text-center p-8">
+        <div className="max-w-lg w-full text-center p-8">
           <div className="text-6xl mb-4">⚠️</div>
           <h1 className="text-xl font-bold mb-2">FFmpeg Not Found</h1>
-          <p className="text-white/60">Please ensure FFmpeg binaries are installed.</p>
+          <p className="text-white/60 mb-4">
+            Place <code className="text-blue-400">ffmpeg.exe</code> and{' '}
+            <code className="text-blue-400">ffprobe.exe</code> in the same folder as the application.
+          </p>
+
+          {ffmpegError && (
+            <details className="text-left mt-4">
+              <summary className="text-white/40 text-xs cursor-pointer hover:text-white/60 transition-colors mb-2">
+                Show diagnostic info
+              </summary>
+              <div className="bg-black/40 border border-white/10 rounded-lg p-3 text-xs font-mono text-white/50 break-all whitespace-pre-wrap">
+                {ffmpegError.details || ffmpegError.message}
+              </div>
+            </details>
+          )}
         </div>
       </div>
     );
