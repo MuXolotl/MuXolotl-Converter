@@ -4,11 +4,10 @@
 
 **High-Performance Cross-Platform Audio & Video Converter**
 
-[![License: GPL v2](https://img.shields.io/badge/License-GPLv2.0-blue.svg)](https://www.gnu.org/licenses/gpl-2.0)
-[![License: LGPL v2.1](https://img.shields.io/badge/License-LGPLv2.1-blue.svg)](https://www.gnu.org/licenses/lgpl-2.1)
-[![Version](https://img.shields.io/badge/version-1.1.0-green.svg)](https://github.com/MuXolotl/MuXolotl-Converter/releases)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/MuXolotl/MuXolotl-Converter)
-[![Built with Tauri](https://img.shields.io/badge/Tauri-1.8.3-blue?logo=tauri)](https://tauri.app/)
+[![License: GPL v2](https://img.shields.io/badge/License-GPLv2.0-blue.svg)](https://www.gnu.org/licenses/gpl-2.0)[![License: LGPL v2.1](https://img.shields.io/badge/LGPLv2.1-blue.svg)](https://www.gnu.org/licenses/lgpl-2.1)
+[![Version](https://img.shields.io/badge/Version-1.1.0-green.svg)](https://github.com/MuXolotl/MuXolotl-Converter/releases)
+[![Platform](https://img.shields.io/badge/Platform-Windows_|_macOS_|_Linux-lightgrey.svg)](https://github.com/MuXolotl/MuXolotl-Converter)
+[![Built with Tauri](https://img.shields.io/badge/Tauri-2.10.1-blue?logo=tauri)](https://tauri.app/)
 [![React](https://img.shields.io/badge/React-18.3-61DAFB?logo=react)](https://react.dev/)
 [![Rust](https://img.shields.io/badge/Rust-2021-orange?logo=rust)](https://www.rust-lang.org/)
 
