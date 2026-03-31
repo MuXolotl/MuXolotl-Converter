@@ -2,24 +2,25 @@
   "compilerOptions": {
     "target": "ES2020",
     "useDefineForClassFields": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "module": "ESNext",
-    "skipLibCheck": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
-    "noEmit": true,
-    "jsx": "react-jsx",
     "strict": true,
+    "noEmit": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
-    "paths": { "@/*": ["./src/*"] },
-    "incremental": true,
-    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.tsbuildinfo"
+    "paths": { "@/*": ["./src/*"] }
   },
-  "include": ["src"],
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.svelte.ts",
+    "src/**/*.svelte"
+  ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

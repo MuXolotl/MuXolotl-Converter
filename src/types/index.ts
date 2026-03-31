@@ -138,16 +138,6 @@ export interface FileItem {
   addedAt: number;
 }
 
-export interface ConversionContextType {
-  isConverting: boolean;
-  activeCount: number;
-  startConversion: (file: FileItem) => Promise<void>;
-  startAll: () => Promise<void>;
-  cancelConversion: (fileId: string) => Promise<void>;
-  cancelAll: () => Promise<void>;
-  updateFile: (fileId: string, updates: Partial<FileItem>) => void;
-}
-
 export interface QueueStats {
   total: number;
   pending: number;
