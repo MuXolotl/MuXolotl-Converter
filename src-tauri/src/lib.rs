@@ -1,4 +1,5 @@
 mod binary;
+mod codec_registry;
 mod commands;
 mod converter;
 mod error;
@@ -51,6 +52,13 @@ pub fn run() {
             commands::cancel_conversion,
         ])
         .setup(|app| {
+            // Initialize codec registry as early as possible if FFmpeg is available
+            if let Ok(ffmpeg_path) = get_ffmpeg_path(&app.handle()) {
+                if let Some(ffmpeg) = ffmpeg_path.to_str() {
+                    codec_registry::init(ffmpeg);
+                }
+            }
+
             let main_window = app.get_webview_window("main");
             let state = app.state::<AppState>();
             let processes = state.active_processes.clone();

@@ -5,7 +5,7 @@
 
 export const APP_CONFIG = {
   name: 'MuXolotl-Converter',
-  version: '1.0.2',
+  version: '1.2.0',
   
   github: {
     repo: 'https://github.com/MuXolotl/MuXolotl-Converter',

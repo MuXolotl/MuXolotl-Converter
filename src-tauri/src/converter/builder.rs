@@ -1,4 +1,3 @@
-use crate::gpu::GpuInfo;
 use crate::types::{FileMetadata, Quality};
 use std::path::PathBuf;
 
@@ -7,6 +6,7 @@ pub struct FfmpegBuilder {
     output: PathBuf,
     args: Vec<String>,
     filters: Vec<String>,
+    filter_complex: Option<String>,
 }
 
 impl FfmpegBuilder {
@@ -16,6 +16,7 @@ impl FfmpegBuilder {
             output: PathBuf::from(output),
             args: Vec::with_capacity(32),
             filters: Vec::with_capacity(4),
+            filter_complex: None,
         }
     }
 
@@ -93,7 +94,12 @@ impl FfmpegBuilder {
         self.arg("-r", &fps.to_string())
     }
 
-    pub fn resolution(mut self, width: Option<u32>, height: Option<u32>, force_exact: bool) -> Self {
+    pub fn resolution(
+        mut self,
+        width: Option<u32>,
+        height: Option<u32>,
+        force_exact: bool,
+    ) -> Self {
         match (width, height) {
             (Some(w), Some(h)) => {
                 if force_exact {
@@ -113,16 +119,24 @@ impl FfmpegBuilder {
         self
     }
 
+    /// Scale to fit within a bounding box while maintaining aspect ratio.
+    /// Output dimensions are rounded to even numbers (required by most codecs).
+    /// Used for auto-downscaling when source exceeds format's max_resolution.
+    pub fn resolution_fit(mut self, max_w: u32, max_h: u32) -> Self {
+        self.filters.push(format!(
+            "scale='min({},iw)':'min({},ih)':force_original_aspect_ratio=decrease,scale=trunc(iw/2)*2:trunc(ih/2)*2",
+            max_w, max_h
+        ));
+        self
+    }
+
     pub fn pixel_format(mut self, fmt: &str) -> Self {
         self.filters.push(format!("format={}", fmt));
         self
     }
 
-    pub fn hwaccel(mut self, gpu: &GpuInfo) -> Self {
-        for (key, value) in gpu.hwaccel_args() {
-            self.args.push(key.to_string());
-            self.args.push(value.to_string());
-        }
+    pub fn filter_complex(mut self, fc: &str) -> Self {
+        self.filter_complex = Some(fc.to_string());
         self
     }
 
@@ -134,6 +148,8 @@ impl FfmpegBuilder {
         self.args.extend(args);
         self
     }
+
+    // ========== Codec-specific presets ==========
 
     pub fn x264_preset(self, quality: Quality) -> Self {
         self.arg("-preset", quality.video_preset())
@@ -153,7 +169,6 @@ impl FfmpegBuilder {
             Quality::Ultra => "p7",
             Quality::Custom => "p4",
         };
-
         self.arg("-preset", preset)
             .arg("-rc", "vbr")
             .arg("-cq", quality.video_crf())
@@ -170,11 +185,9 @@ impl FfmpegBuilder {
         let (usage, qual_profile) = match quality {
             Quality::Low => ("transcoding", "speed"),
             Quality::Medium => ("transcoding", "balanced"),
-            Quality::High => ("transcoding", "quality"),
-            Quality::Ultra => ("transcoding", "quality"),
+            Quality::High | Quality::Ultra => ("transcoding", "quality"),
             Quality::Custom => ("transcoding", "balanced"),
         };
-
         self.arg("-usage", usage)
             .arg("-quality", qual_profile)
             .arg("-profile:v", "main")
@@ -191,35 +204,141 @@ impl FfmpegBuilder {
             Quality::Ultra => "15",
             _ => "31",
         };
-
         let cpu = match quality {
             Quality::Low => "5",
             Quality::High => "1",
             Quality::Ultra => "0",
             _ => "2",
         };
-
         let mut builder = self.arg("-crf", crf).arg("-b:v", "0").arg("-cpu-used", cpu);
-
         if is_vp9 {
             builder = builder.arg("-row-mt", "1").arg("-tile-columns", "2");
         }
-
         builder
     }
 
-    pub fn mpeg2_preset(self, quality: Quality) -> Self {
+    pub fn av1_preset(self, quality: Quality) -> Self {
+        let crf = match quality {
+            Quality::Low => "45",
+            Quality::Medium => "35",
+            Quality::High => "28",
+            Quality::Ultra => "20",
+            Quality::Custom => "35",
+        };
+        let cpu_used = match quality {
+            Quality::Low => "8",
+            Quality::Medium => "6",
+            Quality::High => "4",
+            Quality::Ultra => "2",
+            Quality::Custom => "6",
+        };
+        self.arg("-crf", crf)
+            .arg("-b:v", "0")
+            .arg("-cpu-used", cpu_used)
+            .arg("-row-mt", "1")
+            .arg("-tiles", "2x2")
+    }
+
+    pub fn mpeg_preset(self, quality: Quality) -> Self {
         let bitrate = match quality {
-            Quality::Low => "4000k",
+            Quality::Low => "2000k",
+            Quality::Medium => "5000k",
             Quality::High => "8000k",
             Quality::Ultra => "12000k",
-            _ => "6000k",
+            Quality::Custom => "5000k",
         };
-
+        let maxrate = match quality {
+            Quality::Low => "3000k",
+            Quality::Medium => "6000k",
+            Quality::High => "10000k",
+            Quality::Ultra => "15000k",
+            Quality::Custom => "6000k",
+        };
         self.arg("-b:v", bitrate)
-            .arg("-maxrate", bitrate)
+            .arg("-maxrate", maxrate)
             .arg("-bufsize", "4M")
     }
+
+    pub fn mpeg4_preset(self, quality: Quality) -> Self {
+        let bitrate = match quality {
+            Quality::Low => "1000k",
+            Quality::Medium => "3000k",
+            Quality::High => "5000k",
+            Quality::Ultra => "8000k",
+            Quality::Custom => "3000k",
+        };
+        self.arg("-b:v", bitrate)
+            .arg("-maxrate", bitrate)
+            .arg("-bufsize", "2M")
+    }
+
+    pub fn theora_preset(self, quality: Quality) -> Self {
+        let q = match quality {
+            Quality::Low => "3",
+            Quality::Medium => "6",
+            Quality::High => "8",
+            Quality::Ultra => "10",
+            Quality::Custom => "6",
+        };
+        self.arg("-q:v", q)
+    }
+
+    pub fn flv_preset(self, quality: Quality) -> Self {
+        let bitrate = match quality {
+            Quality::Low => "500k",
+            Quality::Medium => "1500k",
+            Quality::High => "3000k",
+            Quality::Ultra => "5000k",
+            Quality::Custom => "1500k",
+        };
+        self.arg("-b:v", bitrate)
+    }
+
+    pub fn wmv_preset(self, quality: Quality) -> Self {
+        let bitrate = match quality {
+            Quality::Low => "500k",
+            Quality::Medium => "2000k",
+            Quality::High => "4000k",
+            Quality::Ultra => "8000k",
+            Quality::Custom => "2000k",
+        };
+        self.arg("-b:v", bitrate)
+    }
+
+    pub fn mjpeg_preset(self, quality: Quality) -> Self {
+        let q = match quality {
+            Quality::Low => "15",
+            Quality::Medium => "8",
+            Quality::High => "4",
+            Quality::Ultra => "2",
+            Quality::Custom => "8",
+        };
+        self.arg("-q:v", q)
+    }
+
+    pub fn prores_preset(self, quality: Quality) -> Self {
+        let profile = match quality {
+            Quality::Low => "0",
+            Quality::Medium => "2",
+            Quality::High => "3",
+            Quality::Ultra => "4",
+            Quality::Custom => "2",
+        };
+        self.arg("-profile:v", profile).arg("-vendor", "apl0")
+    }
+
+    pub fn generic_bitrate_preset(self, quality: Quality) -> Self {
+        let bitrate = match quality {
+            Quality::Low => "1000k",
+            Quality::Medium => "3000k",
+            Quality::High => "6000k",
+            Quality::Ultra => "10000k",
+            Quality::Custom => "3000k",
+        };
+        self.arg("-b:v", bitrate)
+    }
+
+    // ========== Master codec router ==========
 
     pub fn apply_video_codec_preset(self, codec: &str, quality: Quality) -> Self {
         match codec {
@@ -231,13 +350,26 @@ impl FfmpegBuilder {
             c if c.contains("libx265") => self.x265_preset(quality),
             c if c.contains("libvpx-vp9") => self.vpx_preset(quality, true),
             c if c.contains("libvpx") => self.vpx_preset(quality, false),
-            "mpeg2video" => self.mpeg2_preset(quality),
-            _ => self,
+            c if c.contains("libaom") || c.contains("svtav1") || c.contains("av1") => {
+                self.av1_preset(quality)
+            }
+            "mpeg1video" | "mpeg2video" => self.mpeg_preset(quality),
+            "mpeg4" | "libxvid" => self.mpeg4_preset(quality),
+            "libtheora" | "theora" => self.theora_preset(quality),
+            "flv" | "flv1" => self.flv_preset(quality),
+            "wmv1" | "wmv2" => self.wmv_preset(quality),
+            "mjpeg" => self.mjpeg_preset(quality),
+            c if c.contains("prores") => self.prores_preset(quality),
+            "copy" | "rawvideo" | "gif" | "dvvideo" => self,
+            _ => self.generic_bitrate_preset(quality),
         }
     }
 
     pub fn build(mut self) -> (Vec<String>, String) {
-        if !self.filters.is_empty() {
+        if let Some(fc) = &self.filter_complex {
+            self.args.push("-filter_complex".to_string());
+            self.args.push(fc.clone());
+        } else if !self.filters.is_empty() {
             self.args.push("-vf".to_string());
             self.args.push(self.filters.join(","));
         }

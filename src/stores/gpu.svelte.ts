@@ -9,6 +9,7 @@ const DEFAULT_GPU: GpuInfo = {
   encoder_h265: null,
   decoder: null,
   available: false,
+  encoders: {},
 };
 
 class GpuStore {
@@ -18,13 +19,11 @@ class GpuStore {
 
   async init() {
     try {
-      // Listen for backend GPU detection event (may arrive before invoke returns)
       this.#unlisten = await listen<GpuInfo>('gpu-detected', (event) => {
         this.info = event.payload;
         this.isLoading = false;
       });
 
-      // Also explicitly request GPU info
       const info = await invoke<GpuInfo>('detect_gpu');
       this.info = info;
     } catch (error) {

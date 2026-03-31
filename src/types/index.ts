@@ -7,6 +7,8 @@ export interface GpuInfo {
   encoder_h265: string | null;
   decoder: string | null;
   available: boolean;
+  /** Map of encoder name → actually available on this hardware */
+  encoders: Record<string, boolean>;
 }
 
 export type MediaType = 'audio' | 'video' | 'unknown';
@@ -82,8 +84,11 @@ export interface ValidationResult {
   is_valid: boolean;
   warnings: string[];
   errors: string[];
+  info: string[];
   suggested_params: string[];
   alternative_codec: string | null;
+  can_copy_video: boolean;
+  can_copy_audio: boolean;
 }
 
 export type ConversionStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';

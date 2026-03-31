@@ -1,11 +1,12 @@
 use crate::binary;
+use crate::codec_registry;
 use crate::converter;
 use crate::formats::{audio, video};
 use crate::gpu::{self, GpuInfo};
 use crate::media::{self, MediaInfo};
 use crate::types::ConversionSettings;
 use crate::utils;
-use crate::validator::{self, ValidationResult};
+use crate::validator::{self, ValidationContext, ValidationResult};
 use crate::AppState;
 use serde_json::{json, Value};
 use tauri::{Emitter, Manager, State};
@@ -53,7 +54,19 @@ pub async fn close_splash(window: tauri::WebviewWindow) {
 
 #[tauri::command]
 pub async fn check_ffmpeg(app: tauri::AppHandle) -> Result<bool, String> {
-    binary::check_binaries(&app).map_err(|e| e.into())
+    // Preserve JSON error format for frontend parsing
+    let ok = binary::check_binaries(&app).map_err(|e| -> String { e.into() })?;
+
+    // Initialize codec registry on first successful FFmpeg check
+    if ok && !codec_registry::is_initialized() {
+        if let Ok(ffmpeg_path) = binary::get_ffmpeg_path(&app) {
+            if let Some(ffmpeg) = ffmpeg_path.to_str() {
+                codec_registry::init(ffmpeg);
+            }
+        }
+    }
+
+    Ok(ok)
 }
 
 #[tauri::command]
@@ -174,13 +187,9 @@ fn categorize_audio_formats(formats: &[audio::AudioFormat], audio_codec: &str) -
 }
 
 #[tauri::command]
-pub fn validate_conversion(
-    input_format: String,
-    output_format: String,
-    media_type: String,
-    settings: Value,
-) -> ValidationResult {
-    validator::validate_conversion(&input_format, &output_format, &media_type, settings)
+pub fn validate_conversion(context: Value) -> ValidationResult {
+    let ctx: ValidationContext = serde_json::from_value(context).unwrap_or_default();
+    validator::validate(&ctx)
 }
 
 #[tauri::command]
@@ -192,7 +201,8 @@ pub async fn convert_audio(
     format: String,
     settings: Value,
 ) -> Result<String, String> {
-    let settings: ConversionSettings = serde_json::from_value(settings).map_err(|e| e.to_string())?;
+    let settings: ConversionSettings =
+        serde_json::from_value(settings).map_err(|e| e.to_string())?;
     converter::audio::convert(
         window,
         &input,
@@ -215,7 +225,8 @@ pub async fn convert_video(
     gpu_info: GpuInfo,
     settings: Value,
 ) -> Result<String, String> {
-    let settings: ConversionSettings = serde_json::from_value(settings).map_err(|e| e.to_string())?;
+    let settings: ConversionSettings =
+        serde_json::from_value(settings).map_err(|e| e.to_string())?;
     converter::video::convert(
         window,
         &input,
@@ -238,7 +249,8 @@ pub async fn extract_audio(
     format: String,
     settings: Value,
 ) -> Result<String, String> {
-    let settings: ConversionSettings = serde_json::from_value(settings).map_err(|e| e.to_string())?;
+    let settings: ConversionSettings =
+        serde_json::from_value(settings).map_err(|e| e.to_string())?;
     converter::audio::extract_from_video(
         window,
         &input,
@@ -252,7 +264,10 @@ pub async fn extract_audio(
 }
 
 #[tauri::command]
-pub async fn cancel_conversion(state: State<'_, AppState>, task_id: String) -> Result<(), String> {
+pub async fn cancel_conversion(
+    state: State<'_, AppState>,
+    task_id: String,
+) -> Result<(), String> {
     if let Some(mut child) = state.active_processes.lock().await.remove(&task_id) {
         let _ = child.kill().await;
     }

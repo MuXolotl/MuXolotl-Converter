@@ -1,4 +1,5 @@
 use super::{sort_formats_by_category, Category, Stability};
+use crate::gpu::GpuInfo;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -48,14 +49,17 @@ impl VideoFormat {
             })
     }
 
-    pub fn get_recommended_video_codec(&self, gpu_vendor: &str, use_gpu: bool) -> Option<String> {
-        if use_gpu {
+    /// Get the best video codec for this format, considering GPU availability
+    pub fn get_recommended_video_codec(&self, gpu: &GpuInfo, use_gpu: bool) -> Option<String> {
+        if use_gpu && gpu.available {
+            // Try GPU encoders first — only those actually tested as available
             for codec in &self.video_codecs {
-                if let Some(gpu_codec) = get_gpu_codec(codec, gpu_vendor) {
+                if let Some(gpu_codec) = gpu.get_encoder_for(codec) {
                     return Some(gpu_codec);
                 }
             }
         }
+        // Fallback to software
         self.get_software_codec()
     }
 
@@ -150,22 +154,35 @@ fn codec_matches(container_codec: &str, actual_codec: &str) -> bool {
     }
 }
 
-fn get_gpu_codec(codec: &str, vendor: &str) -> Option<String> {
-    let result = match (codec, vendor) {
-        ("h264", "nvidia") => "h264_nvenc",
-        ("h264", "intel") => "h264_qsv",
-        ("h264", "amd") => "h264_amf",
-        ("h264", "apple") => "h264_videotoolbox",
-        ("hevc", "nvidia") => "hevc_nvenc",
-        ("hevc", "intel") => "hevc_qsv",
-        ("hevc", "amd") => "hevc_amf",
-        ("hevc", "apple") => "hevc_videotoolbox",
-        ("vp9", "nvidia") => "vp9_nvenc",
-        ("vp9", "intel") => "vp9_qsv",
-        _ => return None,
+/// Get a software fallback for a GPU encoder.
+/// Returns None if the codec is already a software encoder.
+pub fn get_software_fallback(codec: &str) -> Option<String> {
+    // Only provide fallback for GPU codecs
+    let is_gpu = codec.contains("nvenc")
+        || codec.contains("qsv")
+        || codec.contains("amf")
+        || codec.contains("videotoolbox");
+
+    if !is_gpu {
+        return None;
+    }
+
+    let fallback = if codec.contains("h264") || codec.starts_with("h264_") {
+        "libx264"
+    } else if codec.contains("hevc") || codec.starts_with("hevc_") {
+        "libx265"
+    } else if codec.contains("av1") {
+        "libaom-av1"
+    } else if codec.contains("vp9") {
+        "libvpx-vp9"
+    } else {
+        return None;
     };
-    Some(result.to_string())
+
+    Some(fallback.to_string())
 }
+
+// ============ TOML parsing (unchanged) ============
 
 #[derive(Debug, Deserialize)]
 struct TomlVideoFormat {
@@ -218,9 +235,14 @@ impl From<TomlVideoFormat> for VideoFormat {
 lazy_static! {
     static ref VIDEO_FORMATS: HashMap<String, VideoFormat> = {
         let toml_str = include_str!("video_formats.toml");
-        let parsed: VideoFormatsToml = toml::from_str(toml_str).expect("Failed to parse video_formats.toml");
+        let parsed: VideoFormatsToml =
+            toml::from_str(toml_str).expect("Failed to parse video_formats.toml");
 
-        parsed.format.into_iter().map(|f| (f.extension.clone(), f.into())).collect()
+        parsed
+            .format
+            .into_iter()
+            .map(|f| (f.extension.clone(), f.into()))
+            .collect()
     };
 }
 

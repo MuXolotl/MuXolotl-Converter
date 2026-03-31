@@ -14,6 +14,7 @@
   import { formatDuration, formatFileSize } from '@/utils';
   import { fileQueueStore } from '@/stores/fileQueue.svelte';
   import { conversionStore } from '@/stores/conversion.svelte';
+  import { gpuStore } from '@/stores/gpu.svelte';
   import FormatSelector from '@/components/FormatSelector.svelte';
   import SettingsPanel from './SettingsPanel.svelte';
   import ValidationBanner from './ValidationBanner.svelte';
@@ -125,7 +126,7 @@
     };
   });
 
-  // --- Effect: validate (debounced) ---
+  // --- Effect: validate (debounced, with extended context) ---
   $effect(() => {
     const currentFile = file;
     const _format = currentFile?.outputFormat;
@@ -141,11 +142,22 @@
 
     const timeout = setTimeout(async () => {
       try {
+        const gpu = gpuStore.info;
+
         const result = await invoke<ValidationResult>('validate_conversion', {
-          inputFormat: _mediaInfo.format_name || '',
-          outputFormat: currentFile.outputFormat,
-          mediaType: type,
-          settings: currentFile.settings,
+          context: {
+            input_format: _mediaInfo.format_name || '',
+            output_format: currentFile.outputFormat,
+            media_type: type,
+            settings: currentFile.settings,
+            input_video_codec: _mediaInfo.video_streams[0]?.codec || null,
+            input_audio_codec: _mediaInfo.audio_streams[0]?.codec || null,
+            input_width: _mediaInfo.video_streams[0]?.width || null,
+            input_height: _mediaInfo.video_streams[0]?.height || null,
+            gpu_vendor: gpu.vendor !== 'none' ? gpu.vendor : null,
+            gpu_name: gpu.available ? gpu.name : null,
+            gpu_available: gpu.available,
+          },
         });
         validation = result;
       } catch (e) {

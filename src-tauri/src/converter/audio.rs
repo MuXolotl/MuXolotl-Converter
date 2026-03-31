@@ -1,5 +1,6 @@
 use super::builder::FfmpegBuilder;
 use super::spawn_ffmpeg;
+use crate::codec_registry;
 use crate::formats::audio::{self, AudioFormat};
 use crate::media;
 use crate::types::ConversionSettings;
@@ -22,6 +23,9 @@ pub async fn convert(
     let fmt = audio::get_format(format).context(format!("Unknown audio format: {}", format))?;
     let media = media::detect_media_type(&window.app_handle(), input).await?;
 
+    // Resolve actual codec (check availability)
+    let codec = resolve_audio_codec(&fmt)?;
+
     let mut builder = FfmpegBuilder::new(input, output)
         .hide_banner()
         .overwrite()
@@ -29,10 +33,14 @@ pub async fn convert(
         .progress_pipe()
         .disable_video()
         .metadata(&settings.metadata)
-        .audio_codec(&fmt.codec);
+        .audio_codec(&codec);
 
-    builder = apply_audio_settings(builder, &fmt, &settings);
-    builder = apply_container_and_params(builder, &fmt);
+    if codec != "copy" {
+        builder = apply_audio_settings(builder, &fmt, &settings);
+        builder = apply_container_and_params(builder, &fmt);
+    } else {
+        builder = apply_container_and_params(builder, &fmt);
+    }
 
     let (args, output_path) = builder.build();
     spawn_ffmpeg(window, task_id, media.duration, args, output_path, processes).await
@@ -63,16 +71,59 @@ pub async fn extract_from_video(
         .metadata(&settings.metadata);
 
     let source_codec = &media.audio_streams[0].codec;
+
     if settings.copy_audio && fmt.can_copy_codec(source_codec) {
         builder = builder.audio_codec("copy");
     } else {
-        builder = builder.audio_codec(&fmt.codec);
-        builder = apply_audio_settings(builder, &fmt, &settings);
-        builder = apply_container_and_params(builder, &fmt);
+        let codec = resolve_audio_codec(&fmt)?;
+        builder = builder.audio_codec(&codec);
+
+        if codec != "copy" {
+            builder = apply_audio_settings(builder, &fmt, &settings);
+        }
     }
+
+    builder = apply_container_and_params(builder, &fmt);
 
     let (args, output_path) = builder.build();
     spawn_ffmpeg(window, task_id, media.duration, args, output_path, processes).await
+}
+
+/// Check if the target codec is available; try fallback if not.
+fn resolve_audio_codec(fmt: &AudioFormat) -> Result<String> {
+    let codec = &fmt.codec;
+
+    // "copy" is always available
+    if codec == "copy" {
+        return Ok(codec.clone());
+    }
+
+    // If registry not initialized, trust the format definition
+    if !codec_registry::is_initialized() {
+        return Ok(codec.clone());
+    }
+
+    // Check primary codec
+    if codec_registry::is_encoder_available(codec) {
+        return Ok(codec.clone());
+    }
+
+    // Try fallback
+    if let Some(fallback) = codec_registry::get_audio_fallback(codec) {
+        eprintln!(
+            "[Audio] Encoder '{}' not available, using fallback '{}'",
+            codec, fallback
+        );
+        return Ok(fallback.to_string());
+    }
+
+    // No fallback available
+    anyhow::bail!(
+        "Audio encoder '{}' is not available in this FFmpeg build. \
+         Format '{}' cannot be used.",
+        codec,
+        fmt.extension
+    )
 }
 
 fn apply_audio_settings(
