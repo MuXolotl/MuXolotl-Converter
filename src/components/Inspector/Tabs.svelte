@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { Settings, Film, Music, FileText } from 'lucide-svelte';
+  import { Settings, Film, Music, FileText, Info } from 'lucide-svelte';
 
-  export type TabId = 'general' | 'video' | 'audio' | 'metadata';
+  export type TabId = 'general' | 'video' | 'audio' | 'info' | 'metadata';
 
   interface TabDef {
     id: TabId;
@@ -14,6 +14,7 @@
     { id: 'general', label: 'Format', shortLabel: 'Fmt', icon: Settings },
     { id: 'video', label: 'Video', shortLabel: 'Vid', icon: Film },
     { id: 'audio', label: 'Audio', shortLabel: 'Aud', icon: Music },
+    { id: 'info', label: 'File Info', shortLabel: 'Info', icon: Info },
     { id: 'metadata', label: 'Meta', shortLabel: 'Meta', icon: FileText },
   ];
 

@@ -18,6 +18,7 @@
   import FormatSelector from '@/components/FormatSelector.svelte';
   import SettingsPanel from './SettingsPanel.svelte';
   import ValidationBanner from './ValidationBanner.svelte';
+  import FileInfo from './FileInfo.svelte';
   import Tabs from './Tabs.svelte';
   import type { TabId } from './Tabs.svelte';
   import type {
@@ -339,14 +340,18 @@
         />
       </div>
 
-      <!-- Settings Panel -->
+      <!-- Tab Content -->
       <div class="flex-1 overflow-y-auto px-3 pb-3 min-h-0">
-        <SettingsPanel
-          {file}
-          {activeTab}
-          disabled={isDisabled}
-          onChange={handleSettingsChange}
-        />
+        {#if activeTab === 'info'}
+          <FileInfo {file} />
+        {:else}
+          <SettingsPanel
+            {file}
+            {activeTab}
+            disabled={isDisabled}
+            onChange={handleSettingsChange}
+          />
+        {/if}
       </div>
     </div>
 
