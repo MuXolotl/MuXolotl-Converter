@@ -8,7 +8,7 @@
 [![Version](https://img.shields.io/badge/Version-1.1.0-green.svg)](https://github.com/MuXolotl/MuXolotl-Converter/releases)
 [![Platform](https://img.shields.io/badge/Platform-Windows_|_macOS_|_Linux-lightgrey.svg)](https://github.com/MuXolotl/MuXolotl-Converter)
 [![Built with Tauri](https://img.shields.io/badge/Tauri-2.10.1-blue?logo=tauri)](https://tauri.app/)
-[![React](https://img.shields.io/badge/React-18.3-61DAFB?logo=react)](https://react.dev/)
+[![Svelte](https://img.shields.io/badge/Svelte-5-FF3E00?logo=svelte)](https://svelte.dev/)
 [![Rust](https://img.shields.io/badge/Rust-2021-orange?logo=rust)](https://www.rust-lang.org/)
 
 [Features](#-features) • [Installation](#-installation) • [Usage](#-usage) • [Building](#%EF%B8%8F-building-from-source) • [Contributing](#-contributing)
@@ -19,7 +19,7 @@
 
 ## 📖 Overview
 
-**MuXolotl-Converter** is a modern, blazing-fast desktop application for converting audio and video files. Built with **Tauri**, **React**, and **Rust**, it leverages **FFmpeg** for professional-grade media processing while providing a beautiful, intuitive interface with GPU acceleration support.
+**MuXolotl-Converter** is a modern, blazing-fast desktop application for converting audio and video files. Built with **Tauri**, **Svelte 5**, and **Rust**, it leverages **FFmpeg** for professional-grade media processing while providing a beautiful, intuitive interface with GPU acceleration support.
 
 > **Status**: 🚧 Active development | Production testing in progress
 
@@ -29,7 +29,7 @@
 - 🎯 **40+ Formats** - Comprehensive audio and video format support
 - ⚡ **Parallel Processing** - Convert up to 4 files simultaneously
 - 💾 **Queue Persistence** - Resume your work after closing the app
-- 🎨 **Modern UI** - Sleek glass-morphism design with Framer Motion animations
+- 🎨 **Modern UI** - Sleek glass-morphism design with smooth transitions
 - 🔧 **Advanced Controls** - Fine-tune bitrate, resolution, FPS, sample rate, channels
 - 📊 **Real-time Progress** - Live FPS, speed, and ETA tracking
 - 🔔 **Desktop Notifications** - Get notified when conversions complete
@@ -401,8 +401,8 @@ npm run tauri build
 npm run dev        # Start Vite dev server + Tauri dev window
 npm run build      # Build frontend for production
 npm run preview    # Preview production build
+npm run check      # Run svelte-check (type checking)
 npm run tauri      # Run Tauri CLI commands
-npm run lint       # Run ESLint
 npm run analyze    # Analyze bundle size
 ```
 
@@ -482,7 +482,7 @@ You may choose either license for your use case.
 
 - **FFmpeg** - [GPL v2 / LGPL v2.1](https://ffmpeg.org/legal.html)
 - **Tauri** - [MIT / Apache 2.0](https://github.com/tauri-apps/tauri/blob/dev/LICENSE_MIT)
-- **React** - [MIT](https://github.com/facebook/react/blob/main/LICENSE)
+- **Svelte** - [MIT](https://github.com/sveltejs/svelte/blob/main/LICENSE.md)
 
 ---
 
@@ -491,13 +491,12 @@ You may choose either license for your use case.
 ### Built With
 
 - **[Tauri](https://tauri.app/)** - Lightweight desktop framework
-- **[React](https://react.dev/)** - UI library
+- **[Svelte 5](https://svelte.dev/)** - UI framework with runes
 - **[TypeScript](https://www.typescriptlang.org/)** - Type-safe JavaScript
 - **[Rust](https://www.rust-lang.org/)** - Systems programming language
 - **[FFmpeg](https://ffmpeg.org/)** - Multimedia processing engine
 - **[Vite](https://vitejs.dev/)** - Frontend build tool
 - **[Tailwind CSS](https://tailwindcss.com/)** - Utility-first CSS framework
-- **[Framer Motion](https://www.framer.com/motion/)** - Animation library
 - **[Lucide Icons](https://lucide.dev/)** - Icon library
 
 ### FFmpeg Builds

@@ -86,7 +86,7 @@ jobs:
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add package.json src-tauri/Cargo.toml src-tauri/tauri.conf.json README.md
+          git add package.json src-tauri/Cargo.toml src-tauri/tauri.conf.json src/config.ts README.md
           git diff --staged --quiet || git commit -m "chore: sync version ${{ steps.read_version.outputs.version }} to all files"
           git push
 
@@ -366,7 +366,7 @@ jobs:
             ---
 
             **License**: GPL v2 / LGPL v2.1  
-            **Built with**: Tauri 2 • React • FFmpeg • Rust
+            **Built with**: Tauri 2 • Svelte 5 • FFmpeg • Rust
 
             </div>
           draft: false
@@ -421,7 +421,7 @@ jobs:
             ---
 
             **License**: GPL v2 / LGPL v2.1  
-            **Built with**: Tauri 2 • React • FFmpeg • Rust
+            **Built with**: Tauri 2 • Svelte 5 • FFmpeg • Rust
 
             </div>
           draft: false

@@ -19,7 +19,7 @@ Be respectful, inclusive, and considerate. We're all here to make this project b
 
 ### Reporting Bugs
 
-Use the [Bug Report template](.github/ISSUE_TEMPLATE/bug_report.yml) and include:
+Use the [Bug Report template](https://github.com/MuXolotl/MuXolotl-Converter/issues/new?template=bug_report.yml) and include:
 - Clear description
 - Steps to reproduce
 - Expected vs actual behavior
@@ -28,7 +28,7 @@ Use the [Bug Report template](.github/ISSUE_TEMPLATE/bug_report.yml) and include
 
 ### Suggesting Features
 
-Use the [Feature Request template](.github/ISSUE_TEMPLATE/feature_request.yml) and describe:
+Use the [Feature Request template](https://github.com/MuXolotl/MuXolotl-Converter/issues/new?template=feature_request.yml) and describe:
 - The problem you're trying to solve
 - Your proposed solution
 - Any alternatives you've considered
@@ -60,27 +60,35 @@ npm run dev
 
 ## Coding Guidelines
 
-### TypeScript/React (Frontend)
+### Svelte 5 / TypeScript (Frontend)
 
-- **Use TypeScript** - no `any` types unless absolutely necessary
-- **Functional components** with hooks (no class components)
-- **React.memo()** for performance-critical components
-- **useCallback/useMemo** to prevent unnecessary re-renders
-- **Named exports** for components
-- **Proper typing** for props and state
+- **Use TypeScript** — no `any` types unless absolutely necessary
+- **Svelte 5 runes** — use `$state`, `$derived`, `$effect`, `$props` (no legacy `let` exports or stores)
+- **Snippets** over slots — use `{#snippet}` / `{@render}` for composition
+- **Named exports** for types; default export is the `.svelte` component itself
+- **Proper typing** for props via `interface Props`
 
 **Example:**
-```typescript
-interface MyComponentProps {
-  title: string;
-  onAction: () => void;
-}
+```svelte
+<script lang="ts">
+  import { SomeIcon } from 'lucide-svelte';
 
-const MyComponent: React.FC<MyComponentProps> = ({ title, onAction }) => {
-  // Component logic
-};
+  interface Props {
+    title: string;
+    onAction: () => void;
+    disabled?: boolean;
+  }
 
-export default React.memo(MyComponent);
+  let { title, onAction, disabled = false }: Props = $props();
+
+  let isActive = $state(false);
+  let label = $derived(isActive ? 'Active' : 'Inactive');
+</script>
+
+<button onclick={onAction} {disabled}>
+  <SomeIcon size={16} />
+  {title} — {label}
+</button>
 ```
 
 ### Rust (Backend)
@@ -108,7 +116,7 @@ pub async fn convert_audio(
 - **Tailwind CSS** utility classes preferred
 - **Glass morphism** for UI elements (use `.glass` class)
 - **Responsive design** (test on different window sizes)
-- **Animations** with Framer Motion
+- **Svelte transitions** for animations where needed
 
 ## Commit Messages
 
@@ -166,4 +174,3 @@ Your PR should:
 - 🐛 [GitHub Issues](https://github.com/MuXolotl/MuXolotl-Converter/issues)
 
 Thank you for contributing! 🦎💜
-```

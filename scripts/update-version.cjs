@@ -131,6 +131,26 @@ console.log(`🔧 Build version: ${baseVersion}\n`);
   }
 })();
 
+// src/config.ts
+(() => {
+  const configPath = path.join(rootDir, 'src', 'config.ts');
+  if (!fileExists(configPath)) {
+    logWarn('src/config.ts not found — skipping');
+    return;
+  }
+
+  const configTs = readUtf8(configPath);
+  const configVersionRegex = /(version:\s*')([^']+)(')/;
+  const updatedConfig = configTs.replace(configVersionRegex, `$1${version}$3`);
+
+  if (updatedConfig === configTs) {
+    logWarn('No version string found in src/config.ts — skipping');
+  } else {
+    writeUtf8(configPath, updatedConfig);
+    logOk(`Updated src/config.ts → ${version}`);
+  }
+})();
+
 // README.md badge
 (() => {
   const readmePath = path.join(rootDir, 'README.md');
