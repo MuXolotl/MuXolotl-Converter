@@ -1,6 +1,7 @@
 <script lang="ts">
   import { APP_CONFIG } from '@/config';
   import DropZone from '@/components/DropZone.svelte';
+  import ActionBar from '@/components/ActionBar.svelte';
   import QueueItem from '@/components/QueueItem.svelte';
   import type { FileItem } from '@/types';
 
@@ -28,6 +29,13 @@
 
   let containerEl: HTMLDivElement | undefined = $state();
   let listHeight = $state(300);
+
+  // Derive the selected file for ActionBar (first selected)
+  let selectedFile = $derived.by(() => {
+    if (selectedIds.size === 0) return null;
+    const firstId = Array.from(selectedIds)[0];
+    return files.find(f => f.id === firstId) || null;
+  });
 
   $effect(() => {
     if (!containerEl) return;
@@ -73,6 +81,9 @@
     onkeydown={handleKeyDown}
     onclick={onDeselectAll}
   >
+    <!-- Batch Actions -->
+    <ActionBar {selectedFile} />
+
     <!-- Header -->
     <div class="shrink-0 bg-[#0f172a] border-b border-white/10 select-none px-2 py-1.5">
       <div

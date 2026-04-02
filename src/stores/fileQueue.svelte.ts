@@ -85,8 +85,6 @@ class FileQueueStore {
 
   updateFile(id: string, updates: Partial<FileItem>) {
     this.files = this.files.map(f => (f.id === id ? { ...f, ...updates } : f));
-    // Note: scheduleSave is called here, but debounce prevents
-    // excessive writes during rapid progress updates
     this.#scheduleSave();
   }
 
@@ -99,6 +97,30 @@ class FileQueueStore {
     });
   }
 
+  /**
+   * Reset all completed, failed, and cancelled files back to pending.
+   * Allows re-converting them with new settings/formats.
+   */
+  retryAll() {
+    const retryStatuses = new Set(['completed', 'failed', 'cancelled']);
+    let changed = false;
+
+    this.files = this.files.map(f => {
+      if (!retryStatuses.has(f.status)) return f;
+      changed = true;
+      return {
+        ...f,
+        status: 'pending' as const,
+        progress: null,
+        error: null,
+        completedAt: undefined,
+        outputPath: undefined,
+      };
+    });
+
+    if (changed) this.#scheduleSave();
+  }
+
   clearCompleted() {
     this.files = this.files.filter(f => f.status !== 'completed');
     this.#scheduleSave();
@@ -108,6 +130,44 @@ class FileQueueStore {
     this.files = [];
     if (this.#saveTimeout) clearTimeout(this.#saveTimeout);
     clearStorageQueue();
+  }
+
+  /**
+   * Copy format and settings from the source file to all other pending files
+   * of the same media type (audio → audio, video → video).
+   *
+   * @param sourceId - ID of the file whose settings should be copied
+   */
+  applySettingsToAll(sourceId: string) {
+    const source = this.files.find(f => f.id === sourceId);
+    if (!source || source.status !== 'pending' || !source.mediaInfo) return;
+
+    const sourceType = source.mediaInfo.media_type;
+    if (sourceType === 'unknown') return;
+
+    const sourceFormat = source.outputFormat;
+    const sourceSettings = { ...source.settings };
+
+    this.files = this.files.map(f => {
+      if (f.id === sourceId) return f;
+      if (f.status !== 'pending') return f;
+      if (!f.mediaInfo || f.mediaInfo.media_type !== sourceType) return f;
+
+      const updated: FileItem = {
+        ...f,
+        outputFormat: sourceFormat,
+        settings: { ...sourceSettings },
+        outputPath: undefined,
+      };
+
+      if (this.outputFolder) {
+        updated.outputPath = generateOutputPath(updated, this.outputFolder);
+      }
+
+      return updated;
+    });
+
+    this.#scheduleSave();
   }
 
   // --- Persistence (debounced) ---

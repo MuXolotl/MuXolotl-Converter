@@ -12,6 +12,7 @@ class ConversionStore {
   #unlisteners: UnlistenFn[] = [];
   #lastUpdate = new Map<string, number>();
   #onError: ((file: FileItem, error: string) => void) | null = null;
+  #abortPipeline = false;
 
   // --- Derived ---
 
@@ -76,7 +77,6 @@ class ConversionStore {
         const { task_id, error } = e.payload;
         this.#lastUpdate.delete(task_id);
 
-        // No stale closure problem — $state always returns current value
         const file = fileQueueStore.files.find(f => f.id === task_id);
         if (file && this.#onError) {
           this.#onError(file, error);
@@ -185,10 +185,18 @@ class ConversionStore {
   async startAll() {
     if (!fileQueueStore.outputFolder) return;
 
-    // Read current pending files (always fresh — no stale closures)
+    this.#abortPipeline = false;
+
     const pending = fileQueueStore.files.filter(f => f.status === 'pending');
     for (const file of pending) {
-      await this.startConversion(file);
+      // Check abort flag before starting each file
+      if (this.#abortPipeline) break;
+
+      // Re-check file is still pending (could have been removed/cancelled)
+      const current = fileQueueStore.files.find(f => f.id === file.id);
+      if (!current || current.status !== 'pending') continue;
+
+      await this.startConversion(current);
     }
   }
 
@@ -208,6 +216,10 @@ class ConversionStore {
   }
 
   async cancelAll() {
+    // Signal the pipeline to stop picking up new files
+    this.#abortPipeline = true;
+
+    // Cancel all currently processing files
     const processing = fileQueueStore.files.filter(f => f.status === 'processing');
     await Promise.all(processing.map(f => this.cancelConversion(f.id)));
   }
@@ -215,6 +227,7 @@ class ConversionStore {
   // --- Cleanup ---
 
   destroy() {
+    this.#abortPipeline = true;
     this.#unlisteners.forEach(fn => fn());
     this.#unlisteners = [];
     this.#lastUpdate.clear();
