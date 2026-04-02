@@ -27,7 +27,7 @@
 
 # COMPLETED (FULLY/PARTIALLY)
 
-- [x] ~*File info — click on a file to show full details: codec, bitrate, resolution, duration, size, audio tracks*~ | **01.04.26**
-- [x] ~*Improved auto-detection of the best codec*~ | **31.03.26**
-- [x] ~*Migration from React to Svelte 5*~ | **31.03.26**
-- [x] ~*Tauri upgrade to v2*~ | **30.03.26**
+- [x] ~*File info — click on a file to show full details: codec, bitrate, resolution, duration, size, audio tracks*~ | **2026-04-01**
+- [x] ~*Improved auto-detection of the best codec*~ | **2026-03-31**
+- [x] ~*Migration from React to Svelte 5*~ | **2026-03-31**
+- [x] ~*Tauri upgrade to v2*~ | **2026-03-30**
