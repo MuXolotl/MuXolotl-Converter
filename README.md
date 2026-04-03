@@ -5,7 +5,7 @@
 **High-Performance Cross-Platform Audio & Video Converter**
 
 [![License: GPL v2](https://img.shields.io/badge/License-GPLv2.0-blue.svg)](https://www.gnu.org/licenses/gpl-2.0)[![License: LGPL v2.1](https://img.shields.io/badge/LGPLv2.1-blue.svg)](https://www.gnu.org/licenses/lgpl-2.1)
-[![Version](https://img.shields.io/badge/Version-1.1.0-green.svg)](https://github.com/MuXolotl/MuXolotl-Converter/releases)
+[![Version](https://img.shields.io/badge/Version-1.2.0-green.svg)](https://github.com/MuXolotl/MuXolotl-Converter/releases)
 [![Platform](https://img.shields.io/badge/Platform-Windows_|_macOS_|_Linux-lightgrey.svg)](https://github.com/MuXolotl/MuXolotl-Converter)
 [![Built with Tauri](https://img.shields.io/badge/Tauri-v2-blue?logo=tauri)](https://tauri.app/)
 [![Svelte](https://img.shields.io/badge/Svelte-v5-FF3E00?logo=svelte)](https://svelte.dev/)
