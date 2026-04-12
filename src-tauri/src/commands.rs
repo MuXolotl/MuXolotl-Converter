@@ -83,6 +83,11 @@ pub fn open_folder(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn reveal_in_folder(path: String) -> Result<(), String> {
+    utils::reveal_in_explorer(&path)
+}
+
+#[tauri::command]
 pub async fn detect_media_type(
     app_handle: tauri::AppHandle,
     path: String,

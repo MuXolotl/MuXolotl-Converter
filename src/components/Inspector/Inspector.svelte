@@ -55,7 +55,9 @@
   let isExtracting = $derived(!!file?.settings.extractAudioOnly && isVideo);
   let isDisabled = $derived(file?.status !== 'pending');
   let isProcessing = $derived(file?.status === 'processing');
+  let isCompleted = $derived(file?.status === 'completed');
   let canConvert = $derived(file?.status === 'pending' && !!outputFolder);
+  let canReveal = $derived(isCompleted && !!file?.outputPath);
 
   let targetType = $derived.by(() => {
     if (!file) return null;
@@ -200,6 +202,13 @@
 
   function handleRetry() {
     if (file) onRetry(file.id);
+  }
+
+  function handleReveal() {
+    if (!file?.outputPath) return;
+    invoke('reveal_in_folder', { path: file.outputPath }).catch((err) => {
+      console.error('Failed to reveal file:', err);
+    });
   }
 </script>
 
@@ -383,6 +392,25 @@
           <Square size={14} fill="currentColor" />
           <span>Stop</span>
         </button>
+      {:else if isCompleted}
+        <div class="flex gap-2">
+          {#if canReveal}
+            <button
+              onclick={handleReveal}
+              class="flex-1 py-2.5 rounded font-bold text-xs flex items-center justify-center gap-1.5 bg-green-500/15 border border-green-500/30 text-green-400 hover:bg-green-500/25 transition-all"
+            >
+              <FolderOpen size={14} />
+              <span>Open in Folder</span>
+            </button>
+          {/if}
+          <button
+            onclick={handleRetry}
+            class="py-2.5 px-4 rounded font-bold text-xs flex items-center justify-center gap-1.5 bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all"
+          >
+            <RotateCcw size={14} />
+            <span>Retry</span>
+          </button>
+        </div>
       {:else}
         <button
           onclick={handleRetry}

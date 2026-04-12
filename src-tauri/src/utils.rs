@@ -54,3 +54,74 @@ pub fn open_path(path: &str) -> Result<(), String> {
 
     Ok(())
 }
+
+/// Open the system file manager and reveal/select the given path.
+///
+/// - If path points to a **file**: the parent folder is opened with the file selected.
+/// - If path points to a **directory**: the directory itself is opened.
+///
+/// Platform behavior:
+/// - **Windows**: `explorer /select,<path>` — highlights the file in Explorer.
+/// - **macOS**: `open -R <path>` — reveals the file in Finder.
+/// - **Linux**: `xdg-open <parent>` — opens the parent directory (no native select support).
+pub fn reveal_in_explorer(path: &str) -> Result<(), String> {
+    let p = std::path::Path::new(path);
+    let is_dir = p.is_dir();
+
+    #[cfg(target_os = "windows")]
+    {
+        if is_dir {
+            Command::new("explorer")
+                .arg(path)
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        } else {
+            // raw_arg passes /select,path as a single undivided token to explorer,
+            // which is required because explorer uses ShellExecuteW (not CreateProcess).
+            Command::new("explorer")
+                .raw_arg(format!("/select,{}", path))
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        if is_dir {
+            Command::new("open")
+                .arg(path)
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        } else {
+            // -R reveals the file in Finder
+            Command::new("open")
+                .args(["-R", path])
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        // Linux has no native "reveal and select" API.
+        // Fall back to opening the parent directory.
+        if is_dir {
+            Command::new("xdg-open")
+                .arg(path)
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        } else if let Some(parent) = p.parent() {
+            Command::new("xdg-open")
+                .arg(parent)
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        } else {
+            Command::new("xdg-open")
+                .arg(".")
+                .spawn()
+                .map_err(|e| e.to_string())?;
+        }
+    }
+
+    Ok(())
+}

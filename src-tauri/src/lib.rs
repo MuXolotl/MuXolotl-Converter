@@ -41,6 +41,7 @@ pub fn run() {
             commands::check_ffmpeg,
             commands::detect_gpu,
             commands::open_folder,
+            commands::reveal_in_folder,
             commands::detect_media_type,
             commands::get_audio_formats,
             commands::get_video_formats,

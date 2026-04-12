@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { FileVideo, FileAudio, Check, AlertTriangle, X, Trash2, ArrowRight } from 'lucide-svelte';
+  import { invoke } from '@tauri-apps/api/core';
+  import { FileVideo, FileAudio, Check, AlertTriangle, X, Trash2, ArrowRight, FolderOpen } from 'lucide-svelte';
   import { formatEta } from '@/utils';
   import type { FileItem } from '@/types';
 
@@ -14,10 +15,19 @@
   let { file, index, isSelected, onClick, onRemove }: Props = $props();
 
   let isVideo = $derived(file.mediaInfo?.media_type === 'video');
+  let canReveal = $derived(file.status === 'completed' && !!file.outputPath);
 
   function handleRemove(e: MouseEvent) {
     e.stopPropagation();
     onRemove();
+  }
+
+  function handleReveal(e: MouseEvent) {
+    e.stopPropagation();
+    if (!file.outputPath) return;
+    invoke('reveal_in_folder', { path: file.outputPath }).catch((err) => {
+      console.error('Failed to reveal file:', err);
+    });
   }
 </script>
 
@@ -100,8 +110,17 @@
     {/if}
   </div>
 
-  <!-- Remove Button -->
-  <div class="w-6 flex justify-center shrink-0">
+  <!-- Action buttons -->
+  <div class="w-8 flex items-center justify-center gap-0.5 shrink-0">
+    {#if canReveal}
+      <button
+        onclick={handleReveal}
+        class="p-1 text-white/20 hover:text-green-400 hover:bg-green-500/10 rounded transition-all opacity-0 group-hover:opacity-100"
+        title="Open in folder"
+      >
+        <FolderOpen size={12} />
+      </button>
+    {/if}
     <button
       onclick={handleRemove}
       class="p-1 text-white/20 hover:text-red-400 hover:bg-red-500/10 rounded transition-all opacity-0 group-hover:opacity-100"
