@@ -2144,7 +2144,7 @@ dependencies = [
 
 [[package]]
 name = "muxolotl-converter"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "lazy_static",
