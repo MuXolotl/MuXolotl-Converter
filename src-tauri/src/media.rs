@@ -1,4 +1,4 @@
-use crate::utils::create_hidden_command;
+use crate::utils::create_async_hidden_command;
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
@@ -59,7 +59,7 @@ pub async fn detect_media_type(app_handle: &tauri::AppHandle, path: &str) -> Res
         .to_str()
         .ok_or_else(|| anyhow::anyhow!("Invalid FFprobe path encoding"))?;
 
-    let output = create_hidden_command(ffprobe_str)
+    let output = create_async_hidden_command(ffprobe_str)
         .args([
             "-v", "quiet",
             "-print_format", "json",
@@ -68,6 +68,7 @@ pub async fn detect_media_type(app_handle: &tauri::AppHandle, path: &str) -> Res
             path,
         ])
         .output()
+        .await
         .context("Failed to execute ffprobe")?;
 
     if !output.status.success() {
@@ -77,10 +78,15 @@ pub async fn detect_media_type(app_handle: &tauri::AppHandle, path: &str) -> Res
     let json_str = String::from_utf8(output.stdout).context("Invalid UTF-8 in ffprobe output")?;
     let probe: serde_json::Value = serde_json::from_str(&json_str).context("Failed to parse ffprobe JSON")?;
 
-    parse_probe_result(&probe, path)
+    let file_size = tokio::fs::metadata(path)
+        .await
+        .map(|m| m.len())
+        .unwrap_or(0);
+
+    parse_probe_result(&probe, file_size)
 }
 
-fn parse_probe_result(probe: &serde_json::Value, path: &str) -> Result<MediaInfo> {
+fn parse_probe_result(probe: &serde_json::Value, file_size: u64) -> Result<MediaInfo> {
     let format = probe.get("format").context("No format information")?;
 
     let duration = format
@@ -88,8 +94,6 @@ fn parse_probe_result(probe: &serde_json::Value, path: &str) -> Result<MediaInfo
         .and_then(|d| d.as_str())
         .and_then(|s| s.parse::<f64>().ok())
         .unwrap_or(0.0);
-
-    let file_size = std::fs::metadata(path).map(|m| m.len()).unwrap_or(0);
 
     let format_name = format
         .get("format_name")
