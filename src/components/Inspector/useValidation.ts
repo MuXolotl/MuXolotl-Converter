@@ -19,7 +19,7 @@ export function useValidation() {
   let recommendations = $state<RecommendedFormats | undefined>();
   let validation = $state<ValidationResult | null>(null);
 
-  let #debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   async function loadRecommendations(
     file: FileItem,
@@ -58,9 +58,9 @@ export function useValidation() {
       return;
     }
 
-    if (#debounceTimer) clearTimeout(#debounceTimer);
+    if (debounceTimer) clearTimeout(debounceTimer);
 
-    #debounceTimer = setTimeout(async () => {
+    debounceTimer = setTimeout(async () => {
       try {
         const gpu = gpuStore.info;
 
@@ -86,7 +86,7 @@ export function useValidation() {
   }
 
   function reset(): void {
-    if (#debounceTimer) clearTimeout(#debounceTimer);
+    if (debounceTimer) clearTimeout(debounceTimer);
     recommendations = undefined;
     validation = null;
   }
