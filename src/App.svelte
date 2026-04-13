@@ -62,6 +62,20 @@
     return fileQueueStore.files.find((f) => f.id === firstId) || null;
   });
 
+  /** Pick the most relevant file to show in the Footer status bar */
+  let lastActiveFile = $derived.by(() => {
+    // Priority 1: currently processing
+    const processing = fileQueueStore.files.find(f => f.status === 'processing');
+    if (processing) return processing;
+
+    // Priority 2: most recently completed/failed/cancelled
+    const finished = fileQueueStore.files
+      .filter(f => f.completedAt)
+      .sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0));
+
+    return finished[0] || null;
+  });
+
   // --- Error handler for conversion store ---
   function handleConversionError(file: FileItem, error: string) {
     errorModal = {
@@ -222,7 +236,7 @@
         <Footer
           isOpen={isConsoleOpen}
           onToggle={() => (isConsoleOpen = !isConsoleOpen)}
-          lastFile={fileQueueStore.files[0] || null}
+          lastFile={lastActiveFile}
         />
       </div>
     </div>

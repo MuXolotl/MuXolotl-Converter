@@ -115,7 +115,14 @@ class ConversionStore {
     }
 
     try {
-      const outputPath = generateOutputPath(file, outputFolder);
+      // Build collision set from all OTHER files' output paths
+      const existingPaths = new Set(
+        fileQueueStore.files
+          .filter(f => f.id !== file.id && f.outputPath)
+          .map(f => f.outputPath!)
+      );
+      const outputPath = generateOutputPath(file, outputFolder, existingPaths);
+
       this.activeCount++;
 
       fileQueueStore.updateFile(file.id, {

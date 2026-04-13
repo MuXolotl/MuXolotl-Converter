@@ -16,7 +16,7 @@ class FileQueueStore {
   outputFolder = $state('');
   #saveTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  // --- Derived (getters auto-track $state dependencies in templates) ---
+  // --- Derived ---
 
   get sortedFiles(): FileItem[] {
     return sortFilesByStatus(this.files);
@@ -50,10 +50,10 @@ class FileQueueStore {
     this.outputFolder = folder;
     saveOutputFolder(folder);
 
-    // Update pending files that don't have an output path yet
+    // Update pending files with new output paths
     if (folder) {
       this.files = this.files.map(f => {
-        if (f.status === 'pending' && !f.outputPath) {
+        if (f.status === 'pending' || !f.outputPath) {
           return { ...f, outputPath: generateOutputPath(f, folder) };
         }
         return f;
@@ -73,6 +73,13 @@ class FileQueueStore {
     const toAdd = unique.slice(0, available);
 
     if (toAdd.length === 0) return;
+
+    // Assign output paths if output folder is set
+    if (this.outputFolder) {
+      for (const file of toAdd) {
+        file.outputPath = generateOutputPath(file, this.outputFolder);
+      }
+    }
 
     this.files = [...toAdd, ...this.files];
     this.#scheduleSave();
@@ -99,7 +106,7 @@ class FileQueueStore {
 
   /**
    * Reset all completed, failed, and cancelled files back to pending.
-   * Allows re-converting them with new settings/formats.
+   * Keeps their existing output paths intact.
    */
   retryAll() {
     const retryStatuses = new Set(['completed', 'failed', 'cancelled']);
@@ -114,7 +121,6 @@ class FileQueueStore {
         progress: null,
         error: null,
         completedAt: undefined,
-        outputPath: undefined,
       };
     });
 
@@ -134,9 +140,7 @@ class FileQueueStore {
 
   /**
    * Copy format and settings from the source file to all other pending files
-   * of the same media type (audio → audio, video → video).
-   *
-   * @param sourceId - ID of the file whose settings should be copied
+   * of the same media type.
    */
   applySettingsToAll(sourceId: string) {
     const source = this.files.find(f => f.id === sourceId);
