@@ -11,30 +11,24 @@ export function generateFileId(): string {
 /**
  * Generate output path for a file conversion.
  *
- * Includes format info in the filename when converting between different formats
- * to naturally prevent collisions (e.g., "song (mp3 - flac converted).flac").
- * Falls back to "_1" suffix for rare same-format-combo collisions.
+ * Uses standard naming: `basename.newext`. Collisions are resolved
+ * by appending `_1`, `_2`, etc. suffixes — same approach as most
+ * popular converters (HandBrake, fre:ac, foobar2000).
  */
 export function generateOutputPath(file: FileItem, folder: string, existingPaths?: Set<string>): string {
   const lastDot = file.name.lastIndexOf('.');
   const baseName = lastDot !== -1 ? file.name.substring(0, lastDot) : file.name;
-  const inputExt = lastDot !== -1 ? file.name.substring(lastDot + 1).toLowerCase() : '';
   const outputExt = file.outputFormat.toLowerCase();
   const separator = folder.includes('\\') ? '\\' : '/';
   const normalizedFolder = folder.replace(/[\\/]+$/, '');
 
-  // Add format info when converting between different formats
-  const formatSuffix = inputExt && inputExt !== outputExt
-    ? ` (${inputExt} - ${outputExt} converted)`
-    : '';
-
-  let candidate = `${normalizedFolder}${separator}${baseName}${formatSuffix}.${outputExt}`;
+  let candidate = `${normalizedFolder}${separator}${baseName}.${outputExt}`;
 
   // Collision avoidance: add _1, _2, ... suffix if path already taken
   if (existingPaths) {
     let counter = 1;
     while (existingPaths.has(candidate)) {
-      candidate = `${normalizedFolder}${separator}${baseName}${formatSuffix}_${counter}.${outputExt}`;
+      candidate = `${normalizedFolder}${separator}${baseName}_${counter}.${outputExt}`;
       counter++;
     }
   }
