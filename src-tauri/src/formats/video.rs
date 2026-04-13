@@ -1,4 +1,5 @@
 use super::{sort_formats_by_category, Category, Stability};
+use crate::codec_map;
 use crate::gpu::GpuInfo;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
@@ -65,16 +66,9 @@ impl VideoFormat {
 
     fn get_software_codec(&self) -> Option<String> {
         self.video_codecs.first().map(|codec| {
-            match codec.as_str() {
-                "h264" => "libx264",
-                "hevc" => "libx265",
-                "vp9" => "libvpx-vp9",
-                "vp8" => "libvpx",
-                "av1" => "libaom-av1",
-                "theora" => "libtheora",
-                other => other,
-            }
-            .to_string()
+            codec_map::software_encoder_for_codec(codec)
+                .unwrap_or(codec)
+                .to_string()
         })
     }
 
@@ -154,35 +148,7 @@ fn codec_matches(container_codec: &str, actual_codec: &str) -> bool {
     }
 }
 
-/// Get a software fallback for a GPU encoder.
-/// Returns None if the codec is already a software encoder.
-pub fn get_software_fallback(codec: &str) -> Option<String> {
-    // Only provide fallback for GPU codecs
-    let is_gpu = codec.contains("nvenc")
-        || codec.contains("qsv")
-        || codec.contains("amf")
-        || codec.contains("videotoolbox");
-
-    if !is_gpu {
-        return None;
-    }
-
-    let fallback = if codec.contains("h264") || codec.starts_with("h264_") {
-        "libx264"
-    } else if codec.contains("hevc") || codec.starts_with("hevc_") {
-        "libx265"
-    } else if codec.contains("av1") {
-        "libaom-av1"
-    } else if codec.contains("vp9") {
-        "libvpx-vp9"
-    } else {
-        return None;
-    };
-
-    Some(fallback.to_string())
-}
-
-// ============ TOML parsing (unchanged) ============
+// ============ TOML parsing ============
 
 #[derive(Debug, Deserialize)]
 struct TomlVideoFormat {

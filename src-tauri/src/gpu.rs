@@ -1,3 +1,4 @@
+use crate::codec_map;
 use crate::utils::create_hidden_command;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -14,6 +15,19 @@ pub enum GpuVendor {
     Amd,
     Apple,
     None,
+}
+
+impl GpuVendor {
+    /// Get the string identifier used by codec_map for encoder lookups.
+    fn as_str(&self) -> Option<&'static str> {
+        match self {
+            GpuVendor::Nvidia => Some("nvidia"),
+            GpuVendor::Intel => Some("intel"),
+            GpuVendor::Amd => Some("amd"),
+            GpuVendor::Apple => Some("apple"),
+            GpuVendor::None => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -48,32 +62,12 @@ impl GpuInfo {
         self.encoders.get(encoder).copied().unwrap_or(false)
     }
 
-    /// Get the best GPU encoder for a given codec type (h264, hevc, vp9, av1)
-    /// Returns None if no GPU encoder is available for this codec
+    /// Get the best GPU encoder for a given codec type (h264, hevc, vp9, av1).
+    /// Returns None if no GPU encoder is available for this codec.
     pub fn get_encoder_for(&self, codec: &str) -> Option<String> {
-        let candidates = match (codec, self.vendor) {
-            ("h264", GpuVendor::Nvidia) => vec!["h264_nvenc"],
-            ("hevc", GpuVendor::Nvidia) => vec!["hevc_nvenc"],
-            ("av1", GpuVendor::Nvidia) => vec!["av1_nvenc"],
-
-            ("h264", GpuVendor::Intel) => vec!["h264_qsv"],
-            ("hevc", GpuVendor::Intel) => vec!["hevc_qsv"],
-            ("vp9", GpuVendor::Intel) => vec!["vp9_qsv"],
-            ("av1", GpuVendor::Intel) => vec!["av1_qsv"],
-
-            ("h264", GpuVendor::Amd) => vec!["h264_amf"],
-            ("hevc", GpuVendor::Amd) => vec!["hevc_amf"],
-            ("av1", GpuVendor::Amd) => vec!["av1_amf"],
-
-            ("h264", GpuVendor::Apple) => vec!["h264_videotoolbox"],
-            ("hevc", GpuVendor::Apple) => vec!["hevc_videotoolbox"],
-
-            _ => vec![],
-        };
-
-        candidates
-            .into_iter()
-            .find(|enc| self.is_encoder_available(enc))
+        let vendor_str = self.vendor.as_str()?;
+        codec_map::gpu_encoder_for_codec(codec, vendor_str)
+            .filter(|enc| self.is_encoder_available(enc))
             .map(|s| s.to_string())
     }
 }

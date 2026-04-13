@@ -1,4 +1,5 @@
 mod binary;
+mod codec_map;
 mod codec_registry;
 mod commands;
 mod converter;

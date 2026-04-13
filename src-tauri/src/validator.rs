@@ -1,4 +1,4 @@
-use crate::codec_registry;
+use crate::codec_map;
 use crate::formats::{audio, video, Stability};
 use serde::{Deserialize, Serialize};
 
@@ -98,9 +98,9 @@ fn validate_audio(result: &mut ValidationResult, ctx: &ValidationContext) {
     result.suggested_params.extend(fmt.special_params.clone());
 
     // Check encoder availability
-    if fmt.codec != "copy" && codec_registry::is_initialized() {
-        if !codec_registry::is_encoder_available(&fmt.codec) {
-            if let Some(fallback) = codec_registry::get_audio_fallback(&fmt.codec) {
+    if fmt.codec != "copy" && crate::codec_registry::is_initialized() {
+        if !crate::codec_registry::is_encoder_available(&fmt.codec) {
+            if let Some(fallback) = crate::codec_registry::get_audio_fallback(&fmt.codec) {
                 result.warn(format!(
                     "Encoder '{}' not found, will use '{}'",
                     fmt.codec, fallback
@@ -197,7 +197,7 @@ fn validate_video(result: &mut ValidationResult, ctx: &ValidationContext) {
     }
 
     // --- Encoder availability ---
-    check_video_encoder(result, &fmt, use_gpu, ctx);
+    check_video_encoder(result, &fmt);
 }
 
 fn check_video_copy(
@@ -262,29 +262,10 @@ fn check_gpu_codec(
     }
 
     // Check if the output format's preferred codecs have GPU support
-    let mut has_any_gpu = false;
-    for video_codec in &fmt.video_codecs {
-        let gpu_encoder = match (video_codec.as_str(), gpu_vendor) {
-            ("h264", "nvidia") => Some("h264_nvenc"),
-            ("hevc", "nvidia") => Some("hevc_nvenc"),
-            ("av1", "nvidia") => Some("av1_nvenc"),
-            ("h264", "intel") => Some("h264_qsv"),
-            ("hevc", "intel") => Some("hevc_qsv"),
-            ("vp9", "intel") => Some("vp9_qsv"),
-            ("av1", "intel") => Some("av1_qsv"),
-            ("h264", "amd") => Some("h264_amf"),
-            ("hevc", "amd") => Some("hevc_amf"),
-            ("av1", "amd") => Some("av1_amf"),
-            ("h264", "apple") => Some("h264_videotoolbox"),
-            ("hevc", "apple") => Some("hevc_videotoolbox"),
-            _ => None,
-        };
-
-        if gpu_encoder.is_some() {
-            has_any_gpu = true;
-            break;
-        }
-    }
+    let has_any_gpu = fmt
+        .video_codecs
+        .iter()
+        .any(|codec| codec_map::gpu_encoder_for_codec(codec, gpu_vendor).is_some());
 
     if !has_any_gpu {
         let codec_names = fmt
@@ -393,28 +374,15 @@ fn recommend_for_input(
     }
 }
 
-fn check_video_encoder(
-    result: &mut ValidationResult,
-    fmt: &video::VideoFormat,
-    _use_gpu: bool,
-    _ctx: &ValidationContext,
-) {
-    if !codec_registry::is_initialized() {
+fn check_video_encoder(result: &mut ValidationResult, fmt: &video::VideoFormat) {
+    if !crate::codec_registry::is_initialized() {
         return;
     }
 
     // Check if at least one software encoder is available for this format
     let any_sw_available = fmt.video_codecs.iter().any(|codec| {
-        let sw_name = match codec.as_str() {
-            "h264" => "libx264",
-            "hevc" => "libx265",
-            "vp9" => "libvpx-vp9",
-            "vp8" => "libvpx",
-            "av1" => "libaom-av1",
-            "theora" => "libtheora",
-            other => other,
-        };
-        codec_registry::is_encoder_available(sw_name)
+        let sw_name = codec_map::software_encoder_for_codec(codec).unwrap_or(codec);
+        crate::codec_registry::is_encoder_available(sw_name)
     });
 
     if !any_sw_available {

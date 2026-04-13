@@ -39,27 +39,10 @@ pub fn is_initialized() -> bool {
     AVAILABLE_ENCODERS.get().is_some()
 }
 
-/// Get the software encoder name for a given codec type.
-/// Returns the encoder FFmpeg would use (e.g., "h264" → "libx264").
-pub fn get_software_encoder(codec_type: &str) -> Option<&'static str> {
-    match codec_type {
-        "h264" => Some("libx264"),
-        "hevc" => Some("libx265"),
-        "vp9" => Some("libvpx-vp9"),
-        "vp8" => Some("libvpx"),
-        "av1" => Some("libaom-av1"),
-        "theora" => Some("libtheora"),
-        "mpeg2video" => Some("mpeg2video"),
-        "mpeg4" => Some("mpeg4"),
-        _ => None,
-    }
-}
-
 /// For an audio codec name, get a fallback if the primary isn't available.
 pub fn get_audio_fallback(codec: &str) -> Option<&'static str> {
     match codec {
         "libmp3lame" if !is_encoder_available("libmp3lame") => {
-            // Some FFmpeg builds have native mp3 encoder
             if is_encoder_available("mp3") {
                 Some("mp3")
             } else {
@@ -103,12 +86,6 @@ fn parse_ffmpeg_list(ffmpeg_path: &str, flag: &str) -> HashSet<String> {
 }
 
 /// Parse the output of `ffmpeg -encoders` or `ffmpeg -decoders`.
-///
-/// Format after the separator line:
-/// ```text
-///  V..... libx264          libx264 H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10 (codec h264)
-///  A..... aac              AAC (Advanced Audio Coding)
-/// ```
 fn parse_codec_list(output: &str) -> HashSet<String> {
     let mut codecs = HashSet::new();
     let mut past_separator = false;
@@ -127,7 +104,6 @@ fn parse_codec_list(output: &str) -> HashSet<String> {
             continue;
         }
 
-        // First token = flags (e.g., "V....."), second token = codec name
         let mut tokens = trimmed.split_whitespace();
         if let (Some(_flags), Some(name)) = (tokens.next(), tokens.next()) {
             if !name.is_empty() && name != "=" {

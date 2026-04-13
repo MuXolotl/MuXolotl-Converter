@@ -1,7 +1,8 @@
 use super::builder::FfmpegBuilder;
 use super::spawn_ffmpeg;
+use crate::codec_map;
 use crate::codec_registry;
-use crate::formats::video::{self, get_software_fallback, VideoFormat};
+use crate::formats::video::{self, VideoFormat};
 use crate::gpu::GpuInfo;
 use crate::media::{self, MediaInfo};
 use crate::types::{ConversionSettings, Quality};
@@ -61,8 +62,8 @@ pub async fn convert(
     let mut video_codec = determine_video_codec(&fmt, &gpu_info, use_gpu, &settings);
 
     // Pre-validate GPU codec
-    if is_gpu_codec(&video_codec) && !gpu_info.is_encoder_available(&video_codec) {
-        if let Some(sw) = get_software_fallback(&video_codec) {
+    if codec_map::is_gpu_encoder(&video_codec) && !gpu_info.is_encoder_available(&video_codec) {
+        if let Some(sw) = codec_map::software_fallback_for_encoder(&video_codec) {
             eprintln!(
                 "[Codec] {} not available on {} — falling back to {}",
                 video_codec, gpu_info.name, sw
@@ -76,12 +77,12 @@ pub async fn convert(
                     "reason": format!("{} not supported by {}", video_codec, gpu_info.name),
                 }),
             );
-            video_codec = sw;
+            video_codec = sw.to_string();
         }
     }
 
     // Check codec registry (FFmpeg build support)
-    if !is_gpu_codec(&video_codec)
+    if !codec_map::is_gpu_encoder(&video_codec)
         && codec_registry::is_initialized()
         && !codec_registry::is_encoder_available(&video_codec)
     {
@@ -98,9 +99,9 @@ pub async fn convert(
 
     // Verify format compatibility
     if !fmt.supports_video_codec(&video_codec) {
-        if let Some(sw) = get_software_fallback(&video_codec) {
-            if fmt.supports_video_codec(&sw) {
-                video_codec = sw;
+        if let Some(sw) = codec_map::software_fallback_for_encoder(&video_codec) {
+            if fmt.supports_video_codec(sw) {
+                video_codec = sw.to_string();
             } else {
                 anyhow::bail!(
                     "No compatible codec for format '{}' (tried: {})",
@@ -183,8 +184,8 @@ pub async fn convert(
     .await
     {
         Ok(result) => Ok(result),
-        Err(e) if get_software_fallback(&video_codec).is_some() => {
-            let sw_codec = get_software_fallback(&video_codec).unwrap();
+        Err(e) if codec_map::software_fallback_for_encoder(&video_codec).is_some() => {
+            let sw_codec = codec_map::software_fallback_for_encoder(&video_codec).unwrap();
             eprintln!(
                 "[Fallback] {} failed at runtime, retrying with {}: {}",
                 video_codec, sw_codec, e
@@ -206,8 +207,8 @@ pub async fn convert(
                 .input_file()
                 .progress_pipe()
                 .metadata(&settings.metadata)
-                .video_codec(&sw_codec)
-                .apply_video_codec_preset(&sw_codec, settings.quality);
+                .video_codec(sw_codec)
+                .apply_video_codec_preset(sw_codec, settings.quality);
 
             if let Some(br) = settings.bitrate {
                 retry = retry.arg("-b:v", &format!("{}k", br));
@@ -252,16 +253,13 @@ async fn convert_to_gif(
     task_id: String,
     processes: Arc<Mutex<HashMap<String, Child>>>,
 ) -> Result<String> {
-    // Determine target FPS (GIF standard: 10-15fps, max useful ~20fps)
     let gif_fps = settings.fps.unwrap_or(15).min(20);
 
-    // Determine scale
     let scale_part = match (settings.width, settings.height) {
         (Some(w), Some(h)) => format!("scale={}:{}:flags=lanczos", w, h),
         (Some(w), None) => format!("scale={}:-2:flags=lanczos", w),
         (None, Some(h)) => format!("scale=-2:{}:flags=lanczos", h),
         (None, None) => {
-            // Auto-scale: cap at 480px width for reasonable GIF file size
             let source_width = media.primary_video().map(|v| v.width).unwrap_or(640);
             if source_width > 480 {
                 "scale=480:-2:flags=lanczos".to_string()
@@ -271,8 +269,6 @@ async fn convert_to_gif(
         }
     };
 
-    // Build filter_complex for palette-optimized GIF
-    // This produces significantly better quality than simple -c:v gif
     let filter_complex = format!(
         "[0:v]fps={},{},split[s0][s1];[s0]palettegen=max_colors=256:stats_mode=diff[p];[s1][p]paletteuse=dither=sierra2_4a",
         gif_fps, scale_part
@@ -332,22 +328,12 @@ fn can_copy_video_stream(
 
 // ============ Helpers ============
 
-fn is_gpu_codec(codec: &str) -> bool {
-    codec.contains("nvenc")
-        || codec.contains("qsv")
-        || codec.contains("amf")
-        || codec.contains("videotoolbox")
-}
-
 fn find_available_encoder(fmt: &VideoFormat) -> Option<String> {
     for codec_type in &fmt.video_codecs {
-        if let Some(sw_name) = codec_registry::get_software_encoder(codec_type) {
-            if codec_registry::is_encoder_available(sw_name) {
-                return Some(sw_name.to_string());
-            }
-        }
-        if codec_registry::is_encoder_available(codec_type) {
-            return Some(codec_type.clone());
+        let sw_name = codec_map::software_encoder_for_codec(codec_type)
+            .unwrap_or(codec_type);
+        if codec_registry::is_encoder_available(sw_name) {
+            return Some(sw_name.to_string());
         }
     }
     None
@@ -407,7 +393,6 @@ fn apply_resolution(
     media: &MediaInfo,
     settings: &ConversionSettings,
 ) -> FfmpegBuilder {
-    // Fixed resolution formats (VOB/DV): force to standard size
     if fmt.requires_fixed_resolution {
         let source_height = media.primary_video().map(|v| v.height).unwrap_or(576);
         let height = if source_height <= 480 { 480 } else { 576 };
@@ -417,13 +402,10 @@ fn apply_resolution(
             .arg("-r", fps);
     }
 
-    // User explicitly set resolution — use it
     if settings.width.is_some() || settings.height.is_some() {
         return builder.resolution(settings.width, settings.height, false);
     }
 
-    // Auto-downscale if source exceeds format's max resolution
-    // Uses resolution_fit to respect BOTH width AND height limits
     if let Some((max_w, max_h)) = fmt.max_resolution {
         if let Some(video) = media.primary_video() {
             if video.width > max_w || video.height > max_h {
