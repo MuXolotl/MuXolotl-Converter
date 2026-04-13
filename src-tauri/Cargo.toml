@@ -3,7 +3,7 @@ name = "muxolotl-converter"
 version = "1.2.0"
 description = "High-Performance Audio & Video Converter"
 authors = ["MuXolotl"]
-license = "MIT"
+license = "GPL-2.0-only"
 repository = "https://github.com/MuXolotl/MuXolotl-Converter"
 edition = "2021"
 
