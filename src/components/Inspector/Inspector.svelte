@@ -14,21 +14,15 @@
   import { formatDuration, formatFileSize } from '@/utils';
   import { fileQueueStore } from '@/stores/fileQueue.svelte';
   import { conversionStore } from '@/stores/conversion.svelte';
-  import { gpuStore } from '@/stores/gpu.svelte';
   import FormatSelector from '@/components/FormatSelector.svelte';
   import SettingsPanel from './SettingsPanel.svelte';
   import ValidationBanner from './ValidationBanner.svelte';
   import FileInfo from './FileInfo.svelte';
   import Tabs from './Tabs.svelte';
   import type { TabId } from './Tabs.svelte';
-  import type {
-    FileItem,
-    FileSettings,
-    AudioFormat,
-    VideoFormat,
-    ValidationResult,
-    RecommendedFormats,
-  } from '@/types';
+  import { useFormats } from './useFormats';
+  import { useValidation } from './useValidation';
+  import type { FileItem, FileSettings } from '@/types';
 
   interface Props {
     file: FileItem | null;
@@ -39,10 +33,11 @@
 
   let { file, selectedCount, outputFolder, onRetry }: Props = $props();
 
+  // --- Composables ---
+  const formatLoader = useFormats();
+  const validator = useValidation();
+
   // --- Local state ---
-  let formats = $state<(AudioFormat | VideoFormat)[]>([]);
-  let recommendations = $state<RecommendedFormats | undefined>();
-  let validation = $state<ValidationResult | null>(null);
   let activeTab = $state<TabId>('general');
 
   // Track previous values to avoid unnecessary tab resets
@@ -83,92 +78,23 @@
     prevExtractAudio = currentExtract;
   });
 
-  // --- Effect: load formats ---
+  // --- Effect: load formats when target type changes ---
   $effect(() => {
-    const type = targetType;
-    if (!type) return;
-
-    let cancelled = false;
-    const command = type === 'audio' ? 'get_audio_formats' : 'get_video_formats';
-
-    invoke<(AudioFormat | VideoFormat)[]>(command)
-      .then((data) => {
-        if (!cancelled) formats = data;
-      })
-      .catch((e) => console.error('Failed to load formats:', e));
-
-    return () => {
-      cancelled = true;
-    };
+    formatLoader.load(targetType);
   });
 
-  // --- Effect: load recommendations ---
-  $effect(() => {
-    const mediaInfo = file?.mediaInfo;
-    const status = file?.status;
-    const type = targetType;
-
-    if (!mediaInfo || status !== 'pending' || !type) return;
-
-    let cancelled = false;
-
-    invoke<RecommendedFormats>('get_recommended_formats', {
-      videoCodec: mediaInfo.video_streams[0]?.codec || '',
-      audioCodec: mediaInfo.audio_streams[0]?.codec || '',
-      mediaType: type,
-      width: mediaInfo.video_streams[0]?.width || null,
-      height: mediaInfo.video_streams[0]?.height || null,
-    })
-      .then((recs) => {
-        if (!cancelled) recommendations = recs;
-      })
-      .catch((e) => console.error('Failed to load recommendations:', e));
-
-    return () => {
-      cancelled = true;
-    };
-  });
-
-  // --- Effect: validate (debounced, with extended context) ---
+  // --- Effect: load recommendations and validate when file/settings change ---
   $effect(() => {
     const currentFile = file;
-    const _format = currentFile?.outputFormat;
-    const _settings = currentFile?.settings;
-    const _status = currentFile?.status;
-    const _mediaInfo = currentFile?.mediaInfo;
     const type = targetType;
 
-    if (!currentFile || _status !== 'pending' || !_mediaInfo) {
-      validation = null;
+    if (!currentFile || !type) {
+      validator.reset();
       return;
     }
 
-    const timeout = setTimeout(async () => {
-      try {
-        const gpu = gpuStore.info;
-
-        const result = await invoke<ValidationResult>('validate_conversion', {
-          context: {
-            input_format: _mediaInfo.format_name || '',
-            output_format: currentFile.outputFormat,
-            media_type: type,
-            settings: currentFile.settings,
-            input_video_codec: _mediaInfo.video_streams[0]?.codec || null,
-            input_audio_codec: _mediaInfo.audio_streams[0]?.codec || null,
-            input_width: _mediaInfo.video_streams[0]?.width || null,
-            input_height: _mediaInfo.video_streams[0]?.height || null,
-            gpu_vendor: gpu.vendor !== 'none' ? gpu.vendor : null,
-            gpu_name: gpu.available ? gpu.name : null,
-            gpu_available: gpu.available,
-          },
-        });
-        validation = result;
-      } catch (e) {
-        console.error('Validation error:', e);
-      }
-    }, APP_CONFIG.limits.validationDebounceMs);
-
-    return () => clearTimeout(timeout);
+    validator.loadRecommendations(currentFile, type);
+    validator.runValidation(currentFile, type);
   });
 
   // --- Handlers ---
@@ -325,19 +251,19 @@
             <ArrowRight size={10} class="text-white/20 shrink-0" />
             <div class="flex-1 min-w-0">
               <FormatSelector
-                {formats}
+                formats={formatLoader.formats}
                 selected={file.outputFormat}
                 onChange={handleFormatChange}
                 disabled={isDisabled}
-                recommendedFormats={recommendations}
+                recommendedFormats={validator.recommendations}
               />
             </div>
           </div>
         </div>
 
-        {#if !isDisabled && validation}
+        {#if !isDisabled && validator.validation}
           <div class="mb-3">
-            <ValidationBanner {validation} />
+            <ValidationBanner validation={validator.validation} />
           </div>
         {/if}
 
