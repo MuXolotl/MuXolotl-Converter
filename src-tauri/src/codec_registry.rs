@@ -19,19 +19,25 @@ pub fn init(ffmpeg_path: &str) {
     );
 }
 
-/// Check if a specific encoder is available in this FFmpeg build
+/// Check if a specific encoder is available in this FFmpeg build.
+///
+/// Returns `false` if the registry has not been initialized — conservative default
+/// that prevents attempting to use encoders that may not exist.
 pub fn is_encoder_available(name: &str) -> bool {
     AVAILABLE_ENCODERS
         .get()
-        .map_or(true, |s| s.contains(name)) // Default true if registry not initialized
+        .map_or(false, |s| s.contains(name))
 }
 
-/// Check if a specific decoder is available in this FFmpeg build
+/// Check if a specific decoder is available in this FFmpeg build.
+///
+/// Returns `false` if the registry has not been initialized — conservative default
+/// that prevents attempting to use decoders that may not exist.
 #[allow(dead_code)]
 pub fn is_decoder_available(name: &str) -> bool {
     AVAILABLE_DECODERS
         .get()
-        .map_or(true, |s| s.contains(name))
+        .map_or(false, |s| s.contains(name))
 }
 
 /// Check if the registry has been initialized
