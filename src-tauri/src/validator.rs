@@ -1,6 +1,5 @@
 use crate::codec_registry;
 use crate::formats::{audio, video, Stability};
-use crate::gpu::GpuInfo;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

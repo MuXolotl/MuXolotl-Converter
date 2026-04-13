@@ -70,9 +70,13 @@ pub async fn check_ffmpeg(app: tauri::AppHandle) -> Result<bool, String> {
 }
 
 #[tauri::command]
-pub async fn detect_gpu() -> GpuInfo {
+pub async fn detect_gpu(app: tauri::AppHandle) -> GpuInfo {
+    let ffmpeg_path = binary::get_ffmpeg_path(&app)
+        .ok()
+        .and_then(|p| p.to_str().map(|s| s.to_string()));
+
     GPU_CACHE
-        .get_or_init(|| async { gpu::detect_gpu().await })
+        .get_or_init(|| async { gpu::detect_gpu(ffmpeg_path).await })
         .await
         .clone()
 }
@@ -280,8 +284,12 @@ pub async fn cancel_conversion(
 }
 
 pub async fn init_caches(window: &tauri::WebviewWindow) {
+    let ffmpeg_path = binary::get_ffmpeg_path(&window.app_handle())
+        .ok()
+        .and_then(|p| p.to_str().map(|s| s.to_string()));
+
     let gpu = GPU_CACHE
-        .get_or_init(|| async { gpu::detect_gpu().await })
+        .get_or_init(|| async { gpu::detect_gpu(ffmpeg_path).await })
         .await;
     let _ = window.emit("gpu-detected", gpu);
 

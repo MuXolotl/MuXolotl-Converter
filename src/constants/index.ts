@@ -41,7 +41,7 @@ export const MEDIA_EXTENSIONS = [
 
 export const STABILITY_CONFIG: Record<Stability, { icon: string; color: string }> = {
   stable: { icon: '✓', color: 'text-green-400' },
-  requiressetup: { icon: '⚠️', color: 'text-yellow-400' },
+  requires_setup: { icon: '⚠️', color: 'text-yellow-400' },
   experimental: { icon: '🔧', color: 'text-orange-400' },
   problematic: { icon: '⛔', color: 'text-red-400' },
 };

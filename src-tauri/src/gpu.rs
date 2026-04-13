@@ -107,26 +107,26 @@ fn get_candidates(vendor: GpuVendor) -> Vec<&'static str> {
 
 // ============ Main detection entry point ============
 
-pub async fn detect_gpu() -> GpuInfo {
+pub async fn detect_gpu(ffmpeg_path: Option<String>) -> GpuInfo {
     // Try each vendor in priority order
-    if let Some(gpu) = try_detect(GpuVendor::Nvidia).await {
+    if let Some(gpu) = try_detect(GpuVendor::Nvidia, ffmpeg_path.clone()).await {
         return gpu;
     }
-    if let Some(gpu) = try_detect(GpuVendor::Amd).await {
+    if let Some(gpu) = try_detect(GpuVendor::Amd, ffmpeg_path.clone()).await {
         return gpu;
     }
-    if let Some(gpu) = try_detect(GpuVendor::Intel).await {
+    if let Some(gpu) = try_detect(GpuVendor::Intel, ffmpeg_path.clone()).await {
         return gpu;
     }
     #[cfg(target_os = "macos")]
-    if let Some(gpu) = try_detect(GpuVendor::Apple).await {
+    if let Some(gpu) = try_detect(GpuVendor::Apple, ffmpeg_path.clone()).await {
         return gpu;
     }
 
     GpuInfo::default()
 }
 
-async fn try_detect(vendor: GpuVendor) -> Option<GpuInfo> {
+async fn try_detect(vendor: GpuVendor, ffmpeg_path: Option<String>) -> Option<GpuInfo> {
     // Step 1: Check if GPU hardware is present
     let name = match vendor {
         GpuVendor::Nvidia => detect_nvidia_name().await?,
@@ -145,7 +145,7 @@ async fn try_detect(vendor: GpuVendor) -> Option<GpuInfo> {
         return None;
     }
 
-    let encoders = test_encoders_parallel(&candidates).await;
+    let encoders = test_encoders_parallel(&candidates, ffmpeg_path).await;
 
     // At least one encoder must work
     let any_available = encoders.values().any(|&v| v);
@@ -195,13 +195,14 @@ fn find_first_available(encoders: &HashMap<String, bool>, candidates: &[&str]) -
 // ============ Encoder testing ============
 
 /// Test multiple encoders in parallel for speed
-async fn test_encoders_parallel(candidates: &[&str]) -> HashMap<String, bool> {
+async fn test_encoders_parallel(candidates: &[&str], ffmpeg_path: Option<String>) -> HashMap<String, bool> {
     let mut handles = Vec::new();
 
     for &enc in candidates {
         let encoder_name = enc.to_string();
+        let path_clone = ffmpeg_path.clone();
         handles.push(tokio::spawn(async move {
-            let available = test_encoder_real(&encoder_name).await;
+            let available = test_encoder_real(&encoder_name, path_clone.as_deref()).await;
             (encoder_name, available)
         }));
     }
@@ -218,12 +219,13 @@ async fn test_encoders_parallel(candidates: &[&str]) -> HashMap<String, bool> {
 
 /// Actually test if an encoder works by trying a minimal encode.
 /// This catches: wrong GPU generation, missing drivers, FFmpeg not compiled with support.
-async fn test_encoder_real(encoder: &str) -> bool {
-    let encoder = encoder.to_string();
+async fn test_encoder_real(encoder: &str, ffmpeg_path: Option<&str>) -> bool {
+    let encoder_owned = encoder.to_string();
+    let cmd_str = ffmpeg_path.unwrap_or("ffmpeg").to_string();
     let null_output = if cfg!(windows) { "NUL" } else { "/dev/null" };
 
     let future = tokio::task::spawn_blocking(move || {
-        create_hidden_command("ffmpeg")
+        create_hidden_command(&cmd_str)
             .args([
                 "-hide_banner",
                 "-loglevel", "error",
@@ -231,7 +233,7 @@ async fn test_encoder_real(encoder: &str) -> bool {
                 "-i", "nullsrc=s=256x256:d=0.1:r=1",
                 "-frames:v", "1",
                 "-an",
-                "-c:v", &encoder,
+                "-c:v", &encoder_owned,
                 "-f", "null",
                 null_output,
             ])

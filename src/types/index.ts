@@ -37,7 +37,7 @@ export interface MediaInfo {
   audio_streams: AudioStream[];
 }
 
-export type Stability = 'stable' | 'requiressetup' | 'experimental' | 'problematic';
+export type Stability = 'stable' | 'requires_setup' | 'experimental' | 'problematic';
 export type Category = 'popular' | 'standard' | 'specialized' | 'legacy' | 'exotic';
 
 export interface AudioFormat {
