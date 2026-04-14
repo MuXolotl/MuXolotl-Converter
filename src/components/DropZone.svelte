@@ -3,7 +3,7 @@
   import { open } from '@tauri-apps/plugin-dialog';
   import { listen } from '@tauri-apps/api/event';
   import { MEDIA_EXTENSIONS } from '@/constants';
-  import { processFilePaths } from '@/utils/fileHelpers';
+  import { processFilePaths } from '@/utils';
   import type { FileItem } from '@/types';
 
   interface DragDropPayload {
@@ -95,7 +95,7 @@
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div
     onclick={isDisabled ? undefined : handleBrowse}
-    class="w-full py-12 flex flex-col items-center justify-center gap-4 border border-dashed rounded-xl transition-all cursor-pointer bg-[#0f172a]/50
+    class="w-full py-12 flex flex-col items-center justify-center gap-4 border border-dashed rounded-xl transition-all cursor-pointer bg-surface-base/50
       {isFull
         ? 'border-red-500/30 cursor-not-allowed opacity-50'
         : isDragging

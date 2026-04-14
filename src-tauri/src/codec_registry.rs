@@ -13,9 +13,10 @@ pub fn init(ffmpeg_path: &str) {
 
     let enc_count = AVAILABLE_ENCODERS.get().map_or(0, |s| s.len());
     let dec_count = AVAILABLE_DECODERS.get().map_or(0, |s| s.len());
-    eprintln!(
-        "[CodecRegistry] Loaded {} encoders, {} decoders",
-        enc_count, dec_count
+    tracing::info!(
+        encoders = enc_count,
+        decoders = dec_count,
+        "Codec registry initialized"
     );
 }
 
@@ -77,15 +78,15 @@ fn parse_ffmpeg_list(ffmpeg_path: &str, flag: &str) -> HashSet<String> {
             parse_codec_list(&stdout)
         }
         Ok(out) => {
-            eprintln!(
-                "[CodecRegistry] FFmpeg {} failed: {}",
+            tracing::warn!(
                 flag,
-                String::from_utf8_lossy(&out.stderr)
+                stderr = %String::from_utf8_lossy(&out.stderr).trim(),
+                "FFmpeg list command failed"
             );
             HashSet::new()
         }
         Err(e) => {
-            eprintln!("[CodecRegistry] Failed to run FFmpeg {}: {}", flag, e);
+            tracing::warn!(flag, error = %e, "Failed to run FFmpeg list command");
             HashSet::new()
         }
     }

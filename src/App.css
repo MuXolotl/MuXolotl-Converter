@@ -3,11 +3,10 @@
 @tailwind utilities;
 
 :root {
-  --bg-dark: #0f172a;
-  --bg-panel: #1e293b;
-  --bg-hover: #334155;
-  --border-color: rgba(255, 255, 255, 0.08);
-  --accent-color: #3b82f6;
+  --surface-base: #0f172a;
+  --surface-panel: #1e293b;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --accent: #3b82f6;
 }
 
 * {
@@ -21,7 +20,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
-  background-color: var(--bg-dark);
+  background-color: var(--surface-base);
   color: #e2e8f0;
 }
 
@@ -54,21 +53,9 @@ body {
 
 .glass {
   background: rgba(30, 41, 59, 0.95);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-subtle);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-}
-
-.gradient-text {
-  color: white;
-}
-
-.bg-gradient-main {
-  background: var(--bg-dark);
-}
-
-.bg-gradient-primary {
-  background: var(--accent-color);
 }
 
 [data-tauri-drag-region] {
@@ -82,7 +69,7 @@ body {
 }
 
 select option {
-  background-color: var(--bg-panel);
+  background-color: var(--surface-panel);
   color: white;
   padding: 8px;
 }
@@ -124,8 +111,8 @@ input[type="checkbox"] {
 }
 
 input[type="checkbox"]:checked {
-  background-color: var(--accent-color);
-  border-color: var(--accent-color);
+  background-color: var(--accent);
+  border-color: var(--accent);
 }
 
 input[type="checkbox"]:checked::before {

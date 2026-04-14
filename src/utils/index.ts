@@ -1,5 +1,6 @@
+import { invoke } from '@tauri-apps/api/core';
 import { APP_CONFIG } from '@/config';
-import type { FileItem, FileSettings, MediaType, ConversionStatus, QueueStats, SystemInfo } from '@/types';
+import type { FileItem, FileSettings, MediaType, ConversionStatus, QueueStats, SystemInfo, MediaInfo } from '@/types';
 
 let idCounter = 0;
 
@@ -127,6 +128,58 @@ export function getSystemInfo(): SystemInfo {
     language: navigator.language,
   };
 }
+
+// ============ File processing ============
+
+const FILE_BATCH_SIZE = 10;
+
+/**
+ * Process file paths into FileItem objects by probing media info via FFprobe.
+ * Processes in batches to avoid overwhelming the backend.
+ */
+export async function processFilePaths(paths: string[]): Promise<FileItem[]> {
+  const results: FileItem[] = [];
+  const errors: string[] = [];
+
+  for (let i = 0; i < paths.length; i += FILE_BATCH_SIZE) {
+    const batch = paths.slice(i, i + FILE_BATCH_SIZE);
+    const batchResults = await Promise.allSettled(batch.map(processFile));
+
+    for (const result of batchResults) {
+      if (result.status === 'fulfilled') {
+        results.push(result.value);
+      } else {
+        errors.push(String(result.reason));
+      }
+    }
+  }
+
+  if (errors.length > 0) {
+    console.warn(`Failed to process ${errors.length} file(s):`, errors);
+  }
+
+  return results;
+}
+
+async function processFile(path: string): Promise<FileItem> {
+  const mediaInfo = await invoke<MediaInfo>('detect_media_type', { path });
+  const name = path.split(/[\\/]/).pop() || 'unknown';
+
+  return {
+    id: generateFileId(),
+    path,
+    name,
+    mediaInfo,
+    outputFormat: getDefaultFormat(mediaInfo.media_type),
+    settings: getDefaultSettings(),
+    status: 'pending',
+    progress: null,
+    error: null,
+    addedAt: Date.now(),
+  };
+}
+
+// ============ Queue persistence ============
 
 interface StorageData {
   version: number;

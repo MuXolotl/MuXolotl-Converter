@@ -54,7 +54,7 @@
 
 <div
   data-tauri-drag-region
-  class="relative h-9 bg-[#0f172a] flex items-center justify-between px-2 select-none shrink-0 border-b border-white/5"
+  class="relative h-9 bg-surface-base flex items-center justify-between px-2 select-none shrink-0 border-b border-white/5"
 >
   <div class="flex items-center w-20 pl-2">
     <span class="text-lg">🦎</span>

@@ -117,9 +117,10 @@ fn resolve_audio_codec(fmt: &AudioFormat) -> Result<String> {
 
     // Try fallback
     if let Some(fallback) = codec_registry::get_audio_fallback(codec) {
-        eprintln!(
-            "[Audio] Encoder '{}' not available, using fallback '{}'",
-            codec, fallback
+        tracing::warn!(
+            codec = %codec,
+            fallback = %fallback,
+            "Audio encoder not available, using fallback"
         );
         return Ok(fallback.to_string());
     }

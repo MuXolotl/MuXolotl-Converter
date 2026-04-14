@@ -206,7 +206,7 @@ lazy_static! {
                 parsed.format.into_iter().map(|f| (f.extension.clone(), f.into())).collect()
             }
             Err(e) => {
-                eprintln!("[VideoFormats] FATAL: Failed to parse video_formats.toml: {}", e);
+                tracing::error!(error = %e, "Failed to parse video_formats.toml");
                 HashMap::new()
             }
         }

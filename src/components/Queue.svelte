@@ -67,7 +67,7 @@
 </script>
 
 {#if files.length === 0}
-  <div class="h-full flex flex-col items-center justify-center p-4 bg-[#1e293b]/30">
+  <div class="h-full flex flex-col items-center justify-center p-4 bg-surface-panel/30">
     <DropZone {onFilesAdded} currentCount={0} maxCount={APP_CONFIG.limits.maxQueueSize} />
   </div>
 {:else}
@@ -75,7 +75,7 @@
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
   <div
-    class="h-full flex flex-col bg-[#1e293b]/30 outline-none"
+    class="h-full flex flex-col bg-surface-panel/30 outline-none"
     role="listbox"
     tabindex="0"
     onkeydown={handleKeyDown}
@@ -85,7 +85,7 @@
     <ActionBar {selectedFile} />
 
     <!-- Header -->
-    <div class="shrink-0 bg-[#0f172a] border-b border-white/10 select-none px-2 py-1.5">
+    <div class="shrink-0 bg-surface-base border-b border-white/10 select-none px-2 py-1.5">
       <div
         class="flex items-center gap-2 text-[9px] font-semibold text-slate-500 uppercase tracking-wider"
       >

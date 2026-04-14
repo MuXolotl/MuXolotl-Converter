@@ -13,13 +13,13 @@
 
 <div class="flex flex-col shrink-0 z-30">
   {#if isOpen}
-    <div class="h-32 bg-[#0b1120] border-t border-white/10 p-2 font-mono text-xs text-slate-300 overflow-y-auto shadow-inner">
+    <div class="h-32 bg-surface-deep border-t border-white/10 p-2 font-mono text-xs text-slate-300 overflow-y-auto shadow-inner">
       <div class="opacity-50 select-none">// FFmpeg Output Log (Coming Soon)</div>
       <div class="mt-1 text-blue-400">$ ffmpeg -i input.mp4 -c:v libx264 output.mp4</div>
     </div>
   {/if}
 
-  <div class="h-6 bg-[#0f172a] border-t border-white/5 flex items-center justify-between px-3 text-[10px] font-mono select-none">
+  <div class="h-6 bg-surface-base border-t border-white/5 flex items-center justify-between px-3 text-[10px] font-mono select-none">
     <div class="flex items-center flex-1 min-w-0 mr-4">
       {#if !lastFile}
         <span class="text-slate-500">Ready</span>

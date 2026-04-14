@@ -14,7 +14,7 @@
   let { stats, gpuInfo, gpuLoading, outputFolder, onFolderChange }: Props = $props();
 </script>
 
-<div class="h-10 bg-[#0f172a] border-b border-white/5 flex items-center px-2 gap-2 shrink-0 overflow-hidden">
+<div class="h-10 bg-surface-base border-b border-white/5 flex items-center px-2 gap-2 shrink-0 overflow-hidden">
   <!-- Left: GPU + Stats -->
   <div class="flex items-center gap-2 text-[10px] font-mono text-slate-500 shrink-0">
     {#if !gpuLoading}

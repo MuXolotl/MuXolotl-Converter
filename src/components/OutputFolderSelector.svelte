@@ -36,7 +36,7 @@
 <div
   onclick={handleSelect}
   class="flex items-center gap-2 px-2 py-1 border rounded cursor-pointer transition-all min-w-0 max-w-full {outputFolder
-    ? 'bg-[#1e293b] border-white/10 hover:border-blue-500/50'
+    ? 'bg-surface-panel border-white/10 hover:border-blue-500/50'
     : 'bg-blue-900/10 border-blue-500/30 hover:bg-blue-900/20'}"
   title={outputFolder || 'Click to select output folder'}
 >

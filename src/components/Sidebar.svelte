@@ -14,7 +14,7 @@
   }
 </script>
 
-<div class="w-12 h-full flex flex-col items-center py-3 bg-[#0f172a] border-r border-white/5 select-none z-20">
+<div class="w-12 h-full flex flex-col items-center py-3 bg-surface-base border-r border-white/5 select-none z-20">
   <div class="flex-1 flex flex-col gap-3 w-full">
     <button
       class="relative w-full h-10 flex items-center justify-center transition-all text-blue-400"

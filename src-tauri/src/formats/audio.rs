@@ -154,7 +154,7 @@ lazy_static! {
                 parsed.format.into_iter().map(|f| (f.extension.clone(), f.into())).collect()
             }
             Err(e) => {
-                eprintln!("[AudioFormats] FATAL: Failed to parse audio_formats.toml: {}", e);
+                tracing::error!(error = %e, "Failed to parse audio_formats.toml");
                 HashMap::new()
             }
         }

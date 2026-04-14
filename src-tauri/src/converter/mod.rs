@@ -60,7 +60,9 @@ pub async fn spawn_ffmpeg(
         let mut reader = BufReader::new(stderr).lines();
         while let Ok(Some(line)) = reader.next_line().await {
             if line.contains("Error") || line.contains("Invalid") || line.contains("failed") {
-                eprintln!("[FFmpeg Error] {}: {}", task_id_err, line);
+                tracing::warn!(task_id = %task_id_err, stderr = %line);
+            } else if !line.is_empty() {
+                tracing::trace!(task_id = %task_id_err, stderr = %line);
             }
         }
     });

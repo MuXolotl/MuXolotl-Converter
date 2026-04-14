@@ -101,6 +101,10 @@ fn get_candidates(vendor: GpuVendor) -> Vec<&'static str> {
 
 // ============ Main detection entry point ============
 
+/// GPU detection priority: NVIDIA > AMD > Intel > Apple.
+/// NVIDIA first because NVENC is the most widely available and reliable.
+/// AMD before Intel because AMF is more common on desktop GPUs.
+/// Apple last because it only applies to macOS.
 pub async fn detect_gpu(ffmpeg_path: Option<String>) -> GpuInfo {
     // Try each vendor in priority order
     if let Some(gpu) = try_detect(GpuVendor::Nvidia, ffmpeg_path.clone()).await {
@@ -159,12 +163,12 @@ async fn try_detect(vendor: GpuVendor, ffmpeg_path: Option<String>) -> Option<Gp
         GpuVendor::None => None,
     };
 
-    // Log results for debugging
+    // Log results
     for (enc, ok) in &encoders {
         if *ok {
-            eprintln!("[GPU] ✅ {} — available", enc);
+            tracing::info!(encoder = %enc, vendor = ?vendor, "GPU encoder available");
         } else {
-            eprintln!("[GPU] ❌ {} — unavailable", enc);
+            tracing::debug!(encoder = %enc, vendor = ?vendor, "GPU encoder unavailable");
         }
     }
 

@@ -184,7 +184,7 @@
 {#if ffmpegReady === null}
   <!-- Loading... -->
 {:else if ffmpegReady === false}
-  <div class="h-screen w-screen bg-[#0f172a] text-white flex items-center justify-center">
+  <div class="h-screen w-screen bg-surface-base text-white flex items-center justify-center">
     <div class="max-w-lg w-full text-center p-8">
       <div class="text-6xl mb-4">⚠️</div>
       <h1 class="text-xl font-bold mb-2">FFmpeg Not Found</h1>
@@ -206,7 +206,7 @@
     </div>
   </div>
 {:else}
-  <div class="h-screen w-screen bg-[#0f172a] text-white flex flex-col overflow-hidden">
+  <div class="h-screen w-screen bg-surface-base text-white flex flex-col overflow-hidden">
     <TitleBar />
     <div class="flex-1 flex overflow-hidden min-h-0">
       <Sidebar onFeedbackClick={() => (feedbackOpen = true)} />

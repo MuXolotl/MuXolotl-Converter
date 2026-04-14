@@ -90,7 +90,7 @@
 
 {#if hasFiles}
   <div
-    class="bg-[#0f172a] border-b border-white/10 flex items-center px-2 py-1.5 gap-1.5 shrink-0 overflow-x-auto"
+    class="bg-surface-base border-b border-white/10 flex items-center px-2 py-1.5 gap-1.5 shrink-0 overflow-x-auto"
   >
     <!-- Convert All -->
     <button

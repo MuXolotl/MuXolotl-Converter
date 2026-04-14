@@ -4,6 +4,14 @@ export default {
   theme: {
     extend: {
       colors: {
+        surface: {
+          base: '#0f172a',
+          panel: '#1e293b',
+          elevated: '#334155',
+          deep: '#0b1120',
+          overlay: '#172033',
+          inset: '#161e2e',
+        },
         primary: { purple: '#8b5cf6', pink: '#ec4899' },
         status: {
           success: '#10b981',

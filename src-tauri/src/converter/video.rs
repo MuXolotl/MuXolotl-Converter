@@ -37,7 +37,10 @@ pub async fn convert(
 
     // ========== Stream copy fast path ==========
     if can_copy_video_stream(&media, &fmt, &settings) {
-        eprintln!("[Codec] Using video stream copy (no re-encoding)");
+        tracing::info!(
+            task_id = %task_id,
+            "Using video stream copy — no re-encoding needed"
+        );
         let _ = window.emit(
             "conversion-info",
             serde_json::json!({
@@ -68,9 +71,11 @@ pub async fn convert(
     // Pre-validate GPU codec
     if codec_map::is_gpu_encoder(&video_codec) && !gpu_info.is_encoder_available(&video_codec) {
         if let Some(sw) = codec_map::software_fallback_for_encoder(&video_codec) {
-            eprintln!(
-                "[Codec] {} not available on {} — falling back to {}",
-                video_codec, gpu_info.name, sw
+            tracing::warn!(
+                encoder = %video_codec,
+                gpu = %gpu_info.name,
+                fallback = %sw,
+                "GPU encoder not available, falling back to software"
             );
             let _ = window.emit(
                 "conversion-fallback",
@@ -91,7 +96,11 @@ pub async fn convert(
         && !codec_registry::is_encoder_available(&video_codec)
     {
         if let Some(alt) = find_available_encoder(&fmt) {
-            eprintln!("[Codec] {} not in FFmpeg, using {}", video_codec, alt);
+            tracing::warn!(
+                encoder = %video_codec,
+                alternative = %alt,
+                "Encoder not available in FFmpeg build, using alternative"
+            );
             video_codec = alt;
         } else {
             anyhow::bail!(
@@ -190,9 +199,11 @@ pub async fn convert(
         Ok(result) => Ok(result),
         Err(e) if codec_map::software_fallback_for_encoder(&video_codec).is_some() => {
             let sw_codec = codec_map::software_fallback_for_encoder(&video_codec).unwrap();
-            eprintln!(
-                "[Fallback] {} failed at runtime, retrying with {}: {}",
-                video_codec, sw_codec, e
+            tracing::warn!(
+                encoder = %video_codec,
+                fallback = %sw_codec,
+                error = %e,
+                "GPU encoder failed at runtime, retrying with software fallback"
             );
 
             let _ = window.emit(
@@ -278,9 +289,10 @@ async fn convert_to_gif(
         gif_fps, scale_part
     );
 
-    eprintln!(
-        "[GIF] Converting with palette optimization: fps={}, filter={}",
-        gif_fps, filter_complex
+    tracing::info!(
+        task_id = %task_id,
+        fps = gif_fps,
+        "Converting to GIF with palette optimization"
     );
 
     let builder = FfmpegBuilder::new(input, output)
@@ -413,9 +425,11 @@ fn apply_resolution(
     if let Some((max_w, max_h)) = fmt.max_resolution {
         if let Some(video) = media.primary_video() {
             if video.width > max_w || video.height > max_h {
-                eprintln!(
-                    "[Resolution] Auto-downscaling {}x{} to fit {}x{} for {}",
-                    video.width, video.height, max_w, max_h, fmt.extension
+                tracing::info!(
+                    source = format!("{}x{}", video.width, video.height),
+                    max = format!("{}x{}", max_w, max_h),
+                    format = %fmt.extension,
+                    "Auto-downscaling to fit format resolution limits"
                 );
                 return builder.resolution_fit(max_w, max_h);
             }
@@ -451,7 +465,10 @@ fn apply_audio_settings(
         let actual_codec = if codec_registry::is_initialized()
             && !codec_registry::is_encoder_available(&rec)
         {
-            eprintln!("[Audio] Encoder {} not available, trying alternatives", rec);
+            tracing::warn!(
+                encoder = %rec,
+                "Audio encoder not available, trying alternatives"
+            );
             codec_registry::get_audio_fallback(&rec)
                 .map(|s| s.to_string())
                 .unwrap_or(rec.clone())

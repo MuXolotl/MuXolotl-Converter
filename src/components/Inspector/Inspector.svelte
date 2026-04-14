@@ -21,8 +21,8 @@
   import FileInfo from './FileInfo.svelte';
   import Tabs from './Tabs.svelte';
   import type { TabId } from './Tabs.svelte';
-  import { useFormats } from './useFormats.svelte.ts';
-  import { useValidation } from './useValidation.svelte.ts';
+  import { useFormats } from '@/composables/useFormats.svelte';
+  import { useValidation } from '@/composables/useValidation.svelte';
   import type { FileItem, FileSettings } from '@/types';
 
   interface Props {
@@ -146,7 +146,7 @@
 {#if !file}
   <!-- Empty state -->
   <div
-    class="h-full flex flex-col items-center justify-center text-slate-500 bg-[#1e293b] border-l border-white/5 p-4"
+    class="h-full flex flex-col items-center justify-center text-slate-500 bg-surface-panel border-l border-white/5 p-4"
   >
     <div class="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center mb-3">
       <svg
@@ -170,13 +170,13 @@
     </p>
   </div>
 {:else}
-  <div class="h-full flex flex-col bg-[#1e293b] border-l border-white/5 overflow-hidden">
+  <div class="h-full flex flex-col bg-surface-panel border-l border-white/5 overflow-hidden">
     <!-- Preview Header -->
     <div
-      class="h-28 shrink-0 bg-[#161e2e] relative flex flex-col items-center justify-center border-b border-white/5 overflow-hidden"
+      class="h-28 shrink-0 bg-surface-inset relative flex flex-col items-center justify-center border-b border-white/5 overflow-hidden"
     >
       <div
-        class="absolute inset-0 bg-gradient-to-b from-transparent to-[#1e293b]/30 pointer-events-none"
+        class="absolute inset-0 bg-gradient-to-b from-transparent to-surface-panel/30 pointer-events-none"
       ></div>
 
       {#if isAudio}
@@ -296,7 +296,7 @@
     </div>
 
     <!-- Action Button -->
-    <div class="p-3 border-t border-white/5 bg-[#172033] shrink-0">
+    <div class="p-3 border-t border-white/5 bg-surface-overlay shrink-0">
       {#if file.status === 'pending'}
         {#if !outputFolder}
           <div
