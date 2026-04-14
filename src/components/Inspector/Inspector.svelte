@@ -20,8 +20,8 @@
   import FileInfo from './FileInfo.svelte';
   import Tabs from './Tabs.svelte';
   import type { TabId } from './Tabs.svelte';
-  import { useFormats } from './useFormats';
-  import { useValidation } from './useValidation';
+  import { useFormats } from './useFormats.svelte.ts';
+  import { useValidation } from './useValidation.svelte.ts';
   import type { FileItem, FileSettings } from '@/types';
 
   interface Props {
