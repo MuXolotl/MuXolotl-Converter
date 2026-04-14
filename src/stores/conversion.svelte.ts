@@ -13,6 +13,7 @@ class ConversionStore {
   #lastUpdate = new Map<string, number>();
   #onError: ((file: FileItem, error: string) => void) | null = null;
   #abortPipeline = false;
+  #activeTaskIds = new Set<string>();
 
   // --- Derived ---
 
@@ -54,6 +55,7 @@ class ConversionStore {
       listen<string>('conversion-completed', (e) => {
         const taskId = e.payload;
         this.#lastUpdate.delete(taskId);
+        this.#activeTaskIds.delete(taskId);
         fileQueueStore.updateFile(taskId, {
           status: 'completed',
           progress: null,
@@ -65,6 +67,7 @@ class ConversionStore {
       listen<string>('conversion-cancelled', (e) => {
         const taskId = e.payload;
         this.#lastUpdate.delete(taskId);
+        this.#activeTaskIds.delete(taskId);
         fileQueueStore.updateFile(taskId, {
           status: 'cancelled',
           progress: null,
@@ -76,6 +79,7 @@ class ConversionStore {
       listen<{ task_id: string; error: string }>('conversion-error', (e) => {
         const { task_id, error } = e.payload;
         this.#lastUpdate.delete(task_id);
+        this.#activeTaskIds.delete(task_id);
 
         const file = fileQueueStore.files.find(f => f.id === task_id);
         if (file && this.#onError) {
@@ -114,6 +118,9 @@ class ConversionStore {
       return;
     }
 
+    // Prevent duplicate processing
+    if (this.#activeTaskIds.has(file.id)) return;
+
     try {
       // Build collision set from all OTHER files' output paths
       const existingPaths = new Set(
@@ -124,6 +131,7 @@ class ConversionStore {
       const outputPath = generateOutputPath(file, outputFolder, existingPaths);
 
       this.activeCount++;
+      this.#activeTaskIds.add(file.id);
 
       fileQueueStore.updateFile(file.id, {
         outputPath,
@@ -179,40 +187,71 @@ class ConversionStore {
       await invoke(command, params);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      fileQueueStore.updateFile(file.id, {
-        status: 'failed',
-        error: errorMessage,
-        progress: null,
-      });
-      this.#onError?.(file, errorMessage);
-      this.activeCount = Math.max(0, this.activeCount - 1);
+      
+      // If invoke rejected, the Rust backend usually emits a 'conversion-error' event.
+      // We only handle the error here if the event listener didn't catch it yet
+      // (e.g., IPC failure). We check the current status to avoid double-handling.
+      const currentFile = fileQueueStore.files.find(f => f.id === file.id);
+      if (currentFile?.status === 'processing') {
+        fileQueueStore.updateFile(file.id, {
+          status: 'failed',
+          error: errorMessage,
+          progress: null,
+        });
+        this.activeCount = Math.max(0, this.activeCount - 1);
+        this.#onError?.(file, errorMessage);
+      }
+      
+      this.#activeTaskIds.delete(file.id);
     }
   }
 
+  /**
+   * Start all pending conversions using a concurrency pool.
+   * Spawns up to `maxParallelConversions` workers that pull tasks from the queue.
+   * Only processes files that were pending at the moment the function was called.
+   */
   async startAll() {
     if (!fileQueueStore.outputFolder) return;
 
     this.#abortPipeline = false;
 
-    const pending = fileQueueStore.files.filter(f => f.status === 'pending');
-    for (const file of pending) {
-      // Check abort flag before starting each file
-      if (this.#abortPipeline) break;
+    const maxParallel = APP_CONFIG.limits.maxParallelConversions;
 
-      // Re-check file is still pending (could have been removed/cancelled)
-      const current = fileQueueStore.files.find(f => f.id === file.id);
-      if (!current || current.status !== 'pending') continue;
+    // Snapshot of target file IDs to prevent newly added files from auto-starting
+    const targetIds = new Set(fileQueueStore.pendingFiles.map(f => f.id));
 
-      await this.startConversion(current);
-    }
+    const worker = async () => {
+      while (!this.#abortPipeline) {
+        // Find the next file that is still pending, in our snapshot, and not already picked up
+        const nextFile = fileQueueStore.files.find(
+          f => f.status === 'pending' && targetIds.has(f.id) && !this.#activeTaskIds.has(f.id)
+        );
+
+        if (!nextFile) break; // No more files to process in this batch
+
+        // Start conversion and wait for it to finish (or fail) before pulling the next one
+        await this.startConversion(nextFile);
+      }
+    };
+
+    // Launch concurrent workers
+    const workers = Array.from(
+      { length: Math.min(maxParallel, targetIds.size) },
+      () => worker()
+    );
+
+    await Promise.all(workers);
   }
 
   async cancelConversion(id: string) {
     try {
+      this.#activeTaskIds.delete(id); // Remove from active set immediately
       await invoke('cancel_conversion', { taskId: id });
     } catch {
       // If invoke fails, update state directly
       this.#lastUpdate.delete(id);
+      this.#activeTaskIds.delete(id);
       fileQueueStore.updateFile(id, {
         status: 'cancelled',
         progress: null,
@@ -238,6 +277,7 @@ class ConversionStore {
     this.#unlisteners.forEach(fn => fn());
     this.#unlisteners = [];
     this.#lastUpdate.clear();
+    this.#activeTaskIds.clear();
   }
 }
 

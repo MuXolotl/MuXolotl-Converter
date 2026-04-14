@@ -14,7 +14,7 @@ export const APP_CONFIG = {
   
   limits: {
     maxQueueSize: 50,
-    maxParallelConversions: 4,
+    maxParallelConversions: 4, // Maximum number of simultaneous conversions
     queuePersistenceDays: 7,
     autosaveDebounceMs: 2000,
     validationDebounceMs: 300,
