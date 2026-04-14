@@ -81,11 +81,7 @@ class ConversionStore {
         this.#lastUpdate.delete(task_id);
         this.#activeTaskIds.delete(task_id);
 
-        const file = fileQueueStore.files.find(f => f.id === task_id);
-        if (file && this.#onError) {
-          this.#onError(file, error);
-        }
-
+        // Standard FFmpeg errors do not require a modal popup; they are shown in the queue item.
         fileQueueStore.updateFile(task_id, {
           status: 'failed',
           error,
@@ -107,15 +103,13 @@ class ConversionStore {
     if (!outputFolder) {
       const error = 'No output folder selected';
       fileQueueStore.updateFile(file.id, { status: 'failed', error });
-      this.#onError?.(file, error);
-      return;
+      return; // No modal for this expected error
     }
 
     if (!file.mediaInfo) {
       const error = 'File has no media information';
       fileQueueStore.updateFile(file.id, { status: 'failed', error });
-      this.#onError?.(file, error);
-      return;
+      return; // No modal for this expected error
     }
 
     // Prevent duplicate processing
@@ -199,7 +193,9 @@ class ConversionStore {
           progress: null,
         });
         this.activeCount = Math.max(0, this.activeCount - 1);
-        this.#onError?.(file, errorMessage);
+        
+        // Only invoke global error handler for critical IPC issues
+        if (this.#onError) this.#onError(file, errorMessage);
       }
       
       this.#activeTaskIds.delete(file.id);

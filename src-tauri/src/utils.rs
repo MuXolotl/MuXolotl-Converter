@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::process::Command;
 
 #[cfg(target_os = "windows")]
@@ -25,6 +26,18 @@ pub fn create_async_hidden_command(program: &str) -> tokio::process::Command {
 #[cfg(not(target_os = "windows"))]
 pub fn create_async_hidden_command(program: &str) -> tokio::process::Command {
     tokio::process::Command::new(program)
+}
+
+/// Validate that an input file exists and is accessible before conversion.
+pub fn validate_input_path(path: &str) -> anyhow::Result<()> {
+    let p = Path::new(path);
+    if !p.exists() {
+        anyhow::bail!("Input file does not exist: {}", path);
+    }
+    if !p.is_file() {
+        anyhow::bail!("Input path is not a file: {}", path);
+    }
+    Ok(())
 }
 
 pub fn open_path(path: &str) -> Result<(), String> {
@@ -65,7 +78,7 @@ pub fn open_path(path: &str) -> Result<(), String> {
 /// - **macOS**: `open -R <path>` — reveals the file in Finder.
 /// - **Linux**: `xdg-open <parent>` — opens the parent directory (no native select support).
 pub fn reveal_in_explorer(path: &str) -> Result<(), String> {
-    let p = std::path::Path::new(path);
+    let p = Path::new(path);
     let is_dir = p.is_dir();
 
     #[cfg(target_os = "windows")]

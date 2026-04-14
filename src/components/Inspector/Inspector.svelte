@@ -9,6 +9,7 @@
     FileVideo,
     Music,
     FileAudio,
+    Trash2,
   } from 'lucide-svelte';
   import { APP_CONFIG } from '@/config';
   import { formatDuration, formatFileSize } from '@/utils';
@@ -128,6 +129,10 @@
 
   function handleRetry() {
     if (file) onRetry(file.id);
+  }
+
+  function handleRemove() {
+    if (file) fileQueueStore.removeFile(file.id);
   }
 
   function handleReveal() {
@@ -337,7 +342,43 @@
             <span>Retry</span>
           </button>
         </div>
-      {:else}
+      {:else if file.status === 'failed'}
+        {@const isFileMissing = file.error?.toLowerCase().includes('not found') || file.error?.toLowerCase().includes('does not exist')}
+        
+        {#if isFileMissing}
+          <!-- Missing file: No retry, only error message and delete -->
+          <div class="space-y-2">
+            <div class="p-2.5 bg-red-500/10 border border-red-500/20 rounded text-[11px] text-red-400 text-center break-words">
+              {file.error || 'Source file not found'}
+            </div>
+            <button
+              onclick={handleRemove}
+              class="w-full py-2.5 rounded font-bold text-xs flex items-center justify-center gap-1.5 bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-all"
+            >
+              <Trash2 size={14} />
+              <span>Remove</span>
+            </button>
+          </div>
+        {:else}
+          <!-- Other failure: Retry + Remove -->
+          <div class="flex gap-2">
+            <button
+              onclick={handleRetry}
+              class="flex-1 py-2.5 rounded font-bold text-xs flex items-center justify-center gap-1.5 bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all"
+            >
+              <RotateCcw size={14} />
+              <span>Retry</span>
+            </button>
+            <button
+              onclick={handleRemove}
+              class="py-2.5 px-4 rounded font-bold text-xs flex items-center justify-center gap-1.5 bg-white/5 border border-white/10 text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all"
+              title="Remove from queue"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        {/if}
+      {:else if file.status === 'cancelled'}
         <button
           onclick={handleRetry}
           class="w-full py-2.5 rounded font-bold text-xs flex items-center justify-center gap-1.5 bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all"

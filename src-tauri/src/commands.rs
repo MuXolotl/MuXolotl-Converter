@@ -91,6 +91,16 @@ pub fn reveal_in_folder(path: String) -> Result<(), String> {
     utils::reveal_in_explorer(&path)
 }
 
+/// Batch check if paths exist on disk. Returns a vector of booleans
+/// corresponding to the input paths. Used for startup validation.
+#[tauri::command]
+pub fn check_paths_exist(paths: Vec<String>) -> Vec<bool> {
+    paths
+        .iter()
+        .map(|p| std::path::Path::new(p).exists())
+        .collect()
+}
+
 #[tauri::command]
 pub async fn detect_media_type(
     app_handle: tauri::AppHandle,

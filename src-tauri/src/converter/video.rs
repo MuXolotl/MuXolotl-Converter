@@ -6,6 +6,7 @@ use crate::formats::video::{self, VideoFormat};
 use crate::gpu::GpuInfo;
 use crate::media::{self, MediaInfo};
 use crate::types::{ConversionSettings, Quality};
+use crate::utils;
 use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -22,6 +23,9 @@ pub async fn convert(
     settings: ConversionSettings,
     processes: Arc<Mutex<HashMap<String, Child>>>,
 ) -> Result<String> {
+    // Pre-flight validation: ensure input file still exists
+    utils::validate_input_path(input)?;
+
     let task_id = settings.task_id();
     let fmt = video::get_format(format).context("Unknown video format")?;
     let media = media::detect_media_type(&window.app_handle(), input).await?;

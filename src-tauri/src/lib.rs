@@ -43,6 +43,7 @@ pub fn run() {
             commands::detect_gpu,
             commands::open_folder,
             commands::reveal_in_folder,
+            commands::check_paths_exist,
             commands::detect_media_type,
             commands::get_audio_formats,
             commands::get_video_formats,

@@ -201,14 +201,15 @@ impl From<TomlVideoFormat> for VideoFormat {
 lazy_static! {
     static ref VIDEO_FORMATS: HashMap<String, VideoFormat> = {
         let toml_str = include_str!("video_formats.toml");
-        let parsed: VideoFormatsToml =
-            toml::from_str(toml_str).expect("Failed to parse video_formats.toml");
-
-        parsed
-            .format
-            .into_iter()
-            .map(|f| (f.extension.clone(), f.into()))
-            .collect()
+        match toml::from_str::<VideoFormatsToml>(toml_str) {
+            Ok(parsed) => {
+                parsed.format.into_iter().map(|f| (f.extension.clone(), f.into())).collect()
+            }
+            Err(e) => {
+                eprintln!("[VideoFormats] FATAL: Failed to parse video_formats.toml: {}", e);
+                HashMap::new()
+            }
+        }
     };
 }
 

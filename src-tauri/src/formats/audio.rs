@@ -149,9 +149,15 @@ impl From<TomlAudioFormat> for AudioFormat {
 lazy_static! {
     static ref AUDIO_FORMATS: HashMap<String, AudioFormat> = {
         let toml_str = include_str!("audio_formats.toml");
-        let parsed: AudioFormatsToml = toml::from_str(toml_str).expect("Failed to parse audio_formats.toml");
-
-        parsed.format.into_iter().map(|f| (f.extension.clone(), f.into())).collect()
+        match toml::from_str::<AudioFormatsToml>(toml_str) {
+            Ok(parsed) => {
+                parsed.format.into_iter().map(|f| (f.extension.clone(), f.into())).collect()
+            }
+            Err(e) => {
+                eprintln!("[AudioFormats] FATAL: Failed to parse audio_formats.toml: {}", e);
+                HashMap::new()
+            }
+        }
     };
 }
 

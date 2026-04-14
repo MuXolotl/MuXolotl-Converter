@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core';
 import { APP_CONFIG } from '@/config';
 import {
   generateOutputPath,
@@ -41,6 +42,59 @@ class FileQueueStore {
     const folder = loadOutputFolder();
     if (folder) {
       this.outputFolder = folder;
+    }
+  }
+
+  /**
+   * Validate that persisted files and output folder still exist on disk.
+   * Should be called once after init.
+   */
+  async validateOnStartup() {
+    // 1. Validate output folder
+    if (this.outputFolder) {
+      try {
+        const folderExists = await invoke<boolean>('check_paths_exist', {
+          paths: [this.outputFolder],
+        });
+        if (!folderExists[0]) {
+          this.setOutputFolder(''); // Clear invalid folder
+        }
+      } catch {
+        this.setOutputFolder('');
+      }
+    }
+
+    // 2. Validate input files existence
+    const filesToCheck = this.files.filter(
+      f => f.status === 'pending' || f.status === 'processing'
+    );
+
+    if (filesToCheck.length === 0) return;
+
+    try {
+      const paths = filesToCheck.map(f => f.path);
+      const existenceMap = await invoke<boolean[]>('check_paths_exist', { paths });
+
+      let changed = false;
+      this.files = this.files.map(f => {
+        if (f.status !== 'pending' && f.status !== 'processing') return f;
+
+        const index = filesToCheck.findIndex(ftc => ftc.id === f.id);
+        if (index !== -1 && !existenceMap[index]) {
+          changed = true;
+          return {
+            ...f,
+            status: 'failed' as const,
+            error: 'Source file not found',
+            progress: null,
+          };
+        }
+        return f;
+      });
+
+      if (changed) this.#scheduleSave();
+    } catch (e) {
+      console.error('Failed to validate files on startup:', e);
     }
   }
 
@@ -96,6 +150,10 @@ class FileQueueStore {
   }
 
   retryFile(id: string) {
+    // Find the file first to check if it still exists before retrying
+    const file = this.files.find(f => f.id === id);
+    if (!file) return;
+
     this.updateFile(id, {
       status: 'pending',
       progress: null,

@@ -16,6 +16,7 @@
 
   let isVideo = $derived(file.mediaInfo?.media_type === 'video');
   let canReveal = $derived(file.status === 'completed' && !!file.outputPath);
+  let isFailed = $derived(file.status === 'failed');
 
   function handleRemove(e: MouseEvent) {
     e.stopPropagation();
@@ -48,7 +49,9 @@
     <div
       class="shrink-0 p-1 rounded {isSelected
         ? 'bg-blue-500/20 text-blue-400'
-        : 'bg-white/5 text-white/40'}"
+        : isFailed
+          ? 'bg-red-500/20 text-red-400'
+          : 'bg-white/5 text-white/40'}"
     >
       {#if isVideo}
         <FileVideo size={12} />
@@ -57,7 +60,7 @@
       {/if}
     </div>
     <div
-      class="text-[11px] truncate font-medium {isSelected ? 'text-white' : 'text-slate-300'}"
+      class="text-[11px] truncate font-medium {isSelected ? 'text-white' : isFailed ? 'text-red-300' : 'text-slate-300'}"
       title={file.name}
     >
       {file.name}
@@ -96,7 +99,7 @@
         title={file.error || undefined}
       >
         <AlertTriangle size={10} />
-        <span class="truncate">Failed</span>
+        <span class="truncate">{file.error || 'Failed'}</span>
       </span>
     {:else if file.status === 'cancelled'}
       <span class="flex items-center gap-1 text-[10px] font-medium text-orange-400">
@@ -123,7 +126,7 @@
     {/if}
     <button
       onclick={handleRemove}
-      class="p-1 text-white/20 hover:text-red-400 hover:bg-red-500/10 rounded transition-all opacity-0 group-hover:opacity-100"
+      class="p-1 text-white/20 hover:text-red-400 hover:bg-red-500/10 rounded transition-all {isFailed ? '' : 'opacity-0 group-hover:opacity-100'}"
       title="Remove"
     >
       <Trash2 size={12} />

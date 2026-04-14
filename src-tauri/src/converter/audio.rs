@@ -4,6 +4,7 @@ use crate::codec_registry;
 use crate::formats::audio::{self, AudioFormat};
 use crate::media;
 use crate::types::ConversionSettings;
+use crate::utils;
 use anyhow::{Context, Result};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -19,6 +20,9 @@ pub async fn convert(
     settings: ConversionSettings,
     processes: Arc<Mutex<HashMap<String, Child>>>,
 ) -> Result<String> {
+    // Pre-flight validation: ensure input file still exists
+    utils::validate_input_path(input)?;
+
     let task_id = settings.task_id();
     let fmt = audio::get_format(format).context(format!("Unknown audio format: {}", format))?;
     let media = media::detect_media_type(&window.app_handle(), input).await?;
@@ -54,6 +58,9 @@ pub async fn extract_from_video(
     settings: ConversionSettings,
     processes: Arc<Mutex<HashMap<String, Child>>>,
 ) -> Result<String> {
+    // Pre-flight validation: ensure input file still exists
+    utils::validate_input_path(input)?;
+
     let task_id = settings.task_id();
     let fmt = audio::get_format(format).context(format!("Unknown audio format: {}", format))?;
     let media = media::detect_media_type(&window.app_handle(), input).await?;

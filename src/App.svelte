@@ -78,21 +78,27 @@
 
   // --- Error handler for conversion store ---
   function handleConversionError(file: FileItem, error: string) {
-    errorModal = {
-      title: 'Conversion Failed',
-      message: error || 'Error',
-      details: error,
-      fileInfo: {
-        name: file.name,
-        path: file.path,
-        format: file.mediaInfo?.format_name.split(',')[0] || 'unknown',
-        outputFormat: file.outputFormat,
-        duration: file.mediaInfo?.duration,
-        size: file.mediaInfo?.file_size,
-      },
-      settings: { ...file.settings },
-      gpuInfo: gpuStore.info,
-    };
+    // Only show modal for critical/unexpected errors (e.g. IPC failures)
+    // Standard conversion failures (missing files, codec errors) are handled inline in the queue
+    const isCritical = error.toLowerCase().includes('ipc') || error.toLowerCase().includes('tauri');
+    
+    if (isCritical) {
+      errorModal = {
+        title: 'Critical Error',
+        message: error || 'Error',
+        details: error,
+        fileInfo: {
+          name: file.name,
+          path: file.path,
+          format: file.mediaInfo?.format_name.split(',')[0] || 'unknown',
+          outputFormat: file.outputFormat,
+          duration: file.mediaInfo?.duration,
+          size: file.mediaInfo?.file_size,
+        },
+        settings: { ...file.settings },
+        gpuInfo: gpuStore.info,
+      };
+    }
   }
 
   // --- Initialization ---
@@ -102,6 +108,9 @@
     await gpuStore.init();
     await conversionStore.init();
     conversionStore.setErrorHandler(handleConversionError);
+
+    // Validate persisted state (check if files/folders still exist)
+    await fileQueueStore.validateOnStartup();
 
     // Check FFmpeg
     try {
