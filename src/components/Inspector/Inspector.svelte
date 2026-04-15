@@ -15,7 +15,8 @@
   import { formatDuration, formatFileSize } from '@/utils';
   import { fileQueueStore } from '@/stores/fileQueue.svelte';
   import { conversionStore } from '@/stores/conversion.svelte';
-  import FormatSelector from '@/components/FormatSelector.svelte';
+  import Button from '@/components/ui/Button.svelte';
+  import FormatSelector from './FormatSelector.svelte';
   import SettingsPanel from './SettingsPanel.svelte';
   import ValidationBanner from './ValidationBanner.svelte';
   import FileInfo from './FileInfo.svelte';
@@ -34,18 +35,14 @@
 
   let { file, selectedCount, outputFolder, onRetry }: Props = $props();
 
-  // --- Composables ---
   const formatLoader = useFormats();
   const validator = useValidation();
 
-  // --- Local state ---
   let activeTab = $state<TabId>('general');
 
-  // Track previous values to avoid unnecessary tab resets
   let prevFileId: string | undefined;
   let prevExtractAudio: boolean | undefined;
 
-  // --- Derived ---
   let isVideo = $derived(file?.mediaInfo?.media_type === 'video');
   let isAudio = $derived(file?.mediaInfo?.media_type === 'audio');
   let isExtracting = $derived(!!file?.settings.extractAudioOnly && isVideo);
@@ -66,7 +63,6 @@
     return file.mediaInfo.video_streams?.[0]?.codec || 'N/A';
   });
 
-  // --- Effect: reset tab only when file ID or extractAudio actually changes ---
   $effect(() => {
     const currentId = file?.id;
     const currentExtract = file?.settings.extractAudioOnly ?? false;
@@ -79,12 +75,10 @@
     prevExtractAudio = currentExtract;
   });
 
-  // --- Effect: load formats when target type changes ---
   $effect(() => {
     formatLoader.load(targetType);
   });
 
-  // --- Effect: load recommendations and validate when file/settings change ---
   $effect(() => {
     const currentFile = file;
     const type = targetType;
@@ -98,7 +92,6 @@
     validator.runValidation(currentFile, type);
   });
 
-  // --- Handlers ---
   function handleFormatChange(format: string) {
     if (!file) return;
     fileQueueStore.updateFile(file.id, { outputFormat: format, outputPath: undefined });
@@ -306,86 +299,58 @@
             <span>Select Folder</span>
           </div>
         {:else}
-          <button
-            onclick={handleStart}
-            disabled={!canConvert}
-            class="w-full py-2.5 rounded font-bold text-xs flex items-center justify-center gap-1.5 bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/30 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-          >
+          <Button variant="primary" full onclick={handleStart} disabled={!canConvert}>
             <Play size={14} fill="currentColor" />
             <span>Convert</span>
-          </button>
+          </Button>
         {/if}
       {:else if isProcessing}
-        <button
-          onclick={handleCancel}
-          class="w-full py-2.5 rounded font-bold text-xs flex items-center justify-center gap-1.5 bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-all"
-        >
+        <Button variant="danger" full onclick={handleCancel}>
           <Square size={14} fill="currentColor" />
           <span>Stop</span>
-        </button>
+        </Button>
       {:else if isCompleted}
         <div class="flex gap-2">
           {#if canReveal}
-            <button
-              onclick={handleReveal}
-              class="flex-1 py-2.5 rounded font-bold text-xs flex items-center justify-center gap-1.5 bg-green-500/15 border border-green-500/30 text-green-400 hover:bg-green-500/25 transition-all"
-            >
+            <Button variant="success" full onclick={handleReveal}>
               <FolderOpen size={14} />
               <span>Open in Folder</span>
-            </button>
+            </Button>
           {/if}
-          <button
-            onclick={handleRetry}
-            class="py-2.5 px-4 rounded font-bold text-xs flex items-center justify-center gap-1.5 bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all"
-          >
+          <Button variant="ghost" full onclick={handleRetry} class="!border !border-white/10 !text-white">
             <RotateCcw size={14} />
             <span>Retry</span>
-          </button>
+          </Button>
         </div>
       {:else if file.status === 'failed'}
         {@const isFileMissing = file.error?.toLowerCase().includes('not found') || file.error?.toLowerCase().includes('does not exist')}
-        
+
         {#if isFileMissing}
-          <!-- Missing file: No retry, only error message and delete -->
           <div class="space-y-2">
             <div class="p-2.5 bg-red-500/10 border border-red-500/20 rounded text-[11px] text-red-400 text-center break-words">
               {file.error || 'Source file not found'}
             </div>
-            <button
-              onclick={handleRemove}
-              class="w-full py-2.5 rounded font-bold text-xs flex items-center justify-center gap-1.5 bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-all"
-            >
+            <Button variant="danger" full onclick={handleRemove}>
               <Trash2 size={14} />
               <span>Remove</span>
-            </button>
+            </Button>
           </div>
         {:else}
-          <!-- Other failure: Retry + Remove -->
           <div class="flex gap-2">
-            <button
-              onclick={handleRetry}
-              class="flex-1 py-2.5 rounded font-bold text-xs flex items-center justify-center gap-1.5 bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all"
-            >
+            <Button variant="ghost" full onclick={handleRetry} class="!border !border-white/10 !text-white">
               <RotateCcw size={14} />
               <span>Retry</span>
-            </button>
-            <button
-              onclick={handleRemove}
-              class="py-2.5 px-4 rounded font-bold text-xs flex items-center justify-center gap-1.5 bg-white/5 border border-white/10 text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all"
-              title="Remove from queue"
-            >
+            </Button>
+            <Button variant="danger" onclick={handleRemove} class="!py-2.5 !px-4" title="Remove from queue">
               <Trash2 size={14} />
-            </button>
+            </Button>
           </div>
         {/if}
       {:else if file.status === 'cancelled'}
-        <button
-          onclick={handleRetry}
-          class="w-full py-2.5 rounded font-bold text-xs flex items-center justify-center gap-1.5 bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all"
-        >
+        <Button variant="ghost" full onclick={handleRetry} class="!border !border-white/10 !text-white">
           <RotateCcw size={14} />
           <span>Retry</span>
-        </button>
+        </Button>
       {/if}
     </div>
   </div>

@@ -8,12 +8,10 @@
   let isMaximized = $state(true);
 
   onMount(() => {
-    // Check once on mount
     invoke<boolean>('window_is_maximized')
       .then((v) => (isMaximized = v))
       .catch(() => {});
 
-    // Listen for window resize events (fires on maximize/unmaximize/snap/etc.)
     let debounceTimer: ReturnType<typeof setTimeout>;
 
     const unlisten = listen('tauri://resize', () => {
@@ -40,7 +38,6 @@
   async function handleMaximize() {
     try {
       await invoke('window_maximize');
-      // Optimistic toggle — UI responds instantly
       isMaximized = !isMaximized;
     } catch {
       // ignore

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Zap, Cpu } from 'lucide-svelte';
-  import OutputFolderSelector from '@/components/OutputFolderSelector.svelte';
+  import OutputFolderSelector from './OutputFolderSelector.svelte';
   import type { GpuInfo, QueueStats } from '@/types';
 
   interface Props {
@@ -40,17 +40,11 @@
         <span class="font-semibold">T</span>
         <span>{stats.total}</span>
       </div>
-      <div
-        class="flex gap-1 {stats.pending > 0 ? 'opacity-100' : 'opacity-40'}"
-        title="Pending"
-      >
+      <div class="flex gap-1 {stats.pending > 0 ? 'opacity-100' : 'opacity-40'}" title="Pending">
         <span class="font-semibold">P</span>
         <span class={stats.pending > 0 ? 'text-blue-400' : ''}>{stats.pending}</span>
       </div>
-      <div
-        class="flex gap-1 {stats.completed > 0 ? 'opacity-100' : 'opacity-40'}"
-        title="Done"
-      >
+      <div class="flex gap-1 {stats.completed > 0 ? 'opacity-100' : 'opacity-40'}" title="Done">
         <span class="font-semibold">D</span>
         <span class={stats.completed > 0 ? 'text-green-500' : ''}>{stats.completed}</span>
       </div>

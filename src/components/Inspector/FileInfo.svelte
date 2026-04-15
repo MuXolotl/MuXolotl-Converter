@@ -15,8 +15,6 @@
   let videoStreams = $derived(media?.video_streams || []);
   let audioStreams = $derived(media?.audio_streams || []);
 
-  // --- Formatters ---
-
   function formatBitrate(bps: number | null | undefined): string {
     if (!bps) return '—';
     if (bps >= 1_000_000) return `${(bps / 1_000_000).toFixed(1)} Mbps`;

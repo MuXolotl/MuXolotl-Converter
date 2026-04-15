@@ -1,8 +1,8 @@
 <script lang="ts">
   import { APP_CONFIG } from '@/config';
-  import DropZone from '@/components/DropZone.svelte';
-  import ActionBar from '@/components/ActionBar.svelte';
-  import QueueItem from '@/components/QueueItem.svelte';
+  import DropZone from './DropZone.svelte';
+  import ActionBar from './ActionBar.svelte';
+  import QueueItem from './QueueItem.svelte';
   import type { FileItem } from '@/types';
 
   interface Props {
@@ -28,29 +28,6 @@
   }: Props = $props();
 
   let containerEl: HTMLDivElement | undefined = $state();
-  let listHeight = $state(300);
-
-  // Derive the selected file for ActionBar (first selected)
-  let selectedFile = $derived.by(() => {
-    if (selectedIds.size === 0) return null;
-    const firstId = Array.from(selectedIds)[0];
-    return files.find(f => f.id === firstId) || null;
-  });
-
-  $effect(() => {
-    if (!containerEl) return;
-
-    const updateHeight = () => {
-      if (containerEl) listHeight = containerEl.offsetHeight;
-    };
-
-    updateHeight();
-
-    const observer = new ResizeObserver(updateHeight);
-    observer.observe(containerEl);
-
-    return () => observer.disconnect();
-  });
 
   function handleKeyDown(e: KeyboardEvent) {
     if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -82,13 +59,11 @@
     onclick={onDeselectAll}
   >
     <!-- Batch Actions -->
-    <ActionBar {selectedFile} />
+    <ActionBar selectedFile={selectedIds.size > 0 ? files.find(f => selectedIds.has(f.id)) || null : null} />
 
     <!-- Header -->
     <div class="shrink-0 bg-surface-base border-b border-white/10 select-none px-2 py-1.5">
-      <div
-        class="flex items-center gap-2 text-[9px] font-semibold text-slate-500 uppercase tracking-wider"
-      >
+      <div class="flex items-center gap-2 text-[9px] font-semibold text-slate-500 uppercase tracking-wider">
         <div class="w-6 text-center">#</div>
         <div class="flex-1 min-w-0">File</div>
         <div class="w-16">Format</div>

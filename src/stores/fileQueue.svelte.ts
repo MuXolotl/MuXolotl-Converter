@@ -17,8 +17,6 @@ class FileQueueStore {
   outputFolder = $state('');
   #saveTimeout: ReturnType<typeof setTimeout> | null = null;
 
-  // --- Derived ---
-
   get sortedFiles(): FileItem[] {
     return sortFilesByStatus(this.files);
   }
@@ -30,8 +28,6 @@ class FileQueueStore {
   get pendingFiles(): FileItem[] {
     return this.files.filter(f => f.status === 'pending');
   }
-
-  // --- Initialization ---
 
   init() {
     const loaded = loadQueue();
@@ -45,26 +41,20 @@ class FileQueueStore {
     }
   }
 
-  /**
-   * Validate that persisted files and output folder still exist on disk.
-   * Should be called once after init.
-   */
   async validateOnStartup() {
-    // 1. Validate output folder
     if (this.outputFolder) {
       try {
         const folderExists = await invoke<boolean>('check_paths_exist', {
           paths: [this.outputFolder],
         });
         if (!folderExists[0]) {
-          this.setOutputFolder(''); // Clear invalid folder
+          this.setOutputFolder('');
         }
       } catch {
         this.setOutputFolder('');
       }
     }
 
-    // 2. Validate input files existence
     const filesToCheck = this.files.filter(
       f => f.status === 'pending' || f.status === 'processing'
     );
@@ -98,13 +88,10 @@ class FileQueueStore {
     }
   }
 
-  // --- Output folder ---
-
   setOutputFolder(folder: string) {
     this.outputFolder = folder;
     saveOutputFolder(folder);
 
-    // Update pending files with new output paths
     if (folder) {
       this.files = this.files.map(f => {
         if (f.status === 'pending' || !f.outputPath) {
@@ -116,8 +103,6 @@ class FileQueueStore {
     }
   }
 
-  // --- Queue operations ---
-
   addFiles(newFiles: FileItem[]) {
     const available = APP_CONFIG.limits.maxQueueSize - this.files.length;
     if (available <= 0) return;
@@ -128,7 +113,6 @@ class FileQueueStore {
 
     if (toAdd.length === 0) return;
 
-    // Assign output paths if output folder is set
     if (this.outputFolder) {
       for (const file of toAdd) {
         file.outputPath = generateOutputPath(file, this.outputFolder);
@@ -150,7 +134,6 @@ class FileQueueStore {
   }
 
   retryFile(id: string) {
-    // Find the file first to check if it still exists before retrying
     const file = this.files.find(f => f.id === id);
     if (!file) return;
 
@@ -162,10 +145,6 @@ class FileQueueStore {
     });
   }
 
-  /**
-   * Reset all completed, failed, and cancelled files back to pending.
-   * Keeps their existing output paths intact.
-   */
   retryAll() {
     const retryStatuses = new Set(['completed', 'failed', 'cancelled']);
     let changed = false;
@@ -196,10 +175,6 @@ class FileQueueStore {
     clearStorageQueue();
   }
 
-  /**
-   * Copy format and settings from the source file to all other pending files
-   * of the same media type.
-   */
   applySettingsToAll(sourceId: string) {
     const source = this.files.find(f => f.id === sourceId);
     if (!source || source.status !== 'pending' || !source.mediaInfo) return;
@@ -231,8 +206,6 @@ class FileQueueStore {
 
     this.#scheduleSave();
   }
-
-  // --- Persistence (debounced) ---
 
   #scheduleSave() {
     if (this.#saveTimeout) clearTimeout(this.#saveTimeout);

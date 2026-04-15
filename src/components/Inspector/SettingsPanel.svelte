@@ -6,6 +6,8 @@
     VIDEO_RESOLUTIONS,
     VIDEO_FPS,
   } from '@/constants';
+  import Select from '@/components/ui/Select.svelte';
+  import Input from '@/components/ui/Input.svelte';
   import type { FileItem, FileSettings } from '@/types';
   import type { TabId } from './Tabs.svelte';
 
@@ -43,27 +45,6 @@
   }
 </script>
 
-{#snippet selectField(id: string, value: string, onchange: (e: Event) => void, options: { value: string; label: string }[])}
-  <div class="relative">
-    <select
-      {id}
-      {value}
-      {onchange}
-      {disabled}
-      class="w-full px-3 py-2.5 bg-surface-base border border-white/10 rounded text-sm text-white focus:outline-none focus:border-blue-500 disabled:opacity-50 cursor-pointer appearance-none"
-    >
-      {#each options as opt (opt.value)}
-        <option value={opt.value}>{opt.label}</option>
-      {/each}
-    </select>
-    <div class="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-white/30">
-      <svg width="10" height="6" viewBox="0 0 10 6" fill="none">
-        <path d="M1 1L5 5L9 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-      </svg>
-    </div>
-  </div>
-{/snippet}
-
 {#if activeTab === 'general'}
   <div class="space-y-4">
     <div class="group">
@@ -73,12 +54,16 @@
       >
         Quality Preset
       </label>
-      {@render selectField(
-        'setting-quality',
-        file.settings.quality,
-        (e) => onChange({ quality: (e.target as HTMLSelectElement).value as FileSettings['quality'] }),
-        QUALITY_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
-      )}
+      <Select
+        id="setting-quality"
+        value={file.settings.quality}
+        onchange={(e) => onChange({ quality: (e.target as HTMLSelectElement).value as FileSettings['quality'] })}
+        {disabled}
+      >
+        {#each QUALITY_OPTIONS as opt (opt.value)}
+          <option value={opt.value}>{opt.label}</option>
+        {/each}
+      </Select>
     </div>
 
     {#if isVideo}
@@ -111,12 +96,16 @@
       >
         Resolution
       </label>
-      {@render selectField(
-        'setting-resolution',
-        currentResolution(),
-        handleResolutionChange,
-        VIDEO_RESOLUTIONS.map((r) => ({ value: r.value, label: r.label })),
-      )}
+      <Select
+        id="setting-resolution"
+        value={currentResolution()}
+        onchange={handleResolutionChange}
+        {disabled}
+      >
+        {#each VIDEO_RESOLUTIONS as r (r.value)}
+          <option value={r.value}>{r.label}</option>
+        {/each}
+      </Select>
     </div>
 
     <div class="group">
@@ -126,12 +115,16 @@
       >
         Frame Rate
       </label>
-      {@render selectField(
-        'setting-fps',
-        file.settings.fps?.toString() || 'original',
-        handleFpsChange,
-        VIDEO_FPS.map((f) => ({ value: f.value, label: f.label })),
-      )}
+      <Select
+        id="setting-fps"
+        value={file.settings.fps?.toString() || 'original'}
+        onchange={handleFpsChange}
+        {disabled}
+      >
+        {#each VIDEO_FPS as f (f.value)}
+          <option value={f.value}>{f.label}</option>
+        {/each}
+      </Select>
     </div>
   </div>
 {:else if activeTab === 'audio'}
@@ -143,12 +136,16 @@
       >
         Sample Rate
       </label>
-      {@render selectField(
-        'setting-samplerate',
-        file.settings.sampleRate?.toString() || '44100',
-        (e) => onChange({ sampleRate: parseInt((e.target as HTMLSelectElement).value) }),
-        AUDIO_SAMPLE_RATES.map((r) => ({ value: r.toString(), label: `${r} Hz` })),
-      )}
+      <Select
+        id="setting-samplerate"
+        value={file.settings.sampleRate?.toString() || '44100'}
+        onchange={(e) => onChange({ sampleRate: parseInt((e.target as HTMLSelectElement).value) })}
+        {disabled}
+      >
+        {#each AUDIO_SAMPLE_RATES as r (r)}
+          <option value={r.toString()}>{r} Hz</option>
+        {/each}
+      </Select>
     </div>
 
     <div class="group">
@@ -158,12 +155,16 @@
       >
         Channels
       </label>
-      {@render selectField(
-        'setting-channels',
-        file.settings.channels?.toString() || '2',
-        (e) => onChange({ channels: parseInt((e.target as HTMLSelectElement).value) }),
-        AUDIO_CHANNELS.map((c) => ({ value: c.value.toString(), label: c.label })),
-      )}
+      <Select
+        id="setting-channels"
+        value={file.settings.channels?.toString() || '2'}
+        onchange={(e) => onChange({ channels: parseInt((e.target as HTMLSelectElement).value) })}
+        {disabled}
+      >
+        {#each AUDIO_CHANNELS as c (c.value)}
+          <option value={c.value.toString()}>{c.label}</option>
+        {/each}
+      </Select>
     </div>
 
     {#if file.settings.quality === 'custom'}
@@ -174,7 +175,7 @@
         >
           Bitrate (kbps)
         </label>
-        <input
+        <Input
           id="setting-bitrate"
           type="number"
           value={file.settings.bitrate || 192}
@@ -183,7 +184,6 @@
           min={64}
           max={320}
           step={32}
-          class="w-full px-3 py-2 bg-surface-base border border-white/10 rounded text-sm text-white focus:outline-none focus:border-blue-500 disabled:opacity-50"
         />
       </div>
     {/if}

@@ -27,7 +27,6 @@
     return Math.max(minLeftWidth, Math.min(maxLeft, desired));
   }
 
-  // Initialize + observe container resize
   $effect(() => {
     if (!containerEl) return;
 
@@ -56,7 +55,6 @@
     isDragging = true;
   }
 
-  // Drag handling via $effect — auto-cleans up when isDragging changes to false
   $effect(() => {
     if (!isDragging || !dragStart) return;
 

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { ChevronDown, Filter } from 'lucide-svelte';
+  import Badge from '@/components/ui/Badge.svelte';
   import { STABILITY_CONFIG, CATEGORY_LABELS } from '@/constants';
   import type { AudioFormat, VideoFormat, RecommendedFormats, Category } from '@/types';
 
@@ -18,8 +19,6 @@
   let buttonEl: HTMLButtonElement | undefined = $state();
   let dropdownEl: HTMLDivElement | undefined = $state();
   let position = $state({ top: 0, left: 0, width: 320 });
-
-  // --- Derived ---
 
   let visibleFormats = $derived.by(() => {
     if (!recommendedFormats || showAll) return formats;
@@ -45,20 +44,13 @@
 
   let selectedFormat = $derived(formats.find((f) => f.extension === selected));
 
-  // --- Helpers ---
-
-  function getBadge(ext: string): { label: string; className: string } | null {
+  function getBadgeVariant(ext: string): 'fast' | 'safe' | 'setup' | 'beta' | 'risky' | null {
     if (!recommendedFormats) return null;
-    if (recommendedFormats.fast.includes(ext))
-      return { label: 'FAST', className: 'bg-green-500/20 text-green-400' };
-    if (recommendedFormats.safe.includes(ext))
-      return { label: 'SAFE', className: 'bg-blue-500/20 text-blue-400' };
-    if (recommendedFormats.setup.includes(ext))
-      return { label: 'SETUP', className: 'bg-yellow-500/20 text-yellow-400' };
-    if (recommendedFormats.experimental.includes(ext))
-      return { label: 'BETA', className: 'bg-orange-500/20 text-orange-400' };
-    if (recommendedFormats.problematic.includes(ext))
-      return { label: 'RISKY', className: 'bg-red-500/20 text-red-400' };
+    if (recommendedFormats.fast.includes(ext)) return 'fast';
+    if (recommendedFormats.safe.includes(ext)) return 'safe';
+    if (recommendedFormats.setup.includes(ext)) return 'setup';
+    if (recommendedFormats.experimental.includes(ext)) return 'beta';
+    if (recommendedFormats.problematic.includes(ext)) return 'risky';
     return null;
   }
 
@@ -86,7 +78,6 @@
     isOpen = !isOpen;
   }
 
-  // --- Manage open state: position, outside click, keyboard, scroll ---
   $effect(() => {
     if (!isOpen) return;
 
@@ -120,7 +111,7 @@
     };
   });
 
-  let selectedBadge = $derived(getBadge(selected));
+  let selectedBadge = $derived(getBadgeVariant(selected));
 </script>
 
 <button
@@ -133,9 +124,7 @@
     <span class="text-xs">{STABILITY_CONFIG[selectedFormat?.stability || 'stable'].icon}</span>
     <span class="font-mono uppercase">{selected}</span>
     {#if selectedBadge}
-      <span class="text-[9px] px-1.5 py-0.5 rounded font-semibold {selectedBadge.className}">
-        {selectedBadge.label}
-      </span>
+      <Badge variant={selectedBadge}>{selectedBadge === 'fast' ? 'FAST' : selectedBadge === 'safe' ? 'SAFE' : selectedBadge === 'setup' ? 'SETUP' : selectedBadge === 'beta' ? 'BETA' : 'RISKY'}</Badge>
     {/if}
   </div>
   <ChevronDown
@@ -173,27 +162,19 @@
             {CATEGORY_LABELS[category as Category]}
           </div>
           {#each categoryFormats as format (format.extension)}
-            {@const badge = getBadge(format.extension)}
+            {@const badge = getBadgeVariant(format.extension)}
             {@const isSelected = format.extension === selected}
             <button
               onclick={() => handleSelect(format.extension)}
               class="w-full px-3 py-2.5 flex items-start gap-2 text-left hover:bg-purple-500/10 transition-colors
                 {isSelected ? 'bg-purple-500/20' : ''}"
             >
-              <span class="text-sm mt-0.5"
-                >{STABILITY_CONFIG[format.stability].icon}</span
-              >
+              <span class="text-sm mt-0.5">{STABILITY_CONFIG[format.stability].icon}</span>
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 flex-wrap">
-                  <span class="font-mono font-bold text-white uppercase"
-                    >{format.extension}</span
-                  >
+                  <span class="font-mono font-bold text-white uppercase">{format.extension}</span>
                   {#if badge}
-                    <span
-                      class="text-[9px] px-1.5 py-0.5 rounded font-semibold {badge.className}"
-                    >
-                      {badge.label}
-                    </span>
+                    <Badge variant={badge}>{badge === 'fast' ? 'FAST' : badge === 'safe' ? 'SAFE' : badge === 'setup' ? 'SETUP' : badge === 'beta' ? 'BETA' : 'RISKY'}</Badge>
                   {/if}
                 </div>
                 <div class="text-xs text-white/60 mt-0.5 truncate">{format.name}</div>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { AlertTriangle, XCircle, Info, Zap, Copy } from 'lucide-svelte';
+  import Badge from '@/components/ui/Badge.svelte';
   import type { ValidationResult } from '@/types';
 
   interface Props {
@@ -21,24 +22,16 @@
     {#if hasCopy}
       <div class="flex gap-2 flex-wrap">
         {#if validation.can_copy_video}
-          <div
-            class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/15 border border-emerald-500/30 rounded-lg"
-          >
-            <Zap size={12} class="text-emerald-400" />
-            <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-wide"
-              >Video Copy</span
-            >
-          </div>
+          <Badge variant="success" size="md">
+            <Zap size={12} />
+            Video Copy
+          </Badge>
         {/if}
         {#if validation.can_copy_audio}
-          <div
-            class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-cyan-500/15 border border-cyan-500/30 rounded-lg"
-          >
-            <Copy size={12} class="text-cyan-400" />
-            <span class="text-[10px] font-bold text-cyan-400 uppercase tracking-wide"
-              >Audio Copy</span
-            >
-          </div>
+          <Badge variant="info" size="md">
+            <Copy size={12} />
+            Audio Copy
+          </Badge>
         {/if}
       </div>
     {/if}

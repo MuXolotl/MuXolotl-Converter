@@ -94,10 +94,7 @@
         <span class="truncate">Done</span>
       </span>
     {:else if file.status === 'failed'}
-      <span
-        class="flex items-center gap-1 text-[10px] font-medium text-red-400"
-        title={file.error || undefined}
-      >
+      <span class="flex items-center gap-1 text-[10px] font-medium text-red-400" title={file.error || undefined}>
         <AlertTriangle size={10} />
         <span class="truncate">{file.error || 'Failed'}</span>
       </span>

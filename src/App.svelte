@@ -6,15 +6,15 @@
   import { conversionStore } from '@/stores/conversion.svelte';
   import type { FileItem, GpuInfo } from '@/types';
 
-  import TitleBar from '@/components/TitleBar.svelte';
-  import Sidebar from '@/components/Sidebar.svelte';
-  import Toolbar from '@/components/Toolbar.svelte';
-  import SplitPane from '@/components/SplitPane.svelte';
-  import Queue from '@/components/Queue.svelte';
-  import Inspector from '@/components/Inspector/Inspector.svelte';
-  import ErrorModal from '@/components/ErrorModal.svelte';
-  import FeedbackModal from '@/components/FeedbackModal.svelte';
-  import Footer from '@/components/Footer.svelte';
+  import TitleBar from '@/components/layout/TitleBar.svelte';
+  import Sidebar from '@/components/layout/Sidebar.svelte';
+  import Toolbar from '@/components/layout/Toolbar.svelte';
+  import SplitPane from '@/components/layout/SplitPane.svelte';
+  import Queue from '@/components/queue/Queue.svelte';
+  import Inspector from '@/components/inspector/Inspector.svelte';
+  import ErrorModal from '@/components/modals/ErrorModal.svelte';
+  import FeedbackModal from '@/components/modals/FeedbackModal.svelte';
+  import Footer from '@/components/layout/Footer.svelte';
 
   // --- Error types ---
   interface ErrorState {
@@ -62,13 +62,10 @@
     return fileQueueStore.files.find((f) => f.id === firstId) || null;
   });
 
-  /** Pick the most relevant file to show in the Footer status bar */
   let lastActiveFile = $derived.by(() => {
-    // Priority 1: currently processing
     const processing = fileQueueStore.files.find(f => f.status === 'processing');
     if (processing) return processing;
 
-    // Priority 2: most recently completed/failed/cancelled
     const finished = fileQueueStore.files
       .filter(f => f.completedAt)
       .sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0));
@@ -76,12 +73,10 @@
     return finished[0] || null;
   });
 
-  // --- Error handler for conversion store ---
+  // --- Error handler ---
   function handleConversionError(file: FileItem, error: string) {
-    // Only show modal for critical/unexpected errors (e.g. IPC failures)
-    // Standard conversion failures (missing files, codec errors) are handled inline in the queue
     const isCritical = error.toLowerCase().includes('ipc') || error.toLowerCase().includes('tauri');
-    
+
     if (isCritical) {
       errorModal = {
         title: 'Critical Error',
@@ -103,16 +98,13 @@
 
   // --- Initialization ---
   onMount(async () => {
-    // Init stores
     fileQueueStore.init();
     await gpuStore.init();
     await conversionStore.init();
     conversionStore.setErrorHandler(handleConversionError);
 
-    // Validate persisted state (check if files/folders still exist)
     await fileQueueStore.validateOnStartup();
 
-    // Check FFmpeg
     try {
       const isReady = await invoke<boolean>('check_ffmpeg');
       ffmpegReady = isReady;

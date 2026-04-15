@@ -15,19 +15,13 @@ class ConversionStore {
   #abortPipeline = false;
   #activeTaskIds = new Set<string>();
 
-  // --- Derived ---
-
   get isConverting(): boolean {
     return this.activeCount > 0;
   }
 
-  // --- Error handler (set by App component) ---
-
   setErrorHandler(handler: (file: FileItem, error: string) => void) {
     this.#onError = handler;
   }
-
-  // --- Initialization: set up Tauri event listeners ---
 
   async init() {
     const listeners = await Promise.all([
@@ -36,7 +30,6 @@ class ConversionStore {
         const now = Date.now();
         const lastUpdate = this.#lastUpdate.get(task_id) || 0;
 
-        // Throttle progress updates
         if (
           now - lastUpdate < APP_CONFIG.limits.progressThrottleMs &&
           percent > 0 &&
@@ -81,7 +74,6 @@ class ConversionStore {
         this.#lastUpdate.delete(task_id);
         this.#activeTaskIds.delete(task_id);
 
-        // Standard FFmpeg errors do not require a modal popup; they are shown in the queue item.
         fileQueueStore.updateFile(task_id, {
           status: 'failed',
           error,
@@ -95,28 +87,24 @@ class ConversionStore {
     this.#unlisteners = listeners;
   }
 
-  // --- Conversion actions ---
-
   async startConversion(file: FileItem) {
     const outputFolder = fileQueueStore.outputFolder;
 
     if (!outputFolder) {
       const error = 'No output folder selected';
       fileQueueStore.updateFile(file.id, { status: 'failed', error });
-      return; // No modal for this expected error
+      return;
     }
 
     if (!file.mediaInfo) {
       const error = 'File has no media information';
       fileQueueStore.updateFile(file.id, { status: 'failed', error });
-      return; // No modal for this expected error
+      return;
     }
 
-    // Prevent duplicate processing
     if (this.#activeTaskIds.has(file.id)) return;
 
     try {
-      // Build collision set from all OTHER files' output paths
       const existingPaths = new Set(
         fileQueueStore.files
           .filter(f => f.id !== file.id && f.outputPath)
@@ -181,10 +169,7 @@ class ConversionStore {
       await invoke(command, params);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
-      
-      // If invoke rejected, the Rust backend usually emits a 'conversion-error' event.
-      // We only handle the error here if the event listener didn't catch it yet
-      // (e.g., IPC failure). We check the current status to avoid double-handling.
+
       const currentFile = fileQueueStore.files.find(f => f.id === file.id);
       if (currentFile?.status === 'processing') {
         fileQueueStore.updateFile(file.id, {
@@ -193,20 +178,14 @@ class ConversionStore {
           progress: null,
         });
         this.activeCount = Math.max(0, this.activeCount - 1);
-        
-        // Only invoke global error handler for critical IPC issues
+
         if (this.#onError) this.#onError(file, errorMessage);
       }
-      
+
       this.#activeTaskIds.delete(file.id);
     }
   }
 
-  /**
-   * Start all pending conversions using a concurrency pool.
-   * Spawns up to `maxParallelConversions` workers that pull tasks from the queue.
-   * Only processes files that were pending at the moment the function was called.
-   */
   async startAll() {
     if (!fileQueueStore.outputFolder) return;
 
@@ -214,24 +193,20 @@ class ConversionStore {
 
     const maxParallel = APP_CONFIG.limits.maxParallelConversions;
 
-    // Snapshot of target file IDs to prevent newly added files from auto-starting
     const targetIds = new Set(fileQueueStore.pendingFiles.map(f => f.id));
 
     const worker = async () => {
       while (!this.#abortPipeline) {
-        // Find the next file that is still pending, in our snapshot, and not already picked up
         const nextFile = fileQueueStore.files.find(
           f => f.status === 'pending' && targetIds.has(f.id) && !this.#activeTaskIds.has(f.id)
         );
 
-        if (!nextFile) break; // No more files to process in this batch
+        if (!nextFile) break;
 
-        // Start conversion and wait for it to finish (or fail) before pulling the next one
         await this.startConversion(nextFile);
       }
     };
 
-    // Launch concurrent workers
     const workers = Array.from(
       { length: Math.min(maxParallel, targetIds.size) },
       () => worker()
@@ -242,10 +217,9 @@ class ConversionStore {
 
   async cancelConversion(id: string) {
     try {
-      this.#activeTaskIds.delete(id); // Remove from active set immediately
+      this.#activeTaskIds.delete(id);
       await invoke('cancel_conversion', { taskId: id });
     } catch {
-      // If invoke fails, update state directly
       this.#lastUpdate.delete(id);
       this.#activeTaskIds.delete(id);
       fileQueueStore.updateFile(id, {
@@ -258,15 +232,11 @@ class ConversionStore {
   }
 
   async cancelAll() {
-    // Signal the pipeline to stop picking up new files
     this.#abortPipeline = true;
 
-    // Cancel all currently processing files
     const processing = fileQueueStore.files.filter(f => f.status === 'processing');
     await Promise.all(processing.map(f => this.cancelConversion(f.id)));
   }
-
-  // --- Cleanup ---
 
   destroy() {
     this.#abortPipeline = true;

@@ -6,21 +6,21 @@
 export const APP_CONFIG = {
   name: 'MuXolotl-Converter',
   version: '1.2.0',
-  
+
   github: {
     repo: 'https://github.com/MuXolotl/MuXolotl-Converter',
     issues: 'https://github.com/MuXolotl/MuXolotl-Converter/issues/new',
   },
-  
+
   limits: {
     maxQueueSize: 50,
-    maxParallelConversions: 4, // Maximum number of simultaneous conversions
+    maxParallelConversions: 4,
     queuePersistenceDays: 7,
     autosaveDebounceMs: 2000,
     validationDebounceMs: 300,
     progressThrottleMs: 100,
   },
-  
+
   storage: {
     keys: {
       queue: 'muxolotl_queue',
