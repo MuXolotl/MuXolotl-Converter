@@ -94,24 +94,25 @@ fn validate_audio(result: &mut ValidationResult, ctx: &ValidationContext) {
         return;
     };
 
-    result.check_stability(fmt.stability.clone(), &fmt.extension);
+    result.check_stability(fmt.stability, &fmt.extension);
     result.suggested_params.extend(fmt.special_params.clone());
 
     // Check encoder availability
-    if fmt.codec != "copy" && crate::codec_registry::is_initialized() {
-        if !crate::codec_registry::is_encoder_available(&fmt.codec) {
-            if let Some(fallback) = crate::codec_registry::get_audio_fallback(&fmt.codec) {
-                result.warn(format!(
-                    "Encoder '{}' not found, will use '{}'",
-                    fmt.codec, fallback
-                ));
-                result.alternative_codec = Some(fallback.to_string());
-            } else {
-                result.error(format!(
-                    "Encoder '{}' not available in this FFmpeg build",
-                    fmt.codec
-                ));
-            }
+    if fmt.codec != "copy"
+        && crate::codec_registry::is_initialized()
+        && !crate::codec_registry::is_encoder_available(&fmt.codec)
+    {
+        if let Some(fallback) = crate::codec_registry::get_audio_fallback(&fmt.codec) {
+            result.warn(format!(
+                "Encoder '{}' not found, will use '{}'",
+                fmt.codec, fallback
+            ));
+            result.alternative_codec = Some(fallback.to_string());
+        } else {
+            result.error(format!(
+                "Encoder '{}' not available in this FFmpeg build",
+                fmt.codec
+            ));
         }
     }
 
@@ -163,7 +164,7 @@ fn validate_video(result: &mut ValidationResult, ctx: &ValidationContext) {
         return;
     };
 
-    result.check_stability(fmt.stability.clone(), &fmt.extension);
+    result.check_stability(fmt.stability, &fmt.extension);
     result.suggested_params.extend(fmt.special_params.clone());
 
     let use_gpu = ctx
@@ -209,35 +210,31 @@ fn check_video_copy(
         return;
     };
 
-    let no_resize = ctx
-        .settings
-        .get("width")
-        .and_then(|v| v.as_u64())
-        .is_none()
+    let no_resize = ctx.settings.get("width").and_then(|v| v.as_u64()).is_none()
         && ctx
             .settings
             .get("height")
             .and_then(|v| v.as_u64())
             .is_none();
-    let no_fps = ctx
-        .settings
-        .get("fps")
-        .and_then(|v| v.as_u64())
-        .is_none();
+
+    let no_fps = ctx.settings.get("fps").and_then(|v| v.as_u64()).is_none();
+
     let no_explicit_codec = ctx
         .settings
         .get("videoCodec")
         .and_then(|v| v.as_str())
         .is_none();
+
     let no_fixed_res = !fmt.requires_fixed_resolution;
 
-    if no_resize && no_fps && no_explicit_codec && no_fixed_res {
-        if fmt.supports_video_codec(input_codec) {
-            result.can_copy_video = true;
-            result.info(
-                "⚡ Stream copy possible — no re-encoding, very fast!".to_string(),
-            );
-        }
+    if no_resize
+        && no_fps
+        && no_explicit_codec
+        && no_fixed_res
+        && fmt.supports_video_codec(input_codec)
+    {
+        result.can_copy_video = true;
+        result.info("⚡ Stream copy possible — no re-encoding, very fast!".to_string());
     }
 
     // Also check audio copy
@@ -274,6 +271,7 @@ fn check_gpu_codec(
             .map(|c| c.to_uppercase())
             .collect::<Vec<_>>()
             .join("/");
+
         result.info(format!(
             "No GPU encoder for {} — {} will use CPU (software encoding)",
             codec_names, gpu_name
@@ -323,29 +321,29 @@ fn recommend_for_input(
                 .video_codecs
                 .iter()
                 .any(|c| c == "hevc" || c == "av1" || c == "vp9");
+
             if !has_efficient {
                 result.info(
                     "4K source: consider MKV or WebM with HEVC/AV1 for 50% smaller files"
                         .to_string(),
                 );
             } else {
-                result.info(
-                    "4K content: HEVC/AV1 will provide excellent compression".to_string(),
-                );
+                result.info("4K content: HEVC/AV1 will provide excellent compression".to_string());
             }
         } else if is_1440p {
-            let has_efficient = fmt
-                .video_codecs
-                .iter()
-                .any(|c| c == "hevc" || c == "av1");
+            let has_efficient = fmt.video_codecs.iter().any(|c| c == "hevc" || c == "av1");
+
             if has_efficient {
-                result.info("1440p+ content: HEVC/AV1 recommended for better compression".to_string());
+                result.info(
+                    "1440p+ content: HEVC/AV1 recommended for better compression".to_string(),
+                );
             }
         }
 
         // --- Resolution downscale detected ---
         let target_w = ctx.settings.get("width").and_then(|v| v.as_u64());
         let target_h = ctx.settings.get("height").and_then(|v| v.as_u64());
+
         if let (Some(tw), Some(th)) = (target_w, target_h) {
             if (tw as u32) < w / 2 || (th as u32) < h / 2 {
                 result.info(format!(
@@ -359,11 +357,13 @@ fn recommend_for_input(
     // --- HDR detection hint ---
     if let Some(codec) = &ctx.input_video_codec {
         let possibly_hdr = codec == "hevc" || codec == "av1" || codec == "vp9";
+
         if possibly_hdr {
             let output_supports_hdr = fmt
                 .video_codecs
                 .iter()
                 .any(|c| c == "hevc" || c == "av1" || c == "vp9");
+
             if !output_supports_hdr {
                 result.warn(
                     "Source may contain HDR. This format doesn't support HDR — colors may look washed out"
@@ -392,6 +392,7 @@ fn check_video_encoder(result: &mut ValidationResult, fmt: &video::VideoFormat) 
             .map(|c| c.as_str())
             .collect::<Vec<_>>()
             .join(", ");
+
         result.error(format!(
             "No encoder available for codecs: {}. Check FFmpeg installation.",
             names

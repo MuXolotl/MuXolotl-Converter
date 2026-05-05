@@ -83,7 +83,9 @@ impl ProgressParser {
             return Some(progress);
         }
 
-        if self.last_progress.is_some() && self.last_update.elapsed().as_millis() < UPDATE_INTERVAL_MS {
+        if self.last_progress.is_some()
+            && self.last_update.elapsed().as_millis() < UPDATE_INTERVAL_MS
+        {
             return None;
         }
 

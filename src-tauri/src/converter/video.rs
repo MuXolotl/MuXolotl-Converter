@@ -28,7 +28,7 @@ pub async fn convert(
 
     let task_id = settings.task_id();
     let fmt = video::get_format(format).context("Unknown video format")?;
-    let media = media::detect_media_type(&window.app_handle(), input).await?;
+    let media = media::detect_media_type(window.app_handle(), input).await?;
 
     // ========== GIF special path ==========
     if format == "gif" {
@@ -41,6 +41,7 @@ pub async fn convert(
             task_id = %task_id,
             "Using video stream copy — no re-encoding needed"
         );
+
         let _ = window.emit(
             "conversion-info",
             serde_json::json!({
@@ -61,7 +62,16 @@ pub async fn convert(
         builder = apply_container_settings(builder, &fmt);
 
         let (args, output_path) = builder.build();
-        return spawn_ffmpeg(window, task_id, media.duration, args, output_path, processes).await;
+
+        return spawn_ffmpeg(
+            window,
+            task_id,
+            media.duration,
+            args,
+            output_path,
+            processes,
+        )
+        .await;
     }
 
     // ========== Normal conversion path ==========
@@ -77,6 +87,7 @@ pub async fn convert(
                 fallback = %sw,
                 "GPU encoder not available, falling back to software"
             );
+
             let _ = window.emit(
                 "conversion-fallback",
                 serde_json::json!({
@@ -86,6 +97,7 @@ pub async fn convert(
                     "reason": format!("{} not supported by {}", video_codec, gpu_info.name),
                 }),
             );
+
             video_codec = sw.to_string();
         }
     }
@@ -154,6 +166,7 @@ pub async fn convert(
                 .map(|v| v.fps.round() as u32)
                 .unwrap_or(30)
         });
+
         let target_bitrate =
             calculate_auto_bitrate(width, height, fps, settings.quality, &video_codec);
         builder = builder
@@ -199,6 +212,7 @@ pub async fn convert(
         Ok(result) => Ok(result),
         Err(e) if codec_map::software_fallback_for_encoder(&video_codec).is_some() => {
             let sw_codec = codec_map::software_fallback_for_encoder(&video_codec).unwrap();
+
             tracing::warn!(
                 encoder = %video_codec,
                 fallback = %sw_codec,
@@ -230,19 +244,17 @@ pub async fn convert(
             }
 
             retry = apply_resolution(retry, &fmt, &media, &settings);
-
             if let Some(fps) = settings.fps {
                 retry = retry.fps(fps);
             }
-
             if let Some(pix_fmt) = &fmt.default_pixel_format {
                 retry = retry.pixel_format(pix_fmt);
             }
-
             retry = apply_audio_settings(retry, &fmt, &media, &settings);
             retry = apply_container_settings(retry, &fmt);
 
             let (retry_args, retry_output) = retry.build();
+
             spawn_ffmpeg(
                 window,
                 task_id,
@@ -306,7 +318,16 @@ async fn convert_to_gif(
         .format("gif");
 
     let (args, output_path) = builder.build();
-    spawn_ffmpeg(window, task_id, media.duration, args, output_path, processes).await
+
+    spawn_ffmpeg(
+        window,
+        task_id,
+        media.duration,
+        args,
+        output_path,
+        processes,
+    )
+    .await
 }
 
 // ============ Stream copy detection ============
@@ -324,15 +345,19 @@ fn can_copy_video_stream(
     if settings.video_codec.is_some() {
         return false;
     }
+
     if settings.width.is_some() || settings.height.is_some() {
         return false;
     }
+
     if settings.fps.is_some() {
         return false;
     }
+
     if fmt.requires_fixed_resolution {
         return false;
     }
+
     if let Some((max_w, max_h)) = fmt.max_resolution {
         if video.width > max_w || video.height > max_h {
             return false;
@@ -346,8 +371,7 @@ fn can_copy_video_stream(
 
 fn find_available_encoder(fmt: &VideoFormat) -> Option<String> {
     for codec_type in &fmt.video_codecs {
-        let sw_name = codec_map::software_encoder_for_codec(codec_type)
-            .unwrap_or(codec_type);
+        let sw_name = codec_map::software_encoder_for_codec(codec_type).unwrap_or(codec_type);
         if codec_registry::is_encoder_available(sw_name) {
             return Some(sw_name.to_string());
         }
@@ -355,13 +379,7 @@ fn find_available_encoder(fmt: &VideoFormat) -> Option<String> {
     None
 }
 
-fn calculate_auto_bitrate(
-    width: u32,
-    height: u32,
-    fps: u32,
-    quality: Quality,
-    codec: &str,
-) -> u32 {
+fn calculate_auto_bitrate(width: u32, height: u32, fps: u32, quality: Quality, codec: &str) -> u32 {
     let pixels = width as f64 * height as f64;
 
     let base_bpp = match quality {
@@ -413,6 +431,7 @@ fn apply_resolution(
         let source_height = media.primary_video().map(|v| v.height).unwrap_or(576);
         let height = if source_height <= 480 { 480 } else { 576 };
         let fps = if height == 480 { "30000/1001" } else { "25" };
+
         return builder
             .resolution(Some(720), Some(height), true)
             .arg("-r", fps);
@@ -462,19 +481,18 @@ fn apply_audio_settings(
     }
 
     if let Some(rec) = fmt.get_recommended_audio_codec() {
-        let actual_codec = if codec_registry::is_initialized()
-            && !codec_registry::is_encoder_available(&rec)
-        {
-            tracing::warn!(
-                encoder = %rec,
-                "Audio encoder not available, trying alternatives"
-            );
-            codec_registry::get_audio_fallback(&rec)
-                .map(|s| s.to_string())
-                .unwrap_or(rec.clone())
-        } else {
-            rec.clone()
-        };
+        let actual_codec =
+            if codec_registry::is_initialized() && !codec_registry::is_encoder_available(&rec) {
+                tracing::warn!(
+                    encoder = %rec,
+                    "Audio encoder not available, trying alternatives"
+                );
+                codec_registry::get_audio_fallback(&rec)
+                    .map(|s| s.to_string())
+                    .unwrap_or(rec.clone())
+            } else {
+                rec.clone()
+            };
 
         let mut b = builder.audio_codec(&actual_codec);
         if !actual_codec.starts_with("pcm") && actual_codec != "copy" {

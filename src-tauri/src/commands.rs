@@ -165,11 +165,9 @@ fn categorize_video_formats(
     height: Option<u32>,
 ) -> Value {
     let mut result = CategoryResult::default();
-
     for fmt in formats {
         let compat = fmt.get_compatibility_level(video_codec, audio_codec, width, height);
         let ext = fmt.extension.clone();
-
         match compat {
             video::FormatCompatibility::Fast => result.fast.push(ext),
             video::FormatCompatibility::Safe => result.safe.push(ext),
@@ -178,14 +176,13 @@ fn categorize_video_formats(
             video::FormatCompatibility::Problematic => result.problematic.push(ext),
         }
     }
-
     json!(result)
 }
 
 fn categorize_audio_formats(formats: &[audio::AudioFormat], audio_codec: &str) -> Value {
     use crate::formats::Stability;
-    let mut result = CategoryResult::default();
 
+    let mut result = CategoryResult::default();
     for fmt in formats {
         let ext = fmt.extension.clone();
         match fmt.stability {
@@ -201,7 +198,6 @@ fn categorize_audio_formats(formats: &[audio::AudioFormat], audio_codec: &str) -
             Stability::Problematic => result.problematic.push(ext),
         }
     }
-
     json!(result)
 }
 
@@ -222,6 +218,7 @@ pub async fn convert_audio(
 ) -> Result<String, String> {
     let settings: ConversionSettings =
         serde_json::from_value(settings).map_err(|e| e.to_string())?;
+
     converter::audio::convert(
         window,
         &input,
@@ -246,6 +243,7 @@ pub async fn convert_video(
 ) -> Result<String, String> {
     let settings: ConversionSettings =
         serde_json::from_value(settings).map_err(|e| e.to_string())?;
+
     converter::video::convert(
         window,
         &input,
@@ -270,6 +268,7 @@ pub async fn extract_audio(
 ) -> Result<String, String> {
     let settings: ConversionSettings =
         serde_json::from_value(settings).map_err(|e| e.to_string())?;
+
     converter::audio::extract_from_video(
         window,
         &input,
@@ -283,10 +282,7 @@ pub async fn extract_audio(
 }
 
 #[tauri::command]
-pub async fn cancel_conversion(
-    state: State<'_, AppState>,
-    task_id: String,
-) -> Result<(), String> {
+pub async fn cancel_conversion(state: State<'_, AppState>, task_id: String) -> Result<(), String> {
     if let Some(mut child) = state.active_processes.lock().await.remove(&task_id) {
         let _ = child.kill().await;
     }
@@ -294,7 +290,7 @@ pub async fn cancel_conversion(
 }
 
 pub async fn init_caches(window: &tauri::WebviewWindow) {
-    let ffmpeg_path = binary::get_ffmpeg_path(&window.app_handle())
+    let ffmpeg_path = binary::get_ffmpeg_path(window.app_handle())
         .ok()
         .and_then(|p| p.to_str().map(|s| s.to_string()));
 

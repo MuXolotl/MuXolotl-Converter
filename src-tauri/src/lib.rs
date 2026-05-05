@@ -63,7 +63,7 @@ pub fn run() {
         ])
         .setup(|app| {
             // Initialize codec registry as early as possible if FFmpeg is available
-            if let Ok(ffmpeg_path) = get_ffmpeg_path(&app.handle()) {
+            if let Ok(ffmpeg_path) = get_ffmpeg_path(app.handle()) {
                 if let Some(ffmpeg) = ffmpeg_path.to_str() {
                     codec_registry::init(ffmpeg);
                 }

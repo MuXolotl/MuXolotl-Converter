@@ -71,7 +71,7 @@ impl From<serde_json::Error> for AppError {
 
 impl From<AppError> for String {
     fn from(err: AppError) -> Self {
-        serde_json::to_string(&err).unwrap_or_else(|_| err.message)
+        serde_json::to_string(&err).unwrap_or(err.message)
     }
 }
 

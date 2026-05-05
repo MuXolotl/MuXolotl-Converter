@@ -76,24 +76,24 @@ impl GpuInfo {
 fn get_candidates(vendor: GpuVendor) -> Vec<&'static str> {
     match vendor {
         GpuVendor::Nvidia => vec![
-            "h264_nvenc",  // Kepler+ (GTX 600+)
-            "hevc_nvenc",  // Maxwell 2nd gen+ (GTX 950+)
-            "av1_nvenc",   // Ada Lovelace+ (RTX 40xx+)
+            "h264_nvenc", // Kepler+ (GTX 600+)
+            "hevc_nvenc", // Maxwell 2nd gen+ (GTX 950+)
+            "av1_nvenc",  // Ada Lovelace+ (RTX 40xx+)
         ],
         GpuVendor::Intel => vec![
-            "h264_qsv",   // Sandy Bridge+
-            "hevc_qsv",   // Skylake+
-            "vp9_qsv",    // Ice Lake+
-            "av1_qsv",    // Arc / Alchemist+
+            "h264_qsv", // Sandy Bridge+
+            "hevc_qsv", // Skylake+
+            "vp9_qsv",  // Ice Lake+
+            "av1_qsv",  // Arc / Alchemist+
         ],
         GpuVendor::Amd => vec![
-            "h264_amf",   // GCN 1.0+ (HD 7000+)
-            "hevc_amf",   // Polaris+ (RX 400+)
-            "av1_amf",    // RDNA3+ (RX 7000+)
+            "h264_amf", // GCN 1.0+ (HD 7000+)
+            "hevc_amf", // Polaris+ (RX 400+)
+            "av1_amf",  // RDNA3+ (RX 7000+)
         ],
         GpuVendor::Apple => vec![
-            "h264_videotoolbox",  // All Macs
-            "hevc_videotoolbox",  // A10+, all M-series
+            "h264_videotoolbox", // All Macs
+            "hevc_videotoolbox", // A10+, all M-series
         ],
         GpuVendor::None => vec![],
     }
@@ -131,7 +131,9 @@ async fn try_detect(vendor: GpuVendor, ffmpeg_path: Option<String>) -> Option<Gp
         GpuVendor::Intel => get_gpu_name(&["intel", "hd graphics", "uhd graphics", "iris"]).await?,
         GpuVendor::Amd => get_gpu_name(&["amd", "radeon"]).await?,
         #[cfg(target_os = "macos")]
-        GpuVendor::Apple => get_gpu_name(&["apple"]).await.unwrap_or_else(|| "Apple GPU".to_string()),
+        GpuVendor::Apple => get_gpu_name(&["apple"])
+            .await
+            .unwrap_or_else(|| "Apple GPU".to_string()),
         #[cfg(not(target_os = "macos"))]
         GpuVendor::Apple => return None,
         GpuVendor::None => return None,
@@ -152,8 +154,14 @@ async fn try_detect(vendor: GpuVendor, ffmpeg_path: Option<String>) -> Option<Gp
     }
 
     // Step 3: Build GpuInfo with tested results
-    let encoder_h264 = find_first_available(&encoders, &["h264_nvenc", "h264_qsv", "h264_amf", "h264_videotoolbox"]);
-    let encoder_h265 = find_first_available(&encoders, &["hevc_nvenc", "hevc_qsv", "hevc_amf", "hevc_videotoolbox"]);
+    let encoder_h264 = find_first_available(
+        &encoders,
+        &["h264_nvenc", "h264_qsv", "h264_amf", "h264_videotoolbox"],
+    );
+    let encoder_h265 = find_first_available(
+        &encoders,
+        &["hevc_nvenc", "hevc_qsv", "hevc_amf", "hevc_videotoolbox"],
+    );
 
     let decoder = match vendor {
         GpuVendor::Nvidia => Some("h264_cuvid".to_string()),
@@ -193,7 +201,10 @@ fn find_first_available(encoders: &HashMap<String, bool>, candidates: &[&str]) -
 // ============ Encoder testing ============
 
 /// Test multiple encoders in parallel for speed
-async fn test_encoders_parallel(candidates: &[&str], ffmpeg_path: Option<String>) -> HashMap<String, bool> {
+async fn test_encoders_parallel(
+    candidates: &[&str],
+    ffmpeg_path: Option<String>,
+) -> HashMap<String, bool> {
     let mut handles = Vec::new();
 
     for &enc in candidates {
@@ -226,13 +237,19 @@ async fn test_encoder_real(encoder: &str, ffmpeg_path: Option<&str>) -> bool {
         create_hidden_command(&cmd_str)
             .args([
                 "-hide_banner",
-                "-loglevel", "error",
-                "-f", "lavfi",
-                "-i", "nullsrc=s=256x256:d=0.1:r=1",
-                "-frames:v", "1",
+                "-loglevel",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                "nullsrc=s=256x256:d=0.1:r=1",
+                "-frames:v",
+                "1",
                 "-an",
-                "-c:v", &encoder_owned,
-                "-f", "null",
+                "-c:v",
+                &encoder_owned,
+                "-f",
+                "null",
                 null_output,
             ])
             .output()
@@ -247,11 +264,8 @@ async fn test_encoder_real(encoder: &str, ffmpeg_path: Option<&str>) -> bool {
 // ============ GPU name detection ============
 
 async fn detect_nvidia_name() -> Option<String> {
-    let output = run_command_timeout(
-        "nvidia-smi",
-        &["--query-gpu=name", "--format=csv,noheader"],
-    )
-    .await?;
+    let output =
+        run_command_timeout("nvidia-smi", &["--query-gpu=name", "--format=csv,noheader"]).await?;
 
     if !output.status.success() {
         return None;
@@ -269,9 +283,8 @@ async fn run_command_timeout(program: &str, args: &[&str]) -> Option<std::proces
     let program = program.to_string();
     let args: Vec<String> = args.iter().map(|s| s.to_string()).collect();
 
-    let future = tokio::task::spawn_blocking(move || {
-        create_hidden_command(&program).args(&args).output()
-    });
+    let future =
+        tokio::task::spawn_blocking(move || create_hidden_command(&program).args(&args).output());
 
     timeout(GPU_DETECT_TIMEOUT, future).await.ok()?.ok()?.ok()
 }

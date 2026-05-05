@@ -25,7 +25,7 @@ pub async fn convert(
 
     let task_id = settings.task_id();
     let fmt = audio::get_format(format).context(format!("Unknown audio format: {}", format))?;
-    let media = media::detect_media_type(&window.app_handle(), input).await?;
+    let media = media::detect_media_type(window.app_handle(), input).await?;
 
     // Resolve actual codec (check availability)
     let codec = resolve_audio_codec(&fmt)?;
@@ -47,7 +47,16 @@ pub async fn convert(
     }
 
     let (args, output_path) = builder.build();
-    spawn_ffmpeg(window, task_id, media.duration, args, output_path, processes).await
+
+    spawn_ffmpeg(
+        window,
+        task_id,
+        media.duration,
+        args,
+        output_path,
+        processes,
+    )
+    .await
 }
 
 pub async fn extract_from_video(
@@ -63,7 +72,7 @@ pub async fn extract_from_video(
 
     let task_id = settings.task_id();
     let fmt = audio::get_format(format).context(format!("Unknown audio format: {}", format))?;
-    let media = media::detect_media_type(&window.app_handle(), input).await?;
+    let media = media::detect_media_type(window.app_handle(), input).await?;
 
     if media.audio_streams.is_empty() {
         anyhow::bail!("No audio streams found in input file");
@@ -84,7 +93,6 @@ pub async fn extract_from_video(
     } else {
         let codec = resolve_audio_codec(&fmt)?;
         builder = builder.audio_codec(&codec);
-
         if codec != "copy" {
             builder = apply_audio_settings(builder, &fmt, &settings);
         }
@@ -93,7 +101,16 @@ pub async fn extract_from_video(
     builder = apply_container_and_params(builder, &fmt);
 
     let (args, output_path) = builder.build();
-    spawn_ffmpeg(window, task_id, media.duration, args, output_path, processes).await
+
+    spawn_ffmpeg(
+        window,
+        task_id,
+        media.duration,
+        args,
+        output_path,
+        processes,
+    )
+    .await
 }
 
 /// Check if the target codec is available; try fallback if not.

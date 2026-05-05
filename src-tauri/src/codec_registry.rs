@@ -13,6 +13,7 @@ pub fn init(ffmpeg_path: &str) {
 
     let enc_count = AVAILABLE_ENCODERS.get().map_or(0, |s| s.len());
     let dec_count = AVAILABLE_DECODERS.get().map_or(0, |s| s.len());
+
     tracing::info!(
         encoders = enc_count,
         decoders = dec_count,
@@ -25,9 +26,7 @@ pub fn init(ffmpeg_path: &str) {
 /// Returns `false` if the registry has not been initialized — conservative default
 /// that prevents attempting to use encoders that may not exist.
 pub fn is_encoder_available(name: &str) -> bool {
-    AVAILABLE_ENCODERS
-        .get()
-        .map_or(false, |s| s.contains(name))
+    AVAILABLE_ENCODERS.get().is_some_and(|s| s.contains(name))
 }
 
 /// Check if a specific decoder is available in this FFmpeg build.
@@ -36,9 +35,7 @@ pub fn is_encoder_available(name: &str) -> bool {
 /// that prevents attempting to use decoders that may not exist.
 #[allow(dead_code)]
 pub fn is_decoder_available(name: &str) -> bool {
-    AVAILABLE_DECODERS
-        .get()
-        .map_or(false, |s| s.contains(name))
+    AVAILABLE_DECODERS.get().is_some_and(|s| s.contains(name))
 }
 
 /// Check if the registry has been initialized
@@ -102,6 +99,7 @@ fn parse_codec_list(output: &str) -> HashSet<String> {
             past_separator = true;
             continue;
         }
+
         if !past_separator {
             continue;
         }
@@ -139,6 +137,7 @@ mod tests {
  A..... libmp3lame       libmp3lame MP3 (codec mp3)
  A..... libopus          libopus Opus (codec opus)
 "#;
+
         let result = parse_codec_list(sample);
         assert!(result.contains("libx264"));
         assert!(result.contains("libx265"));

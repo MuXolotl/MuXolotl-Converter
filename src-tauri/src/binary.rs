@@ -20,16 +20,16 @@ fn get_binary_suffix() -> &'static str {
 fn get_plain_binary_name(name: &str) -> &'static str {
     #[cfg(target_os = "windows")]
     match name {
-        "ffmpeg" => return "ffmpeg.exe",
-        "ffprobe" => return "ffprobe.exe",
-        _ => return "",
+        "ffmpeg" => "ffmpeg.exe",
+        "ffprobe" => "ffprobe.exe",
+        _ => "",
     }
 
     #[cfg(not(target_os = "windows"))]
     match name {
-        "ffmpeg" => return "ffmpeg",
-        "ffprobe" => return "ffprobe",
-        _ => return "",
+        "ffmpeg" => "ffmpeg",
+        "ffprobe" => "ffprobe",
+        _ => "",
     }
 }
 
@@ -91,10 +91,7 @@ pub fn get_binary_path(app_handle: &AppHandle, name: &str) -> AppResult<PathBuf>
 
     Err(AppError::new(
         ErrorCode::BinaryNotFound,
-        format!(
-            "Binary '{}' not found. Searched: {}",
-            name, searched
-        ),
+        format!("Binary '{}' not found. Searched: {}", name, searched),
     )
     .with_details(format!(
         "Expected filename: '{}' or '{}'. Searched paths: {}",

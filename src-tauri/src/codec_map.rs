@@ -95,7 +95,10 @@ mod tests {
         assert_eq!(gpu_encoder_for_codec("h264", "nvidia"), Some("h264_nvenc"));
         assert_eq!(gpu_encoder_for_codec("hevc", "intel"), Some("hevc_qsv"));
         assert_eq!(gpu_encoder_for_codec("av1", "amd"), Some("av1_amf"));
-        assert_eq!(gpu_encoder_for_codec("h264", "apple"), Some("h264_videotoolbox"));
+        assert_eq!(
+            gpu_encoder_for_codec("h264", "apple"),
+            Some("h264_videotoolbox")
+        );
         assert_eq!(gpu_encoder_for_codec("theora", "nvidia"), None);
         assert_eq!(gpu_encoder_for_codec("h264", "unknown"), None);
     }

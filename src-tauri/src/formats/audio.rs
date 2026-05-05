@@ -126,7 +126,11 @@ impl From<TomlAudioFormat> for AudioFormat {
             name: t.name,
             category: t.category,
             codec: t.codec,
-            container: if t.container.is_empty() { None } else { Some(t.container) },
+            container: if t.container.is_empty() {
+                None
+            } else {
+                Some(t.container)
+            },
             stability: t.stability,
             description: t.description,
             typical_use: t.typical_use,
@@ -136,7 +140,11 @@ impl From<TomlAudioFormat> for AudioFormat {
             } else {
                 None
             },
-            recommended_bitrate: if t.recommended_bitrate == 0 { None } else { Some(t.recommended_bitrate) },
+            recommended_bitrate: if t.recommended_bitrate == 0 {
+                None
+            } else {
+                Some(t.recommended_bitrate)
+            },
             sample_rates: t.sample_rates,
             recommended_sample_rate: t.recommended_sample_rate,
             channels_support: t.channels_support,
@@ -150,9 +158,11 @@ lazy_static! {
     static ref AUDIO_FORMATS: HashMap<String, AudioFormat> = {
         let toml_str = include_str!("audio_formats.toml");
         match toml::from_str::<AudioFormatsToml>(toml_str) {
-            Ok(parsed) => {
-                parsed.format.into_iter().map(|f| (f.extension.clone(), f.into())).collect()
-            }
+            Ok(parsed) => parsed
+                .format
+                .into_iter()
+                .map(|f| (f.extension.clone(), f.into()))
+                .collect(),
             Err(e) => {
                 tracing::error!(error = %e, "Failed to parse audio_formats.toml");
                 HashMap::new()

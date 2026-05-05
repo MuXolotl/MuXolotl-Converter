@@ -61,8 +61,10 @@ pub async fn detect_media_type(app_handle: &tauri::AppHandle, path: &str) -> Res
 
     let output = create_async_hidden_command(ffprobe_str)
         .args([
-            "-v", "quiet",
-            "-print_format", "json",
+            "-v",
+            "quiet",
+            "-print_format",
+            "json",
             "-show_format",
             "-show_streams",
             path,
@@ -72,11 +74,15 @@ pub async fn detect_media_type(app_handle: &tauri::AppHandle, path: &str) -> Res
         .context("Failed to execute ffprobe")?;
 
     if !output.status.success() {
-        anyhow::bail!("FFprobe failed: {}", String::from_utf8_lossy(&output.stderr));
+        anyhow::bail!(
+            "FFprobe failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 
     let json_str = String::from_utf8(output.stdout).context("Invalid UTF-8 in ffprobe output")?;
-    let probe: serde_json::Value = serde_json::from_str(&json_str).context("Failed to parse ffprobe JSON")?;
+    let probe: serde_json::Value =
+        serde_json::from_str(&json_str).context("Failed to parse ffprobe JSON")?;
 
     let file_size = tokio::fs::metadata(path)
         .await
@@ -149,7 +155,10 @@ fn parse_video_stream(stream: &serde_json::Value) -> Option<VideoStream> {
         width: stream.get("width")?.as_u64()? as u32,
         height: stream.get("height")?.as_u64()? as u32,
         fps: parse_framerate(stream.get("r_frame_rate")?.as_str()?),
-        bitrate: stream.get("bit_rate").and_then(|b| b.as_str()).and_then(|s| s.parse().ok()),
+        bitrate: stream
+            .get("bit_rate")
+            .and_then(|b| b.as_str())
+            .and_then(|s| s.parse().ok()),
     })
 }
 
@@ -158,7 +167,10 @@ fn parse_audio_stream(stream: &serde_json::Value) -> Option<AudioStream> {
         codec: stream.get("codec_name")?.as_str()?.to_string(),
         sample_rate: stream.get("sample_rate")?.as_str()?.parse().ok()?,
         channels: stream.get("channels")?.as_u64()? as u32,
-        bitrate: stream.get("bit_rate").and_then(|b| b.as_str()).and_then(|s| s.parse().ok()),
+        bitrate: stream
+            .get("bit_rate")
+            .and_then(|b| b.as_str())
+            .and_then(|s| s.parse().ok()),
     })
 }
 

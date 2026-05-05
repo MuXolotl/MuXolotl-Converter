@@ -39,7 +39,7 @@ pub async fn spawn_ffmpeg(
     output_path: String,
     processes: Arc<Mutex<HashMap<String, Child>>>,
 ) -> Result<String> {
-    let ffmpeg_path = get_ffmpeg_path(&window.app_handle())
+    let ffmpeg_path = get_ffmpeg_path(window.app_handle())
         .map_err(|e| anyhow::anyhow!("FFmpeg not found: {}", e))?;
 
     let mut cmd = create_async_hidden_command(ffmpeg_path.to_str().unwrap());
@@ -48,11 +48,11 @@ pub async fn spawn_ffmpeg(
         .stderr(Stdio::piped());
 
     let mut child = cmd.spawn().context("Failed to spawn FFmpeg")?;
-
     let stdout = child.stdout.take().expect("Failed to capture stdout");
     let stderr = child.stderr.take().expect("Failed to capture stderr");
 
     processes.lock().await.insert(task_id.clone(), child);
+
     let _ = window.emit("conversion-started", &task_id);
 
     let task_id_err = task_id.clone();
@@ -70,24 +70,20 @@ pub async fn spawn_ffmpeg(
     let window_progress = window.clone();
     let task_id_progress = task_id.clone();
     let processes_monitor = processes.clone();
-
     let monitor_future = async move {
         let mut reader = BufReader::new(stdout).lines();
         let mut parser = ProgressParser::new(task_id_progress.clone(), duration);
-
         while let Ok(Some(line)) = reader.next_line().await {
             if let Some(progress) = parser.parse_line(&line) {
                 let _ = window_progress.emit("conversion-progress", &progress);
             }
         }
-
         processes_monitor.lock().await.remove(&task_id_progress)
     };
 
     match timeout(CONVERSION_TIMEOUT, monitor_future).await {
         Ok(Some(mut child)) => {
             let status = child.wait().await?;
-
             if status.success() {
                 let _ = window.emit("conversion-completed", &task_id);
                 Ok(task_id)

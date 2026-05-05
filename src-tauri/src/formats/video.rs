@@ -202,9 +202,11 @@ lazy_static! {
     static ref VIDEO_FORMATS: HashMap<String, VideoFormat> = {
         let toml_str = include_str!("video_formats.toml");
         match toml::from_str::<VideoFormatsToml>(toml_str) {
-            Ok(parsed) => {
-                parsed.format.into_iter().map(|f| (f.extension.clone(), f.into())).collect()
-            }
+            Ok(parsed) => parsed
+                .format
+                .into_iter()
+                .map(|f| (f.extension.clone(), f.into()))
+                .collect(),
             Err(e) => {
                 tracing::error!(error = %e, "Failed to parse video_formats.toml");
                 HashMap::new()
