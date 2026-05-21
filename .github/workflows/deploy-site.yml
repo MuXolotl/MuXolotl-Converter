@@ -1,0 +1,62 @@
+name: Deploy Converter Site to MuXolotl.github.io
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - ".github/workflows/deploy-site.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-converter-site
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source repository
+      # We put it in a subfolder so we can checkout the target repo too.
+        uses: actions/checkout@v4
+        with:
+          path: source
+
+      - name: Checkout target repository (MuXolotl.github.io)
+        uses: actions/checkout@v4
+        with:
+          repository: MuXolotl/MuXolotl.github.io
+          token: ${{ secrets.MUXOLOTL_PAGES_TOKEN }}
+          path: target
+
+      - name: Sync site/ -> target/converter/
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p target/converter
+          rsync -a --delete source/site/ target/converter/
+
+      - name: Commit & push (only if changed)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cd target
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add converter
+
+          if git diff --staged --quiet; then
+            echo "No changes to deploy."
+            exit 0
+          fi
+
+          SHORT_SHA="$(echo "${GITHUB_SHA}" | cut -c1-7)"
+          git commit -m "docs(converter): deploy site from MuXolotl-Converter@${SHORT_SHA}"
+          git push

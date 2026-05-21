@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="icon" type="image/png" href="images/icon.png">
+    <link rel="apple-touch-icon" href="images/icon.png">
+
+    <title>MuXolotl-Converter — Конвертер аудио и видео</title>
+
+    <meta name="description" content="MuXolotl-Converter — бесплатный кросс-платформенный конвертер аудио и видео с аппаратным ускорением. 40+ форматов, GPU-ускорение, открытый исходный код.">
+    <meta name="keywords" content="конвертер, converter, аудио, видео, mp3, mp4, mkv, flac, ffmpeg, open source, GPU, NVENC, аппаратное ускорение">
+    <meta name="author" content="MuXolotl">
+
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://muxolotl.github.io/converter">
+    <meta property="og:title" content="MuXolotl-Converter — Конвертер аудио и видео">
+    <meta property="og:description" content="Бесплатный кросс-платформенный конвертер с аппаратным ускорением. 40+ форматов. Open Source.">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="MuXolotl-Converter">
+    <meta name="twitter:description" content="Конвертер аудио и видео с GPU-ускорением. 40+ форматов. Open Source.">
+
+    <meta name="theme-color" content="#09090b">
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "MuXolotl-Converter",
+      "operatingSystem": "Windows, macOS, Linux",
+      "applicationCategory": "MultimediaApplication",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "description": "Бесплатный конвертер аудио и видео с открытым исходным кодом и аппаратным ускорением.",
+      "author": { "@type": "Person", "name": "MuXolotl" }
+    }
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="bg-zinc-950 text-zinc-100 antialiased overflow-x-hidden">
+
+    <!-- ===== NAVBAR ===== -->
+    <nav class="fixed top-0 left-0 right-0 z-50 border-b border-white/[0.06]" id="navbar">
+        <div class="mx-auto max-w-6xl px-6">
+            <div class="flex h-16 items-center justify-between">
+                <a href="index.html" class="flex items-center gap-2.5 group">
+                    <span class="text-2xl">🦎</span>
+                    <span class="text-sm font-semibold tracking-tight text-zinc-200 group-hover:text-white transition-colors">MuXolotl-Converter</span>
+                </a>
+
+                <div class="hidden md:flex items-center gap-8">
+                    <a href="#features" class="text-sm text-zinc-500 hover:text-zinc-200 transition-colors">Возможности</a>
+                    <a href="#formats" class="text-sm text-zinc-500 hover:text-zinc-200 transition-colors">Форматы</a>
+                    <a href="#tech" class="text-sm text-zinc-500 hover:text-zinc-200 transition-colors">Технологии</a>
+                    <a href="#download" class="text-sm text-zinc-500 hover:text-zinc-200 transition-colors">Скачать</a>
+                </div>
+
+                <div class="flex items-center gap-3">
+                    <a href="https://github.com/MuXolotl/MuXolotl-Converter" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-zinc-400 hover:text-zinc-200 hover:bg-white/5 transition-all" title="GitHub">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                        <span class="hidden sm:inline">GitHub</span>
+                    </a>
+                    <a href="#download" class="hidden sm:inline-flex items-center gap-1.5 px-4 py-1.5 bg-violet-600 hover:bg-violet-500 text-sm font-medium rounded-lg transition-colors">
+                        Скачать
+                    </a>
+
+                    <button id="mobileMenuBtn" class="md:hidden p-2 text-zinc-400 hover:text-white">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <div id="mobileMenu" class="hidden md:hidden pb-4 pt-2 border-t border-white/[0.06]">
+                <div class="flex flex-col gap-3">
+                    <a href="#features" class="text-sm text-zinc-400 hover:text-white transition-colors py-1">Возможности</a>
+                    <a href="#formats" class="text-sm text-zinc-400 hover:text-white transition-colors py-1">Форматы</a>
+                    <a href="#tech" class="text-sm text-zinc-400 hover:text-white transition-colors py-1">Технологии</a>
+                    <a href="#download" class="text-sm text-zinc-400 hover:text-white transition-colors py-1">Скачать</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ===== HERO ===== -->
+    <section class="relative min-h-screen flex items-center justify-center pt-16 overflow-hidden">
+        <!-- Background glow -->
+        <div class="absolute inset-0 pointer-events-none">
+            <div class="absolute top-1/4 left-1/2 -translate-x-1/2 w-[800px] h-[600px] bg-violet-600/[0.07] rounded-full blur-[120px]"></div>
+            <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-full h-px bg-gradient-to-r from-transparent via-white/[0.06] to-transparent"></div>
+        </div>
+
+        <!-- Grid pattern -->
+        <div class="absolute inset-0 pointer-events-none opacity-[0.03]" style="background-image: linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px); background-size: 64px 64px;"></div>
+
+        <div class="relative z-10 max-w-4xl mx-auto px-6 text-center">
+            <!-- Version badge -->
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.05] border border-white/[0.08] mb-8">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span class="text-xs font-medium text-zinc-400">v<span class="version-tag">1.2.0</span> — Open Source</span>
+            </div>
+
+            <h1 class="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-extrabold tracking-tight leading-[0.9] mb-6">
+                <span class="block text-white">Конвертируй</span>
+                <span class="block bg-gradient-to-r from-violet-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">без компромиссов</span>
+            </h1>
+
+            <p class="text-lg sm:text-xl text-zinc-500 max-w-2xl mx-auto mb-10 leading-relaxed">
+                Конвертер аудио и видео с аппаратным ускорением.
+                <span class="text-zinc-400">40+ форматов</span>,
+                <span class="text-zinc-400">GPU-ускорение</span>,
+                <span class="text-zinc-400">кросс-платформа</span>.
+            </p>
+
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <a href="#download" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 bg-violet-600 hover:bg-violet-500 text-white font-semibold rounded-xl transition-all hover:shadow-lg hover:shadow-violet-600/25 text-sm">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    Скачать бесплатно
+                </a>
+                <a href="https://github.com/MuXolotl/MuXolotl-Converter" target="_blank" rel="noopener noreferrer" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-3.5 border border-white/[0.1] hover:border-white/[0.2] hover:bg-white/[0.03] text-zinc-300 font-medium rounded-xl transition-all text-sm">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                    Исходный код
+                </a>
+            </div>
+
+            <!-- Platform badges -->
+            <div class="flex items-center justify-center gap-6 mt-10 text-xs text-zinc-600">
+                <span class="flex items-center gap-1.5">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
+                    Windows
+                </span>
+                <span class="flex items-center gap-1.5">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+                    macOS
+                </span>
+                <span class="flex items-center gap-1.5">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12.504 0c-.155 0-.315.008-.48.021-4.226.333-3.105 4.807-3.17 6.298-.076 1.092-.3 1.953-1.05 3.02-.885 1.051-2.127 2.75-2.716 4.521-.278.832-.41 1.684-.287 2.489a.424.424 0 00-.11.135c-.26.268-.45.6-.663.839-.199.199-.485.267-.797.4-.313.136-.658.269-.864.68-.09.189-.136.394-.132.602 0 .199.027.4.055.536.058.399.116.728.04.97-.249.68-.28 1.145-.106 1.484.174.334.535.47.94.601.81.2 1.91.135 2.774.6.926.466 1.866.67 2.616.47.526-.116.97-.464 1.208-.946.587-.003 1.23-.269 2.26-.334.699-.058 1.574.267 2.577.2.025.134.063.198.114.333l.003.003c.391.778 1.113 1.132 1.884 1.071.771-.06 1.592-.536 2.257-1.306.631-.765 1.683-1.084 2.378-1.503.348-.199.629-.469.649-.853.023-.4-.2-.811-.714-1.376v-.097l-.003-.003c-.17-.2-.25-.535-.338-.926-.085-.401-.182-.786-.492-1.046h-.003c-.059-.054-.123-.067-.188-.135a.357.357 0 00-.19-.064c.431-1.278.264-2.55-.173-3.694-.533-1.41-1.465-2.638-2.175-3.483-.796-1.005-1.576-1.957-1.56-3.368.026-2.152.236-6.133-3.544-6.139z"/></svg>
+                    Linux
+                </span>
+            </div>
+        </div>
+
+        <!-- Scroll indicator -->
+        <div class="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-zinc-600">
+            <span class="text-[10px] uppercase tracking-widest">Узнать больше</span>
+            <div class="w-5 h-8 rounded-full border border-zinc-700 flex items-start justify-center p-1">
+                <div class="w-1 h-1.5 rounded-full bg-zinc-500 animate-bounce"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== STATS BAR ===== -->
+    <section class="relative border-y border-white/[0.06] bg-zinc-950/80 backdrop-blur-md">
+        <div class="max-w-6xl mx-auto px-6 py-6">
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-white mb-1">40+</div>
+                    <div class="text-xs text-zinc-500 uppercase tracking-wider">форматов</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-white mb-1">4</div>
+                    <div class="text-xs text-zinc-500 uppercase tracking-wider">GPU вендора</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-white mb-1">3</div>
+                    <div class="text-xs text-zinc-500 uppercase tracking-wider">платформы</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-white mb-1">100%</div>
+                    <div class="text-xs text-zinc-500 uppercase tracking-wider">open source</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== FEATURES ===== -->
+    <section id="features" class="py-24 px-6 relative">
+        <div class="absolute inset-0 pointer-events-none">
+            <div class="absolute top-1/2 right-0 w-[400px] h-[400px] bg-violet-600/[0.04] rounded-full blur-[100px]"></div>
+        </div>
+
+        <div class="max-w-6xl mx-auto relative z-10">
+            <div class="text-center mb-16">
+                <p class="text-xs font-semibold uppercase tracking-widest text-violet-400 mb-3">Возможности</p>
+                <h2 class="text-3xl sm:text-4xl font-bold tracking-tight mb-4">Всё, что нужно для конвертации</h2>
+                <p class="text-zinc-500 max-w-xl mx-auto">Мощный функционал, скрытый за простым интерфейсом. Никаких сложных настроек — если вы не хотите их использовать.</p>
+            </div>
+
+            <!-- Feature cards grid -->
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- GPU Acceleration -->
+                <div class="group p-6 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-violet-500/30 hover:bg-white/[0.04] transition-all duration-300">
+                    <div class="w-10 h-10 rounded-xl bg-yellow-500/10 flex items-center justify-center mb-4">
+                        <svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    </div>
+                    <h3 class="text-sm font-semibold text-zinc-200 mb-2">Аппаратное ускорение</h3>
+                    <p class="text-sm text-zinc-500 leading-relaxed">NVIDIA NVENC, Intel QSV, AMD AMF, Apple VideoToolbox. Автоматическое определение и использование GPU.</p>
+                </div>
+
+                <!-- Multi-format -->
+                <div class="group p-6 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-violet-500/30 hover:bg-white/[0.04] transition-all duration-300">
+                    <div class="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center mb-4">
+                        <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                    </div>
+                    <h3 class="text-sm font-semibold text-zinc-200 mb-2">40+ форматов</h3>
+                    <p class="text-sm text-zinc-500 leading-relaxed">MP4, MKV, WebM, AVI, MOV, MP3, FLAC, WAV, AAC, Opus и десятки других. Аудио, видео, GIF.</p>
+                </div>
+
+                <!-- Batch processing -->
+                <div class="group p-6 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-violet-500/30 hover:bg-white/[0.04] transition-all duration-300">
+                    <div class="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center mb-4">
+                        <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                    </div>
+                    <h3 class="text-sm font-semibold text-zinc-200 mb-2">Пакетная обработка</h3>
+                    <p class="text-sm text-zinc-500 leading-relaxed">До 50 файлов в очереди, параллельная конвертация. Применение настроек ко всем файлам одним кликом.</p>
+                </div>
+
+                <!-- Stream copy -->
+                <div class="group p-6 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-violet-500/30 hover:bg-white/[0.04] transition-all duration-300">
+                    <div class="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center mb-4">
+                        <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                    </div>
+                    <h3 class="text-sm font-semibold text-zinc-200 mb-2">Stream Copy</h3>
+                    <p class="text-sm text-zinc-500 leading-relaxed">Автоматическое определение совместимости кодеков. Мгновенная перемуксация без перекодирования.</p>
+                </div>
+
+                <!-- Audio extraction -->
+                <div class="group p-6 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-violet-500/30 hover:bg-white/[0.04] transition-all duration-300">
+                    <div class="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center mb-4">
+                        <svg class="w-5 h-5 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
+                    </div>
+                    <h3 class="text-sm font-semibold text-zinc-200 mb-2">Извлечение аудио</h3>
+                    <p class="text-sm text-zinc-500 leading-relaxed">Извлечение аудио-дорожки из видео в любой аудио-формат. Один клик — готово.</p>
+                </div>
+
+                <!-- Smart validation -->
+                <div class="group p-6 rounded-2xl bg-white/[0.02] border border-white/[0.06] hover:border-violet-500/30 hover:bg-white/[0.04] transition-all duration-300">
+                    <div class="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center mb-4">
+                        <svg class="w-5 h-5 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                    </div>
+                    <h3 class="text-sm font-semibold text-zinc-200 mb-2">Умная валидация</h3>
+                    <p class="text-sm text-zinc-500 leading-relaxed">Рекомендации форматов, предупреждения о потере качества, проверка совместимости в реальном времени.</p>
+                </div>
+            </div>
+
+            <!-- Large feature highlight -->
+            <div class="mt-8 grid md:grid-cols-2 gap-4">
+                <div class="p-8 rounded-2xl bg-gradient-to-br from-violet-500/[0.08] to-transparent border border-violet-500/[0.15]">
+                    <p class="text-xs font-semibold uppercase tracking-widest text-violet-400 mb-3">Прогресс в реальном времени</p>
+                    <h3 class="text-xl font-bold text-zinc-100 mb-3">Полный контроль над процессом</h3>
+                    <p class="text-sm text-zinc-500 leading-relaxed mb-6">Отслеживание FPS, скорости обработки, ETA. Уведомления о завершении. Отмена в любой момент с очисткой временных файлов.</p>
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="text-zinc-400 font-mono">video_interview.mkv → mp4</span>
+                            <span class="text-violet-400 font-mono">67% · 2.3x · ~1:24</span>
+                        </div>
+                        <div class="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                            <div class="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full transition-all" style="width: 67%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-8 rounded-2xl bg-gradient-to-br from-emerald-500/[0.08] to-transparent border border-emerald-500/[0.15]">
+                    <p class="text-xs font-semibold uppercase tracking-widest text-emerald-400 mb-3">GPU Fallback</p>
+                    <h3 class="text-xl font-bold text-zinc-100 mb-3">Автоматический откат</h3>
+                    <p class="text-sm text-zinc-500 leading-relaxed mb-6">Если GPU-энкодер недоступен или не поддерживается — конвертер автоматически переключается на программный. Конвертация не прерывается.</p>
+                    <div class="flex items-center gap-3 text-xs">
+                        <span class="px-2.5 py-1 rounded-md bg-red-500/10 text-red-400 border border-red-500/20 font-mono">h264_nvenc ✗</span>
+                        <svg class="w-4 h-4 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+                        <span class="px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-mono">libx264 ✓</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== FORMATS ===== -->
+    <section id="formats" class="py-24 px-6 relative border-t border-white/[0.06]">
+        <div class="max-w-6xl mx-auto">
+            <div class="text-center mb-16">
+                <p class="text-xs font-semibold uppercase tracking-widest text-violet-400 mb-3">Форматы</p>
+                <h2 class="text-3xl sm:text-4xl font-bold tracking-tight mb-4">Полная совместимость</h2>
+                <p class="text-zinc-500 max-w-xl mx-auto">Поддержка всех популярных и многих специализированных форматов. От MP3 до ProRes, от WAV до DTS.</p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6">
+                <!-- Audio formats -->
+                <div class="p-6 rounded-2xl bg-white/[0.02] border border-white/[0.06]">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="w-8 h-8 rounded-lg bg-blue-500/15 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-semibold text-zinc-200">Аудио форматы</h3>
+                            <p class="text-xs text-zinc-500">21 формат</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-1.5">
+                        <span class="px-2 py-1 bg-blue-500/8 text-blue-300/80 text-[11px] rounded font-mono border border-blue-500/10">mp3</span>
+                        <span class="px-2 py-1 bg-blue-500/8 text-blue-300/80 text-[11px] rounded font-mono border border-blue-500/10">aac</span>
+                        <span class="px-2 py-1 bg-blue-500/8 text-blue-300/80 text-[11px] rounded font-mono border border-blue-500/10">m4a</span>
+                        <span class="px-2 py-1 bg-blue-500/8 text-blue-300/80 text-[11px] rounded font-mono border border-blue-500/10">flac</span>
+                        <span class="px-2 py-1 bg-blue-500/8 text-blue-300/80 text-[11px] rounded font-mono border border-blue-500/10">wav</span>
+                        <span class="px-2 py-1 bg-blue-500/8 text-blue-300/80 text-[11px] rounded font-mono border border-blue-500/10">ogg</span>
+                        <span class="px-2 py-1 bg-blue-500/8 text-blue-300/80 text-[11px] rounded font-mono border border-blue-500/10">opus</span>
+                        <span class="px-2 py-1 bg-blue-500/8 text-blue-300/80 text-[11px] rounded font-mono border border-blue-500/10">alac</span>
+                        <span class="px-2 py-1 bg-blue-500/8 text-blue-300/80 text-[11px] rounded font-mono border border-blue-500/10">m4b</span>
+                        <span class="px-2 py-1 bg-blue-500/8 text-blue-300/80 text-[11px] rounded font-mono border border-blue-500/10">wma</span>
+                        <span class="px-2 py-1 bg-blue-500/8 text-blue-300/80 text-[11px] rounded font-mono border border-blue-500/10">aiff</span>
+                        <span class="px-2 py-1 bg-blue-500/8 text-blue-300/80 text-[11px] rounded font-mono border border-blue-500/10">wv</span>
+                        <span class="px-2 py-1 bg-blue-500/8 text-blue-300/80 text-[11px] rounded font-mono border border-blue-500/10">tta</span>
+                        <span class="px-2 py-1 bg-blue-500/8 text-blue-300/80 text-[11px] rounded font-mono border border-blue-500/10">ac3</span>
+                        <span class="px-2 py-1 bg-blue-500/8 text-blue-300/80 text-[11px] rounded font-mono border border-blue-500/10">dts</span>
+                        <span class="px-2 py-1 bg-blue-500/8 text-blue-300/80 text-[11px] rounded font-mono border border-blue-500/10">amr</span>
+                        <span class="px-2 py-1 bg-blue-500/8 text-blue-300/80 text-[11px] rounded font-mono border border-blue-500/10">au</span>
+                        <span class="px-2 py-1 bg-blue-500/8 text-blue-300/80 text-[11px] rounded font-mono border border-blue-500/10">ra</span>
+                        <span class="px-2 py-1 bg-blue-500/8 text-blue-300/80 text-[11px] rounded font-mono border border-blue-500/10">shn</span>
+                        <span class="px-2 py-1 bg-blue-500/8 text-blue-300/80 text-[11px] rounded font-mono border border-blue-500/10">mka</span>
+                        <span class="px-2 py-1 bg-blue-500/8 text-blue-300/80 text-[11px] rounded font-mono border border-blue-500/10">spx</span>
+                    </div>
+                </div>
+
+                <!-- Video formats -->
+                <div class="p-6 rounded-2xl bg-white/[0.02] border border-white/[0.06]">
+                    <div class="flex items-center gap-3 mb-5">
+                        <div class="w-8 h-8 rounded-lg bg-purple-500/15 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                        </div>
+                        <div>
+                            <h3 class="text-sm font-semibold text-zinc-200">Видео форматы</h3>
+                            <p class="text-xs text-zinc-500">23 формата</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap gap-1.5">
+                        <span class="px-2 py-1 bg-purple-500/8 text-purple-300/80 text-[11px] rounded font-mono border border-purple-500/10">mp4</span>
+                        <span class="px-2 py-1 bg-purple-500/8 text-purple-300/80 text-[11px] rounded font-mono border border-purple-500/10">mkv</span>
+                        <span class="px-2 py-1 bg-purple-500/8 text-purple-300/80 text-[11px] rounded font-mono border border-purple-500/10">webm</span>
+                        <span class="px-2 py-1 bg-purple-500/8 text-purple-300/80 text-[11px] rounded font-mono border border-purple-500/10">avi</span>
+                        <span class="px-2 py-1 bg-purple-500/8 text-purple-300/80 text-[11px] rounded font-mono border border-purple-500/10">mov</span>
+                        <span class="px-2 py-1 bg-purple-500/8 text-purple-300/80 text-[11px] rounded font-mono border border-purple-500/10">gif</span>
+                        <span class="px-2 py-1 bg-purple-500/8 text-purple-300/80 text-[11px] rounded font-mono border border-purple-500/10">m4v</span>
+                        <span class="px-2 py-1 bg-purple-500/8 text-purple-300/80 text-[11px] rounded font-mono border border-purple-500/10">flv</span>
+                        <span class="px-2 py-1 bg-purple-500/8 text-purple-300/80 text-[11px] rounded font-mono border border-purple-500/10">wmv</span>
+                        <span class="px-2 py-1 bg-purple-500/8 text-purple-300/80 text-[11px] rounded font-mono border border-purple-500/10">mpg</span>
+                        <span class="px-2 py-1 bg-purple-500/8 text-purple-300/80 text-[11px] rounded font-mono border border-purple-500/10">ts</span>
+                        <span class="px-2 py-1 bg-purple-500/8 text-purple-300/80 text-[11px] rounded font-mono border border-purple-500/10">ogv</span>
+                        <span class="px-2 py-1 bg-purple-500/8 text-purple-300/80 text-[11px] rounded font-mono border border-purple-500/10">3gp</span>
+                        <span class="px-2 py-1 bg-purple-500/8 text-purple-300/80 text-[11px] rounded font-mono border border-purple-500/10">mxf</span>
+                        <span class="px-2 py-1 bg-purple-500/8 text-purple-300/80 text-[11px] rounded font-mono border border-purple-500/10">m2ts</span>
+                        <span class="px-2 py-1 bg-purple-500/8 text-purple-300/80 text-[11px] rounded font-mono border border-purple-500/10">f4v</span>
+                        <span class="px-2 py-1 bg-purple-500/8 text-purple-300/80 text-[11px] rounded font-mono border border-purple-500/10">vob</span>
+                        <span class="px-2 py-1 bg-purple-500/8 text-purple-300/80 text-[11px] rounded font-mono border border-purple-500/10">rm</span>
+                        <span class="px-2 py-1 bg-purple-500/8 text-purple-300/80 text-[11px] rounded font-mono border border-purple-500/10">divx</span>
+                        <span class="px-2 py-1 bg-purple-500/8 text-purple-300/80 text-[11px] rounded font-mono border border-purple-500/10">nut</span>
+                        <span class="px-2 py-1 bg-purple-500/8 text-purple-300/80 text-[11px] rounded font-mono border border-purple-500/10">y4m</span>
+                        <span class="px-2 py-1 bg-purple-500/8 text-purple-300/80 text-[11px] rounded font-mono border border-purple-500/10">dv</span>
+                        <span class="px-2 py-1 bg-purple-500/8 text-purple-300/80 text-[11px] rounded font-mono border border-purple-500/10">mpeg</span>
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-center text-xs text-zinc-600 mt-6">Обработка медиафайлов на базе FFmpeg — де-факто стандарт индустрии</p>
+        </div>
+    </section>
+
+    <!-- ===== TECH STACK ===== -->
+    <section id="tech" class="py-24 px-6 relative border-t border-white/[0.06]">
+        <div class="max-w-6xl mx-auto">
+            <div class="text-center mb-16">
+                <p class="text-xs font-semibold uppercase tracking-widest text-violet-400 mb-3">Технологии</p>
+                <h2 class="text-3xl sm:text-4xl font-bold tracking-tight mb-4">Под капотом</h2>
+                <p class="text-zinc-500 max-w-xl mx-auto">Современный стек технологий. Быстрый бэкенд на Rust, легковесная оболочка Tauri, реактивный UI на Svelte 5.</p>
+            </div>
+
+            <!-- Architecture diagram -->
+            <div class="max-w-3xl mx-auto mb-16">
+                <div class="p-6 rounded-2xl bg-white/[0.02] border border-white/[0.06]">
+                    <div class="text-xs text-zinc-600 uppercase tracking-wider mb-4 font-semibold">Архитектура</div>
+                    <div class="flex flex-col sm:flex-row items-center gap-3 sm:gap-0 justify-between text-center">
+                        <div class="flex-1 p-4 rounded-xl bg-orange-500/[0.06] border border-orange-500/15">
+                            <div class="text-sm font-bold text-orange-400 mb-1">Frontend</div>
+                            <div class="text-[11px] text-zinc-500 font-mono">Svelte 5 + TypeScript</div>
+                            <div class="text-[10px] text-zinc-600">Tailwind CSS · Lucide Icons</div>
+                        </div>
+                        <div class="hidden sm:block text-zinc-700 px-2">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                        </div>
+                        <div class="sm:hidden text-zinc-700">
+                            <svg class="w-6 h-6 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                        </div>
+                        <div class="flex-1 p-4 rounded-xl bg-blue-500/[0.06] border border-blue-500/15">
+                            <div class="text-sm font-bold text-blue-400 mb-1">Tauri IPC</div>
+                            <div class="text-[11px] text-zinc-500 font-mono">WebView ↔ Rust</div>
+                            <div class="text-[10px] text-zinc-600">Типизированные команды</div>
+                        </div>
+                        <div class="hidden sm:block text-zinc-700 px-2">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                        </div>
+                        <div class="sm:hidden text-zinc-700">
+                            <svg class="w-6 h-6 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                        </div>
+                        <div class="flex-1 p-4 rounded-xl bg-red-500/[0.06] border border-red-500/15">
+                            <div class="text-sm font-bold text-red-400 mb-1">Backend</div>
+                            <div class="text-[11px] text-zinc-500 font-mono">Rust + FFmpeg</div>
+                            <div class="text-[10px] text-zinc-600">GPU · Codec Registry</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tech grid -->
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                <div class="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] text-center hover:border-white/[0.12] transition-colors">
+                    <div class="text-2xl mb-2">🦀</div>
+                    <div class="text-xs font-semibold text-zinc-300">Rust</div>
+                    <div class="text-[10px] text-zinc-600">Backend</div>
+                </div>
+                <div class="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] text-center hover:border-white/[0.12] transition-colors">
+                    <div class="text-2xl mb-2">⚡</div>
+                    <div class="text-xs font-semibold text-zinc-300">Tauri 2</div>
+                    <div class="text-[10px] text-zinc-600">Framework</div>
+                </div>
+                <div class="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] text-center hover:border-white/[0.12] transition-colors">
+                    <div class="text-2xl mb-2">🔥</div>
+                    <div class="text-xs font-semibold text-zinc-300">Svelte 5</div>
+                    <div class="text-[10px] text-zinc-600">UI</div>
+                </div>
+                <div class="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] text-center hover:border-white/[0.12] transition-colors">
+                    <div class="text-2xl mb-2">🎬</div>
+                    <div class="text-xs font-semibold text-zinc-300">FFmpeg</div>
+                    <div class="text-[10px] text-zinc-600">Engine</div>
+                </div>
+                <div class="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] text-center hover:border-white/[0.12] transition-colors">
+                    <div class="text-2xl mb-2">📘</div>
+                    <div class="text-xs font-semibold text-zinc-300">TypeScript</div>
+                    <div class="text-[10px] text-zinc-600">Types</div>
+                </div>
+                <div class="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] text-center hover:border-white/[0.12] transition-colors">
+                    <div class="text-2xl mb-2">🎨</div>
+                    <div class="text-xs font-semibold text-zinc-300">Tailwind</div>
+                    <div class="text-[10px] text-zinc-600">Styles</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== GPU SUPPORT ===== -->
+    <section class="py-24 px-6 relative border-t border-white/[0.06]">
+        <div class="max-w-6xl mx-auto">
+            <div class="text-center mb-16">
+                <p class="text-xs font-semibold uppercase tracking-widest text-yellow-400 mb-3">GPU Ускорение</p>
+                <h2 class="text-3xl sm:text-4xl font-bold tracking-tight mb-4">Используй всю мощность GPU</h2>
+                <p class="text-zinc-500 max-w-xl mx-auto">Автоматическое определение и тестирование GPU-энкодеров. Если GPU доступен — он будет использован.</p>
+            </div>
+
+            <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="p-5 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-green-500/20 transition-colors">
+                    <div class="text-lg font-bold text-green-400 mb-1">NVIDIA</div>
+                    <div class="text-xs text-zinc-500 mb-3">NVENC</div>
+                    <div class="space-y-1.5 text-[11px] font-mono text-zinc-400">
+                        <div>H.264 · <span class="text-zinc-600">h264_nvenc</span></div>
+                        <div>HEVC · <span class="text-zinc-600">hevc_nvenc</span></div>
+                        <div>AV1 · <span class="text-zinc-600">av1_nvenc</span></div>
+                    </div>
+                </div>
+                <div class="p-5 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-blue-500/20 transition-colors">
+                    <div class="text-lg font-bold text-blue-400 mb-1">Intel</div>
+                    <div class="text-xs text-zinc-500 mb-3">Quick Sync Video</div>
+                    <div class="space-y-1.5 text-[11px] font-mono text-zinc-400">
+                        <div>H.264 · <span class="text-zinc-600">h264_qsv</span></div>
+                        <div>HEVC · <span class="text-zinc-600">hevc_qsv</span></div>
+                        <div>VP9 · <span class="text-zinc-600">vp9_qsv</span></div>
+                        <div>AV1 · <span class="text-zinc-600">av1_qsv</span></div>
+                    </div>
+                </div>
+                <div class="p-5 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-red-500/20 transition-colors">
+                    <div class="text-lg font-bold text-red-400 mb-1">AMD</div>
+                    <div class="text-xs text-zinc-500 mb-3">AMF</div>
+                    <div class="space-y-1.5 text-[11px] font-mono text-zinc-400">
+                        <div>H.264 · <span class="text-zinc-600">h264_amf</span></div>
+                        <div>HEVC · <span class="text-zinc-600">hevc_amf</span></div>
+                        <div>AV1 · <span class="text-zinc-600">av1_amf</span></div>
+                    </div>
+                </div>
+                <div class="p-5 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-zinc-400/20 transition-colors">
+                    <div class="text-lg font-bold text-zinc-300 mb-1">Apple</div>
+                    <div class="text-xs text-zinc-500 mb-3">VideoToolbox</div>
+                    <div class="space-y-1.5 text-[11px] font-mono text-zinc-400">
+                        <div>H.264 · <span class="text-zinc-600">h264_vt</span></div>
+                        <div>HEVC · <span class="text-zinc-600">hevc_vt</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== DOWNLOAD ===== -->
+    <section id="download" class="py-24 px-6 relative border-t border-white/[0.06]">
+        <div class="absolute inset-0 pointer-events-none">
+            <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-violet-600/[0.05] rounded-full blur-[120px]"></div>
+        </div>
+
+        <div class="max-w-3xl mx-auto relative z-10">
+            <div class="text-center mb-12">
+                <p class="text-xs font-semibold uppercase tracking-widest text-violet-400 mb-3">Скачать</p>
+                <h2 class="text-3xl sm:text-4xl font-bold tracking-tight mb-4">Начните прямо сейчас</h2>
+                <p class="text-zinc-500">Бесплатно, без рекламы, без подписок. Навсегда.</p>
+            </div>
+
+            <!-- OS Tabs -->
+            <div class="flex justify-center gap-2 mb-8" id="osSelector">
+                <button data-os="windows" class="os-btn active px-5 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
+                    Windows
+                </button>
+                <button data-os="macos-intel" class="os-btn px-5 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+                    macOS
+                </button>
+                <button data-os="linux" class="os-btn px-5 py-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-2">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12.504 0c-.155 0-.315.008-.48.021-4.226.333-3.105 4.807-3.17 6.298-.076 1.092-.3 1.953-1.05 3.02-.885 1.051-2.127 2.75-2.716 4.521-.278.832-.41 1.684-.287 2.489a.424.424 0 00-.11.135c-.26.268-.45.6-.663.839-.199.199-.485.267-.797.4-.313.136-.658.269-.864.68-.09.189-.136.394-.132.602 0 .199.027.4.055.536.058.399.116.728.04.97-.249.68-.28 1.145-.106 1.484.174.334.535.47.94.601.81.2 1.91.135 2.774.6.926.466 1.866.67 2.616.47.526-.116.97-.464 1.208-.946.587-.003 1.23-.269 2.26-.334.699-.058 1.574.267 2.577.2.025.134.063.198.114.333l.003.003c.391.778 1.113 1.132 1.884 1.071.771-.06 1.592-.536 2.257-1.306.631-.765 1.683-1.084 2.378-1.503.348-.199.629-.469.649-.853.023-.4-.2-.811-.714-1.376v-.097l-.003-.003c-.17-.2-.25-.535-.338-.926-.085-.401-.182-.786-.492-1.046h-.003c-.059-.054-.123-.067-.188-.135a.357.357 0 00-.19-.064c.431-1.278.264-2.55-.173-3.694-.533-1.41-1.465-2.638-2.175-3.483-.796-1.005-1.576-1.957-1.56-3.368.026-2.152.236-6.133-3.544-6.139z"/></svg>
+                    Linux
+                </button>
+            </div>
+
+            <!-- Download panels -->
+            <div id="downloadOptions">
+                <!-- Windows -->
+                <div id="download-windows" class="download-panel p-6 rounded-2xl bg-white/[0.02] border border-white/[0.06]">
+                    <div class="grid sm:grid-cols-2 gap-3 mb-4">
+                        <a href="#" data-download="windows-installer" class="group flex items-center gap-4 p-4 rounded-xl bg-white/[0.03] border border-white/[0.08] hover:border-violet-500/30 transition-all">
+                            <div class="w-10 h-10 rounded-lg bg-violet-500/10 flex items-center justify-center shrink-0">
+                                <svg class="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                            </div>
+                            <div>
+                                <div class="text-sm font-semibold text-zinc-200 group-hover:text-violet-300 transition-colors">Установщик .msi</div>
+                                <div class="text-xs text-zinc-500">Рекомендуется</div>
+                            </div>
+                        </a>
+                        <a href="#" data-download="windows-portable" class="group flex items-center gap-4 p-4 rounded-xl bg-white/[0.03] border border-white/[0.08] hover:border-violet-500/30 transition-all">
+                            <div class="w-10 h-10 rounded-lg bg-zinc-500/10 flex items-center justify-center shrink-0">
+                                <svg class="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/></svg>
+                            </div>
+                            <div>
+                                <div class="text-sm font-semibold text-zinc-200 group-hover:text-violet-300 transition-colors">Portable .exe</div>
+                                <div class="text-xs text-zinc-500">Без установки</div>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="flex items-center justify-between pt-3 border-t border-white/[0.06] text-xs text-zinc-600">
+                        <span>Windows 10+ (x64)</span>
+                        <a href="#" data-download="windows-ffmpeg" class="text-zinc-500 hover:text-violet-400 transition-colors">FFmpeg бинарники →</a>
+                    </div>
+                </div>
+
+                <!-- macOS Intel -->
+                <div id="download-macos-intel" class="download-panel hidden p-6 rounded-2xl bg-white/[0.02] border border-white/[0.06]">
+                    <div class="grid sm:grid-cols-2 gap-3 mb-4">
+                        <a href="#" data-download="macos-intel" class="group flex items-center gap-4 p-4 rounded-xl bg-white/[0.03] border border-white/[0.08] hover:border-violet-500/30 transition-all">
+                            <div class="w-10 h-10 rounded-lg bg-violet-500/10 flex items-center justify-center shrink-0">
+                                <svg class="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                            </div>
+                            <div>
+                                <div class="text-sm font-semibold text-zinc-200 group-hover:text-violet-300 transition-colors">macOS Intel .dmg</div>
+                                <div class="text-xs text-zinc-500">Для Mac с процессором Intel</div>
+                            </div>
+                        </a>
+                        <a href="#" data-download="macos-silicon" class="group flex items-center gap-4 p-4 rounded-xl bg-white/[0.03] border border-white/[0.08] hover:border-violet-500/30 transition-all">
+                            <div class="w-10 h-10 rounded-lg bg-violet-500/10 flex items-center justify-center shrink-0">
+                                <svg class="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                            </div>
+                            <div>
+                                <div class="text-sm font-semibold text-zinc-200 group-hover:text-violet-300 transition-colors">macOS Apple Silicon .dmg</div>
+                                <div class="text-xs text-zinc-500">M1 / M2 / M3 / M4</div>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="flex items-center justify-between pt-3 border-t border-white/[0.06] text-xs text-zinc-600">
+                        <span>macOS 10.15+ (Catalina)</span>
+                        <a href="#" data-download="macos-intel-ffmpeg" class="text-zinc-500 hover:text-violet-400 transition-colors">FFmpeg бинарники →</a>
+                    </div>
+                </div>
+
+                <!-- Linux -->
+                <div id="download-linux" class="download-panel hidden p-6 rounded-2xl bg-white/[0.02] border border-white/[0.06]">
+                    <a href="#" data-download="linux-deb" class="group flex items-center gap-4 p-4 rounded-xl bg-white/[0.03] border border-white/[0.08] hover:border-violet-500/30 transition-all mb-4">
+                        <div class="w-10 h-10 rounded-lg bg-violet-500/10 flex items-center justify-center shrink-0">
+                            <svg class="w-5 h-5 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        </div>
+                        <div>
+                            <div class="text-sm font-semibold text-zinc-200 group-hover:text-violet-300 transition-colors">Linux .deb</div>
+                            <div class="text-xs text-zinc-500">Debian / Ubuntu</div>
+                        </div>
+                    </a>
+                    <div class="flex items-center justify-between pt-3 border-t border-white/[0.06] text-xs text-zinc-600">
+                        <span>Linux x64</span>
+                        <a href="#" data-download="linux-ffmpeg" class="text-zinc-500 hover:text-violet-400 transition-colors">FFmpeg бинарники →</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-center mt-6">
+                <a href="https://github.com/MuXolotl/MuXolotl-Converter/releases" target="_blank" rel="noopener noreferrer" class="text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Все релизы на GitHub →</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== OPEN SOURCE CTA ===== -->
+    <section class="py-24 px-6 border-t border-white/[0.06]">
+        <div class="max-w-3xl mx-auto text-center">
+            <div class="text-5xl mb-6">🦎</div>
+            <h2 class="text-3xl sm:text-4xl font-bold tracking-tight mb-4">Открытый исходный код</h2>
+            <p class="text-zinc-500 max-w-lg mx-auto mb-8">MuXolotl-Converter — полностью открытый проект. Исходный код доступен на GitHub. Принимаем баг-репорты, фичи-реквесты и pull request'ы.</p>
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <a href="https://github.com/MuXolotl/MuXolotl-Converter" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-6 py-3 bg-white/[0.05] border border-white/[0.1] hover:border-white/[0.2] rounded-xl text-sm font-medium text-zinc-300 hover:text-white transition-all">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                    Репозиторий на GitHub
+                </a>
+                <a href="https://github.com/MuXolotl/MuXolotl-Converter/issues/new" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 px-6 py-3 text-sm text-zinc-500 hover:text-zinc-300 transition-colors">
+                    Сообщить о баге →
+                </a>
+            </div>
+            <div class="mt-8 text-xs text-zinc-600">
+                Лицензия: GPL v2 / LGPL v2.1
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== FOOTER ===== -->
+    <footer class="border-t border-white/[0.06] py-8 px-6">
+        <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-2 text-sm text-zinc-600">
+                <span>🦎</span>
+                <span>© 2025 MuXolotl. Open Source.</span>
+            </div>
+            <div class="flex items-center gap-6 text-xs text-zinc-600">
+                <a href="https://github.com/MuXolotl/MuXolotl-Converter" target="_blank" rel="noopener noreferrer" class="hover:text-zinc-400 transition-colors">GitHub</a>
+                <a href="https://github.com/MuXolotl/MuXolotl-Converter/releases" target="_blank" rel="noopener noreferrer" class="hover:text-zinc-400 transition-colors">Релизы</a>
+                <a href="https://github.com/MuXolotl/MuXolotl-Converter/issues" target="_blank" rel="noopener noreferrer" class="hover:text-zinc-400 transition-colors">Issues</a>
+                <a href="/cdn-cgi/l/email-protection#c3aeb6bbacafacb7af83a4aea2aaafeda0acae" class="hover:text-zinc-400 transition-colors">Контакт</a>
+            </div>
+        </div>
+    </footer>
+
+    <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script src="js/main.js"></script>
+</body>
+</html>

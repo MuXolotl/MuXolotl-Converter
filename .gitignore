@@ -1,7 +1,6 @@
 # ===== Tauri =====
 src-tauri/target/
 src-tauri/gen/
-src-tauri/Cargo.lock
 
 # FFmpeg binaries (downloaded in CI, not committed)
 src-tauri/binaries/ffmpeg-*
@@ -36,7 +35,7 @@ Thumbs.db
 Thumbs.db?
 ehthumbs.db
 Desktop.ini
- $RECYCLE.BIN/
+$RECYCLE.BIN/
 
 # ===== Editor / IDE =====
 .vscode/*
