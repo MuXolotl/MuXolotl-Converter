@@ -61,6 +61,12 @@ html {
     font-family: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
 }
 
+/* ===== Scroll indicator bounce ===== */
+@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(4px); }
+}
+
 /* ===== Download links availability (set by JS) ===== */
 a[data-download][data-ready="false"] {
     opacity: 0.55;
@@ -84,21 +90,4 @@ a[data-download][data-ready="false"] {
 
 ::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.15);
-}
-
-/* ===== Accessibility: Reduce motion ===== */
-@media (prefers-reduced-motion: reduce) {
-    html {
-        scroll-behavior: auto;
-    }
-
-    .js-reveal {
-        transition: none !important;
-        transform: none !important;
-    }
-
-    .animate-bounce,
-    .animate-pulse {
-        animation: none !important;
-    }
 }
